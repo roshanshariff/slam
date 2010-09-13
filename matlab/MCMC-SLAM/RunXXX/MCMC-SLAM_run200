@@ -1,0 +1,50 @@
+Runnning on generateCircleMap(50)
+MCMC iteration per step : 150
+landmark average sqL2 error :  5.33402
+state average sqL2 error :  2.33791
+Elapsed time :  2359.94 seconds
+Runnning on generateCircleMap(50)
+MCMC iteration per step : 150
+landmark average sqL2 error :  16.8145
+state average sqL2 error :  8.25891
+Elapsed time :  2429.88 seconds
+Runnning on generateCircleMap(50)
+MCMC iteration per step : 150
+landmark average sqL2 error : 0.244335
+state average sqL2 error : 0.957781
+Elapsed time :   2399.9 seconds
+Runnning on generateCircleMap(50)
+MCMC iteration per step : 150
+landmark average sqL2 error : 0.355762
+state average sqL2 error :  0.92168
+Elapsed time :  2609.01 seconds
+Runnning on generateCircleMap(50)
+MCMC iteration per step : 150
+landmark average sqL2 error :  6.00808
+state average sqL2 error :  2.39049
+Elapsed time :  2660.65 seconds
+Runnning on generateCircleMap(50)
+MCMC iteration per step : 150
+landmark average sqL2 error :  5.62071
+state average sqL2 error :  6.41122
+Elapsed time :  2991.87 seconds
+Runnning on generateCircleMap(50)
+MCMC iteration per step : 150
+landmark average sqL2 error :  17.6478
+state average sqL2 error :   16.337
+Elapsed time :  3206.75 seconds
+Runnning on generateCircleMap(50)
+MCMC iteration per step : 150
+landmark average sqL2 error :  47.5693
+state average sqL2 error :  26.7844
+Elapsed time :  2394.04 seconds
+Runnning on generateCircleMap(50)
+MCMC iteration per step : 150
+landmark average sqL2 error :  6.10053
+state average sqL2 error :  2.59182
+Elapsed time :  2508.06 seconds
+Runnning on generateCircleMap(50)
+MCMC iteration per step : 150
+landmark average sqL2 error :  26.3709
+state average sqL2 error :  22.3246
+Elapsed time :  2392.59 seconds

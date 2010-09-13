@@ -1,0 +1,633 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN">
+<html xmlns:mwsh="http://www.mathworks.com/namespace/mcode/v1/syntaxhighlight.dtd">
+   <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   
+      <!--
+This HTML is auto-generated from an M-file.
+To make changes, update the M-file and republish this document.
+      -->
+      <title>fastslam2r_sim</title>
+      <meta name="generator" content="MATLAB 7.6">
+      <meta name="date" content="2010-01-24">
+      <meta name="m-file" content="fastslam2r_sim"><style>
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000; 
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in 
+wide windows. */ 
+p,h1,h2,div.content div {
+  max-width: 600px;
+  /* Hack for IE6 */
+  width: auto !important; width: 600px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+} 
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head>
+   <body>
+      <div class="content"><pre class="codeinput"><span class="keyword">function</span> data= fastslam2_sim(lm, wp)
+<span class="comment">%function data= fastslam2_sim(lm, wp)</span>
+<span class="comment">%</span>
+<span class="comment">% INPUTS:</span>
+<span class="comment">%   lm - set of landmarks</span>
+<span class="comment">%   wp - set of waypoints</span>
+<span class="comment">%</span>
+<span class="comment">% OUTPUTS:</span>
+<span class="comment">%   data - set of particles representing final state</span>
+<span class="comment">%</span>
+<span class="comment">% NOTES:</span>
+<span class="comment">%   This program is a FastSLAM 2.0 simulator. To use, create a set of landmarks and</span>
+<span class="comment">%   vehicle waypoints (ie, waypoints for the desired vehicle path). The program</span>
+<span class="comment">%   'frontend.m' may be used to create this simulated environment - type</span>
+<span class="comment">%   'help frontend' for more information.</span>
+<span class="comment">%       The configuration of the simulator is managed by the script file</span>
+<span class="comment">%   'configfile.m'. To alter the parameters of the vehicle, sensors, etc</span>
+<span class="comment">%   adjust this file. There are also several switches that control certain</span>
+<span class="comment">%   filter options.</span>
+<span class="comment">%</span>
+<span class="comment">% Tim Bailey and Juan Nieto 2004.</span>
+<span class="comment">% Version 1.0</span>
+
+format <span class="string">compact</span>
+path(path, <span class="string">'../'</span>)
+configfile;
+wp = [[0;0], wp];
+
+<span class="keyword">if</span> SWITCH_PREDICT_NOISE, warning(<span class="string">'Sampling from predict noise usually OFF for FastSLAM 2.0'</span>), <span class="keyword">end</span>
+<span class="keyword">if</span> SWITCH_SAMPLE_PROPOSAL==0, warning(<span class="string">'Sampling from optimal proposal is usually ON for FastSLAM 2.0'</span>), <span class="keyword">end</span>
+
+h= setup_animations(lm,wp);
+veh= [0 -WHEELBASE -WHEELBASE; 0 -1 1];
+
+<span class="comment">% initialisations</span>
+particles= initialise_particles(NPARTICLES);
+xtrue= zeros(3,1);
+
+dt= DT_CONTROLS; <span class="comment">% change in time between predicts</span>
+dtsum= 0; <span class="comment">% change in time since last observation</span>
+ftag= 1:size(lm,2); <span class="comment">% identifier for each landmark</span>
+da_table= zeros(1,size(lm,2)); <span class="comment">% data association table</span>
+iwp= 1; <span class="comment">% index to first waypoint</span>
+G= 0; <span class="comment">% initial steer angle</span>
+plines=[];
+<span class="keyword">if</span> SWITCH_SEED_RANDOM ~= 0, rand(<span class="string">'state'</span>,SWITCH_SEED_RANDOM), randn(<span class="string">'state'</span>,SWITCH_SEED_RANDOM), <span class="keyword">end</span>
+
+Qe= Q; Re= R;
+<span class="keyword">if</span> SWITCH_INFLATE_NOISE==1, Qe= 2*Q; Re= 2*R; <span class="keyword">end</span>
+
+<span class="comment">%if SWITCH_PROFILE, profile on -detail builtin, end</span>
+
+<span class="comment">% main loop</span>
+iterNo = 0;
+lmErr = 0;
+stateErr = 0;
+truePath = [];
+<span class="keyword">while</span> iwp ~= 0 &amp;&amp; iterNo &lt; 1000
+    iterNo = iterNo + 1;
+    <span class="comment">% compute true data</span>
+    [G,iwp]= compute_steering(xtrue, wp, iwp, AT_WAYPOINT, G, RATEG, MAXG, dt);
+    <span class="keyword">if</span> iwp==0 &amp; NUMBER_LOOPS &gt; 1, iwp=1; NUMBER_LOOPS= NUMBER_LOOPS-1; <span class="keyword">end</span>
+    xtrue= predict_true(xtrue, V,G, WHEELBASE,dt);
+    truePath = [truePath, xtrue];
+
+    <span class="comment">% add process noise</span>
+    [Vn,Gn]= add_control_noise(V,G,Q, SWITCH_CONTROL_NOISE);
+
+    <span class="comment">% Predict step</span>
+    <span class="keyword">for</span> i=1:NPARTICLES
+        particles(i)= predict (particles(i), Vn,Gn,Qe, WHEELBASE,dt, SWITCH_PREDICT_NOISE);
+        particles(i)= observe_heading(particles(i), xtrue(3), SWITCH_HEADING_KNOWN); <span class="comment">% if heading known, observe heading</span>
+    <span class="keyword">end</span>
+
+    <span class="comment">% Observe step</span>
+    dtsum= dtsum + dt;
+    <span class="keyword">if</span> dtsum &gt;= DT_OBSERVE
+        dtsum= 0;
+
+        <span class="comment">% Compute true data, then add noise</span>
+        [z,ftag_visible]= get_observations(xtrue, lm, ftag, MAX_RANGE);
+        z= add_observation_noise(z,R, SWITCH_SENSOR_NOISE);
+        <span class="keyword">if</span> ~isempty(z), plines= make_laser_lines (z,xtrue); <span class="keyword">end</span>
+
+        <span class="comment">% Compute (known) data associations</span>
+        Nf= size(particles(1).xf,2);
+        [zf,idf,zn,da_table]= data_associate_known(z, ftag_visible, da_table, Nf);
+
+        <span class="comment">% Observe map features</span>
+        <span class="keyword">if</span> ~isempty(zf)
+
+            <span class="comment">% compute weights w = w * p(z_k | x_k-1)</span>
+            <span class="keyword">for</span> i=1:NPARTICLES
+                w= compute_weightr(particles(i), zf,idf, Re);
+                particles(i).w= particles(i).w * w;
+            <span class="keyword">end</span>
+
+            <span class="comment">% resampling *before* computing proposal permits better particle diversity</span>
+            particles= resample_particles(particles, NEFFECTIVE, SWITCH_RESAMPLE);
+
+            <span class="comment">% sample from "optimal" proposal distribution, then update map</span>
+            <span class="keyword">for</span> i=1:NPARTICLES
+                particles(i)= sample_proposal(particles(i), zf,idf, Re, SWITCH_SAMPLE_PROPOSAL);
+                particles(i)= feature_update(particles(i), zf, idf, Re);
+            <span class="keyword">end</span>
+        <span class="keyword">end</span>
+
+        <span class="comment">% Observe new features, augment map</span>
+        <span class="keyword">if</span> ~isempty(zn)
+            <span class="keyword">for</span> i=1:NPARTICLES
+                <span class="keyword">if</span> isempty(zf) <span class="comment">% sample from proposal distribution (if we have not already done so above)</span>
+                    particles(i).xv= multivariate_gauss(particles(i).xv, particles(i).Pv, 1);
+                    particles(i).Pv= zeros(3);
+                <span class="keyword">end</span>
+                particles(i)= add_feature(particles(i), zn,Re);
+            <span class="keyword">end</span>
+        <span class="keyword">end</span>
+
+
+
+
+
+        [stateCoordinates, featureCoordinates, featureIdx] = getAllSLAMstates( particles, da_table );
+        seenLM = zeros(2,size(featureCoordinates,2));
+        <span class="keyword">for</span> i=1:size(featureCoordinates,2)
+            seenLM(:,i) = lm(:,featureIdx(i));
+        <span class="keyword">end</span>
+        dTheta = getBestRotation( featureCoordinates, seenLM );
+        RR = getRotationMatrix( dTheta );
+        featureCoordinatesR = featureCoordinates;
+        <span class="keyword">for</span> i=1:size(featureCoordinates,2)
+            featureCoordinatesR(1:2,i) = RR*featureCoordinates(1:2,i);
+        <span class="keyword">end</span>
+        stateCoordinatesR = stateCoordinates;
+        <span class="keyword">for</span> i=1:size(stateCoordinates,2)
+            stateCoordinatesR(1:2,i) = RR*stateCoordinates(1:2,i);
+        <span class="keyword">end</span>
+        <span class="keyword">if</span> mod(iterNo,30) == 2
+            figure(111)
+            plot(lm(1,:),lm(2,:),<span class="string">'k*'</span>)
+            axis([-125 110 -100 100])
+            xlim([-125 110])
+            ylim([-100 100])
+            hold <span class="string">on</span>, <span class="comment">%axis equal</span>
+            plot(wp(1,:),wp(2,:), wp(1,:),wp(2,:),<span class="string">'b'</span>, <span class="string">'LineWidth'</span>, 2)
+            plot(featureCoordinatesR(1,:),featureCoordinatesR(2,:),<span class="string">'ro'</span>,<span class="string">'LineWidth'</span>,2,<span class="string">'markersize'</span>, 6, <span class="string">'erasemode'</span>,<span class="string">'background'</span>); <span class="comment">% estimated features</span>
+            plot(stateCoordinatesR(1,:),stateCoordinatesR(2,:),stateCoordinatesR(1,:),stateCoordinatesR(2,:),<span class="string">'k'</span>,<span class="string">'LineWidth'</span>,5,<span class="string">'erasemode'</span>,<span class="string">'background'</span>); <span class="comment">% vehicle path estimate</span>
+            plot(truePath(1,:),truePath(2,:),truePath(1,:),truePath(2,:),<span class="string">'g'</span>,<span class="string">'LineWidth'</span>,2,<span class="string">'erasemode'</span>,<span class="string">'background'</span>); <span class="comment">% vehicle path estimate</span>
+        <span class="keyword">end</span>
+
+        lmErr = 0;
+        <span class="keyword">for</span> i=1:size(featureCoordinatesR,2)
+            e = featureCoordinatesR(1:2,i) - seenLM(1:2,i);
+            lmErr = lmErr + e'*e;
+        <span class="keyword">end</span>
+        lmErr = lmErr/size(featureCoordinatesR,2);
+
+        stateErr = 0;
+        <span class="keyword">for</span> i=1:size(stateCoordinatesR,2)
+            e = stateCoordinatesR(1:2,i) - truePath(1:2,i);
+            stateErr = stateErr + e'*e;
+        <span class="keyword">end</span>
+        stateErr = stateErr/size(stateCoordinatesR,2);
+
+
+
+
+
+
+
+
+
+    <span class="keyword">end</span>
+
+    <span class="comment">% plots</span>
+    do_plot(h, particles, xtrue, plines, veh)
+<span class="keyword">end</span>
+
+<span class="comment">%if SWITCH_PROFILE, profile report, end</span>
+
+data= particles;
+NPARTICLES
+lmErr
+stateErr
+
+<span class="comment">%</span>
+<span class="comment">%</span>
+
+<span class="keyword">function</span> p= make_laser_lines (rb,xv)
+<span class="keyword">if</span> isempty(rb), p=[]; <span class="keyword">return</span>, <span class="keyword">end</span>
+len= size(rb,2);
+lnes(1,:)= zeros(1,len)+ xv(1);
+lnes(2,:)= zeros(1,len)+ xv(2);
+lnes(3:4,:)= transformtoglobal([rb(1,:).*cos(rb(2,:)); rb(1,:).*sin(rb(2,:))], xv);
+p= line_plot_conversion (lnes);
+
+<span class="keyword">function</span> p= initialise_particles(np)
+<span class="keyword">for</span> i=1:np
+    p(i).w= 1/np;
+    p(i).xv= [0;0;0];
+    p(i).Pv= zeros(3);
+    p(i).xf= [];
+    p(i).Pf= [];
+    p(i).da= [];
+<span class="keyword">end</span>
+
+<span class="keyword">function</span> p= make_covariance_ellipses(particle)
+N= 10;
+inc= 2*pi/N;
+phi= 0:inc:2*pi;
+circ= 2*[cos(phi); sin(phi)];
+
+p= make_ellipse(particle.xv(1:2), particle.Pv(1:2,1:2) + eye(2)*eps, circ);
+
+lenf= size(particle.xf,2);
+<span class="keyword">if</span> lenf &gt; 0
+
+    xf= particle.xf;
+    Pf= particle.Pf;
+    p= [p zeros(2, lenf*(N+2))];
+
+    ctr= N+3;
+    <span class="keyword">for</span> i=1:lenf
+        ii= ctr:(ctr+N+1);
+        p(:,ii)= make_ellipse(xf(:,i), Pf(:,:,i), circ);
+        ctr= ctr+N+2;
+    <span class="keyword">end</span>
+<span class="keyword">end</span>
+
+<span class="keyword">function</span> p= make_ellipse(x,P,circ)
+<span class="comment">% make a single 2-D ellipse</span>
+r= sqrtm_2by2(P);
+a= r*circ;
+p(2,:)= [a(2,:)+x(2) NaN];
+p(1,:)= [a(1,:)+x(1) NaN];
+
+<span class="comment">%</span>
+<span class="comment">%</span>
+
+<span class="keyword">function</span> h= setup_animations(lm,wp)
+figure
+plot(lm(1,:),lm(2,:),<span class="string">'g*'</span>)
+hold <span class="string">on</span>, axis <span class="string">equal</span>
+plot(wp(1,:),wp(2,:), wp(1,:),wp(2,:),<span class="string">'ro'</span>)
+
+h.xt= patch(0,0,<span class="string">'g'</span>,<span class="string">'erasemode'</span>,<span class="string">'xor'</span>); <span class="comment">% vehicle true</span>
+h.xm= patch(0,0,<span class="string">'r'</span>,<span class="string">'erasemode'</span>,<span class="string">'xor'</span>); <span class="comment">% mean vehicle estimate</span>
+h.obs= plot(0,0,<span class="string">'y'</span>,<span class="string">'erasemode'</span>,<span class="string">'xor'</span>); <span class="comment">% observations</span>
+h.xfp= plot(0,0,<span class="string">'r.'</span>,<span class="string">'erasemode'</span>,<span class="string">'background'</span>); <span class="comment">% estimated features (particle means)</span>
+h.xvp= plot(0,0,<span class="string">'r.'</span>,<span class="string">'erasemode'</span>,<span class="string">'xor'</span>); <span class="comment">% estimated vehicle (particles)</span>
+h.cov= plot(0,0,<span class="string">'erasemode'</span>,<span class="string">'xor'</span>); <span class="comment">% covariances of max weight particle</span>
+
+
+<span class="keyword">function</span> do_plot(h, particles, xtrue, plines, veh)
+
+xvp = [particles.xv];
+xfp = [particles.xf];
+w = [particles.w];
+
+ii= find(w== max(w));
+xvmax= xvp(:,ii);
+
+xt= transformtoglobal(veh,xtrue);
+<span class="comment">%xm= transformtoglobal(veh,xvmax);</span>
+set(h.xt, <span class="string">'xdata'</span>, xt(1,:), <span class="string">'ydata'</span>, xt(2,:))
+<span class="comment">%set(h.xm, 'xdata', xm(1,:), 'ydata', xm(2,:))</span>
+set(h.xvp, <span class="string">'xdata'</span>, xvp(1,:), <span class="string">'ydata'</span>, xvp(2,:))
+<span class="keyword">if</span> ~isempty(xfp), set(h.xfp, <span class="string">'xdata'</span>, xfp(1,:), <span class="string">'ydata'</span>, xfp(2,:)), <span class="keyword">end</span>
+<span class="keyword">if</span> ~isempty(plines), set(h.obs, <span class="string">'xdata'</span>, plines(1,:), <span class="string">'ydata'</span>, plines(2,:)), <span class="keyword">end</span>
+pcov= make_covariance_ellipses(particles(ii(1)));
+<span class="keyword">if</span> ~isempty(pcov), set(h.cov, <span class="string">'xdata'</span>, pcov(1,:), <span class="string">'ydata'</span>, pcov(2,:)); <span class="keyword">end</span>
+
+drawnow
+</pre><pre class="codeoutput">Input argument "wp" is undefined.
+
+Error in ==&gt; fastslam2r_sim at 27
+wp = [[0;0], wp];
+
+</pre><p class="footer"><br>
+            Published with MATLAB&reg; 7.6<br></p>
+      </div>
+      <!--
+##### SOURCE BEGIN #####
+function data= fastslam2_sim(lm, wp)
+%function data= fastslam2_sim(lm, wp)
+%
+% INPUTS: 
+%   lm - set of landmarks
+%   wp - set of waypoints
+%
+% OUTPUTS:
+%   data - set of particles representing final state
+%
+% NOTES:
+%   This program is a FastSLAM 2.0 simulator. To use, create a set of landmarks and 
+%   vehicle waypoints (ie, waypoints for the desired vehicle path). The program
+%   'frontend.m' may be used to create this simulated environment - type
+%   'help frontend' for more information.
+%       The configuration of the simulator is managed by the script file
+%   'configfile.m'. To alter the parameters of the vehicle, sensors, etc
+%   adjust this file. There are also several switches that control certain
+%   filter options.
+%
+% Tim Bailey and Juan Nieto 2004.
+% Version 1.0
+
+format compact
+path(path, '../')
+configfile;
+wp = [[0;0], wp];
+
+if SWITCH_PREDICT_NOISE, warning('Sampling from predict noise usually OFF for FastSLAM 2.0'), end
+if SWITCH_SAMPLE_PROPOSAL==0, warning('Sampling from optimal proposal is usually ON for FastSLAM 2.0'), end
+
+h= setup_animations(lm,wp);
+veh= [0 -WHEELBASE -WHEELBASE; 0 -1 1];
+
+% initialisations
+particles= initialise_particles(NPARTICLES);
+xtrue= zeros(3,1);
+
+dt= DT_CONTROLS; % change in time between predicts
+dtsum= 0; % change in time since last observation
+ftag= 1:size(lm,2); % identifier for each landmark
+da_table= zeros(1,size(lm,2)); % data association table 
+iwp= 1; % index to first waypoint 
+G= 0; % initial steer angle
+plines=[];
+if SWITCH_SEED_RANDOM ~= 0, rand('state',SWITCH_SEED_RANDOM), randn('state',SWITCH_SEED_RANDOM), end
+
+Qe= Q; Re= R;
+if SWITCH_INFLATE_NOISE==1, Qe= 2*Q; Re= 2*R; end
+
+%if SWITCH_PROFILE, profile on -detail builtin, end
+
+% main loop 
+iterNo = 0;
+lmErr = 0;
+stateErr = 0;
+truePath = [];
+while iwp ~= 0 && iterNo < 1000
+    iterNo = iterNo + 1;
+    % compute true data
+    [G,iwp]= compute_steering(xtrue, wp, iwp, AT_WAYPOINT, G, RATEG, MAXG, dt);
+    if iwp==0 & NUMBER_LOOPS > 1, iwp=1; NUMBER_LOOPS= NUMBER_LOOPS-1; end
+    xtrue= predict_true(xtrue, V,G, WHEELBASE,dt);
+    truePath = [truePath, xtrue];    
+    
+    % add process noise
+    [Vn,Gn]= add_control_noise(V,G,Q, SWITCH_CONTROL_NOISE);
+    
+    % Predict step
+    for i=1:NPARTICLES
+        particles(i)= predict (particles(i), Vn,Gn,Qe, WHEELBASE,dt, SWITCH_PREDICT_NOISE);
+        particles(i)= observe_heading(particles(i), xtrue(3), SWITCH_HEADING_KNOWN); % if heading known, observe heading
+    end
+    
+    % Observe step
+    dtsum= dtsum + dt;
+    if dtsum >= DT_OBSERVE
+        dtsum= 0;
+        
+        % Compute true data, then add noise
+        [z,ftag_visible]= get_observations(xtrue, lm, ftag, MAX_RANGE);
+        z= add_observation_noise(z,R, SWITCH_SENSOR_NOISE);
+        if ~isempty(z), plines= make_laser_lines (z,xtrue); end
+        
+        % Compute (known) data associations
+        Nf= size(particles(1).xf,2);
+        [zf,idf,zn,da_table]= data_associate_known(z, ftag_visible, da_table, Nf);
+        
+        % Observe map features
+        if ~isempty(zf) 
+            
+            % compute weights w = w * p(z_k | x_k-1)
+            for i=1:NPARTICLES
+                w= compute_weightr(particles(i), zf,idf, Re);
+                particles(i).w= particles(i).w * w;
+            end
+            
+            % resampling *before* computing proposal permits better particle diversity
+            particles= resample_particles(particles, NEFFECTIVE, SWITCH_RESAMPLE);            
+            
+            % sample from "optimal" proposal distribution, then update map 
+            for i=1:NPARTICLES
+                particles(i)= sample_proposal(particles(i), zf,idf, Re, SWITCH_SAMPLE_PROPOSAL); 
+                particles(i)= feature_update(particles(i), zf, idf, Re);
+            end
+        end
+        
+        % Observe new features, augment map
+        if ~isempty(zn)
+            for i=1:NPARTICLES
+                if isempty(zf) % sample from proposal distribution (if we have not already done so above)
+                    particles(i).xv= multivariate_gauss(particles(i).xv, particles(i).Pv, 1);
+                    particles(i).Pv= zeros(3);
+                end                        
+                particles(i)= add_feature(particles(i), zn,Re);
+            end
+        end
+        
+
+        
+        
+      
+        [stateCoordinates, featureCoordinates, featureIdx] = getAllSLAMstates( particles, da_table );        
+        seenLM = zeros(2,size(featureCoordinates,2));
+        for i=1:size(featureCoordinates,2)
+            seenLM(:,i) = lm(:,featureIdx(i));
+        end
+        dTheta = getBestRotation( featureCoordinates, seenLM );
+        RR = getRotationMatrix( dTheta );
+        featureCoordinatesR = featureCoordinates;
+        for i=1:size(featureCoordinates,2)
+            featureCoordinatesR(1:2,i) = RR*featureCoordinates(1:2,i);
+        end
+        stateCoordinatesR = stateCoordinates;
+        for i=1:size(stateCoordinates,2)
+            stateCoordinatesR(1:2,i) = RR*stateCoordinates(1:2,i);
+        end
+        if mod(iterNo,30) == 2 
+            figure(111)
+            plot(lm(1,:),lm(2,:),'k*')
+            axis([-125 110 -100 100])
+            xlim([-125 110])
+            ylim([-100 100])
+            hold on, %axis equal
+            plot(wp(1,:),wp(2,:), wp(1,:),wp(2,:),'b', 'LineWidth', 2)
+            plot(featureCoordinatesR(1,:),featureCoordinatesR(2,:),'ro','LineWidth',2,'markersize', 6, 'erasemode','background'); % estimated features 
+            plot(stateCoordinatesR(1,:),stateCoordinatesR(2,:),stateCoordinatesR(1,:),stateCoordinatesR(2,:),'k','LineWidth',5,'erasemode','background'); % vehicle path estimate
+            plot(truePath(1,:),truePath(2,:),truePath(1,:),truePath(2,:),'g','LineWidth',2,'erasemode','background'); % vehicle path estimate
+        end
+        
+        lmErr = 0;
+        for i=1:size(featureCoordinatesR,2)
+            e = featureCoordinatesR(1:2,i) - seenLM(1:2,i);
+            lmErr = lmErr + e'*e;
+        end
+        lmErr = lmErr/size(featureCoordinatesR,2);
+        
+        stateErr = 0;
+        for i=1:size(stateCoordinatesR,2)
+            e = stateCoordinatesR(1:2,i) - truePath(1:2,i);
+            stateErr = stateErr + e'*e;
+        end
+        stateErr = stateErr/size(stateCoordinatesR,2);
+        
+        
+        
+        
+        
+        
+        
+        
+        
+    end
+    
+    % plots
+    do_plot(h, particles, xtrue, plines, veh)
+end
+
+%if SWITCH_PROFILE, profile report, end
+
+data= particles;
+NPARTICLES
+lmErr
+stateErr
+
+% 
+%
+
+function p= make_laser_lines (rb,xv)
+if isempty(rb), p=[]; return, end
+len= size(rb,2);
+lnes(1,:)= zeros(1,len)+ xv(1);
+lnes(2,:)= zeros(1,len)+ xv(2);
+lnes(3:4,:)= transformtoglobal([rb(1,:).*cos(rb(2,:)); rb(1,:).*sin(rb(2,:))], xv);
+p= line_plot_conversion (lnes);
+
+function p= initialise_particles(np)
+for i=1:np
+    p(i).w= 1/np;
+    p(i).xv= [0;0;0];
+    p(i).Pv= zeros(3);
+    p(i).xf= [];
+    p(i).Pf= [];
+    p(i).da= [];
+end
+
+function p= make_covariance_ellipses(particle)
+N= 10;
+inc= 2*pi/N;
+phi= 0:inc:2*pi;
+circ= 2*[cos(phi); sin(phi)];
+
+p= make_ellipse(particle.xv(1:2), particle.Pv(1:2,1:2) + eye(2)*eps, circ);
+
+lenf= size(particle.xf,2);
+if lenf > 0
+    
+    xf= particle.xf;
+    Pf= particle.Pf;
+    p= [p zeros(2, lenf*(N+2))];
+
+    ctr= N+3;
+    for i=1:lenf
+        ii= ctr:(ctr+N+1);
+        p(:,ii)= make_ellipse(xf(:,i), Pf(:,:,i), circ);
+        ctr= ctr+N+2;
+    end
+end
+
+function p= make_ellipse(x,P,circ)
+% make a single 2-D ellipse 
+r= sqrtm_2by2(P);
+a= r*circ;
+p(2,:)= [a(2,:)+x(2) NaN];
+p(1,:)= [a(1,:)+x(1) NaN];
+
+%
+%
+
+function h= setup_animations(lm,wp)
+figure
+plot(lm(1,:),lm(2,:),'g*')
+hold on, axis equal
+plot(wp(1,:),wp(2,:), wp(1,:),wp(2,:),'ro')
+
+h.xt= patch(0,0,'g','erasemode','xor'); % vehicle true
+h.xm= patch(0,0,'r','erasemode','xor'); % mean vehicle estimate
+h.obs= plot(0,0,'y','erasemode','xor'); % observations
+h.xfp= plot(0,0,'r.','erasemode','background'); % estimated features (particle means)
+h.xvp= plot(0,0,'r.','erasemode','xor'); % estimated vehicle (particles)
+h.cov= plot(0,0,'erasemode','xor'); % covariances of max weight particle
+
+
+function do_plot(h, particles, xtrue, plines, veh)
+
+xvp = [particles.xv];
+xfp = [particles.xf];
+w = [particles.w]; 
+
+ii= find(w== max(w)); 
+xvmax= xvp(:,ii);
+
+xt= transformtoglobal(veh,xtrue);
+%xm= transformtoglobal(veh,xvmax);
+set(h.xt, 'xdata', xt(1,:), 'ydata', xt(2,:))
+%set(h.xm, 'xdata', xm(1,:), 'ydata', xm(2,:))
+set(h.xvp, 'xdata', xvp(1,:), 'ydata', xvp(2,:))
+if ~isempty(xfp), set(h.xfp, 'xdata', xfp(1,:), 'ydata', xfp(2,:)), end
+if ~isempty(plines), set(h.obs, 'xdata', plines(1,:), 'ydata', plines(2,:)), end
+pcov= make_covariance_ellipses(particles(ii(1)));
+if ~isempty(pcov), set(h.cov, 'xdata', pcov(1,:), 'ydata', pcov(2,:)); end
+
+drawnow
+
+##### SOURCE END #####
+-->
+   </body>
+</html>

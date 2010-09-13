@@ -1,0 +1,204 @@
+#LyX 1.6.6.1 created this file. For more info see http://www.lyx.org/
+\lyxformat 345
+\begin_document
+\begin_header
+\textclass amsart
+\use_default_options true
+\begin_modules
+theorems-ams
+eqs-within-sections
+figs-within-sections
+theorems-ams-extended
+\end_modules
+\language english
+\inputencoding auto
+\font_roman default
+\font_sans default
+\font_typewriter default
+\font_default_family default
+\font_sc false
+\font_osf false
+\font_sf_scale 100
+\font_tt_scale 100
+
+\graphics default
+\paperfontsize default
+\spacing single
+\use_hyperref false
+\papersize default
+\use_geometry false
+\use_amsmath 1
+\use_esint 1
+\cite_engine basic
+\use_bibtopic false
+\paperorientation portrait
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\defskip medskip
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\author "" 
+\end_header
+
+\begin_body
+
+\begin_layout Lemma*
+Let 
+\begin_inset Formula $\mathbb{F}$
+\end_inset
+
+ be any field.
+ Then 
+\begin_inset Formula $\mathbb{F}\times\left(\mathbb{F}\setminus\left\{ 0_{F}\right\} \right)$
+\end_inset
+
+ forms a group 
+\begin_inset Formula $G$
+\end_inset
+
+ with identity 
+\begin_inset Formula $1_{G}=\left(0_{F},1_{F}\right)\in G$
+\end_inset
+
+ and group operation 
+\begin_inset Formula \[
+\left(x_{1},y_{1}\right)\cdot\left(x_{2},y_{2}\right)=\left(x_{1}+y_{1}x_{2},y_{1}y_{2}\right)\]
+
+\end_inset
+
+ with a suitable inverse.
+\end_layout
+
+\begin_layout Proof
+We note that 
+\begin_inset Formula $G$
+\end_inset
+
+ is closed under the specified operation by the closure of fields under
+ addition and multiplication.
+ To show that it forms a group, we need to show the associativity of the
+ group operation and that 
+\begin_inset Formula $\left(0_{F},1_{F}\right)$
+\end_inset
+
+ is an identity.
+ 
+\end_layout
+
+\begin_layout Proof
+To show associativity, let 
+\begin_inset Formula $\left(x_{1},y_{1}\right),\left(x_{2},y_{2}\right),\left(x_{3},y_{3}\right)\in\mathbb{F}^{2}$
+\end_inset
+
+.
+ Then 
+\begin_inset Formula \begin{align*}
+\left[\left(x_{1},y_{1}\right)\cdot\left(x_{2},y_{2}\right)\right]\cdot\left(x_{3},y_{3}\right) & =\left(x_{1}+y_{1}x_{2},y_{1}y_{2}\right)\cdot\left(x_{3},y_{3}\right)\\
+ & =\left(x_{1}+y_{1}x_{2}+y_{1}y_{2}x_{3},y_{1}y_{2}y_{3}\right)\end{align*}
+
+\end_inset
+
+ and 
+\begin_inset Formula \begin{align*}
+\left(x_{1},y_{1}\right)\cdot\left[\left(x_{2},y_{2}\right)\cdot\left(x_{3},y_{3}\right)\right] & =\left(x_{1},y_{1}\right)\cdot\left(x_{2}+y_{2}x_{3},y_{2}y_{3}\right)\\
+ & =\left(x_{1}+y_{1}x_{2}+y_{1}y_{2}x_{3},y_{1}y_{2}y_{3}\right).\end{align*}
+
+\end_inset
+
+ Thus the 
+\begin_inset Formula $\left(\cdot\right)$
+\end_inset
+
+ operation is associative
+\end_layout
+
+\begin_layout Proof
+Next, we show left and right identity: 
+\begin_inset Formula \begin{align*}
+\left(0_{F},1_{F}\right)\cdot\left(x_{1},y_{1}\right) & =\left(0_{F}+1_{F}x_{1},1_{F}y_{1}\right)\\
+ & =\left(x_{1},y_{1}\right)\end{align*}
+
+\end_inset
+
+ and 
+\begin_inset Formula \begin{align*}
+\left(x_{1},y_{1}\right)\cdot\left(0_{F},1_{F}\right) & =\left(x_{1}+y_{1}0_{F},y_{1}1_{F}\right)\\
+ & =\left(x_{1},y_{1}\right).\end{align*}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Proof
+To find an inverse operation, let 
+\begin_inset Formula $\left(x_{1},y_{1}\right)^{-1}=\left(x_{2},y_{2}\right)$
+\end_inset
+
+ be a right inverse.
+ Then 
+\begin_inset Formula \begin{align*}
+\left(x_{1},y_{1}\right)\cdot\left(x_{2},y_{2}\right) & =\left(0_{F},1_{F}\right)\\
+\left(x_{1}+y_{1}x_{2},y_{1}y_{2}\right) & =\left(0_{F},1_{F}\right)\end{align*}
+
+\end_inset
+
+ which gives 
+\begin_inset Formula \begin{align*}
+x_{1}+y_{1}x_{2} & =0_{F}\\
+x_{2} & =-\frac{x_{1}}{y_{1}}\end{align*}
+
+\end_inset
+
+ and 
+\begin_inset Formula \begin{eqnarray*}
+y_{1}y_{2} & = & 1_{F}\\
+y_{2} & = & \frac{1_{F}}{y_{1}}\end{eqnarray*}
+
+\end_inset
+
+ where the multiplicative inverse of 
+\begin_inset Formula $y_{1}$
+\end_inset
+
+ always exists because 
+\begin_inset Formula $y_{1}\neq0$
+\end_inset
+
+ by the definition of our group.
+\end_layout
+
+\begin_layout Proof
+We now show that this also forms a left inverse: 
+\begin_inset Formula \begin{align*}
+\left(x_{1},y_{1}\right)^{-1}\cdot\left(x_{1},y_{1}\right) & =\left(-x_{1}/y_{1},1_{F}/y_{1}\right)\cdot\left(x_{1},y_{1}\right)\\
+ & =\left(-x_{1}/y_{1}+x_{1}/y_{1},1_{F}y_{1}/y_{1}\right)\\
+ & =\left(0_{F},1_{F}\right).\end{align*}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Proof
+Thus 
+\begin_inset Formula $G$
+\end_inset
+
+ is a group under the specified identity and group operation, with inverses
+ given by 
+\begin_inset Formula \[
+\left(x,y\right)^{-1}=\left(-xy^{-1},y^{-1}\right).\]
+
+\end_inset
+
+
+\end_layout
+
+\end_body
+\end_document

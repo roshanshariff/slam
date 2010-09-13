@@ -1,0 +1,30 @@
+Runnning on generateCircleMap(200), seed 1.834300e+05
+Particle No : 10000
+landmark average sqL2 error :  16.2959
+state average sqL2 error :  91854.4
+Elapsed time :  12462.8 seconds
+Runnning on generateCircleMap(200), seed 1.834300e+05
+Particle No : 10000
+landmark average sqL2 error :  18.5945
+state average sqL2 error :  92163.2
+Elapsed time :  12398.4 seconds
+Runnning on generateCircleMap(200), seed 1.834300e+05
+Particle No : 10000
+landmark average sqL2 error :  4.76868
+state average sqL2 error :  90709.9
+Elapsed time :  12390.5 seconds
+Runnning on generateCircleMap(200), seed 1.834300e+05
+Particle No : 10000
+landmark average sqL2 error :  28.8226
+state average sqL2 error :  92282.1
+Elapsed time :  12389.4 seconds
+Runnning on generateCircleMap(200), seed 1.834300e+05
+Particle No : 10000
+landmark average sqL2 error :  26.3772
+state average sqL2 error :  92187.1
+Elapsed time :  12385.7 seconds
+Runnning on generateCircleMap(200), seed 1.834300e+05
+Particle No : 10000
+landmark average sqL2 error :  10.4158
+state average sqL2 error :  91684.9
+Elapsed time :  12466.5 seconds
