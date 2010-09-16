@@ -3,8 +3,8 @@
 #include <cassert>
 
 #include "utilities/random.hpp"
-#include "utilities/arraymap.hpp"
 #include "utilities/bitree.hpp"
+#include "utilities/arraymap.hpp"
 
 
 template <class ActionModel, class ObservationModel>
@@ -54,8 +54,10 @@ private:
   void initialize_actions ();
   void initialize_features ();
   
-  void update_action (size_t action_id);
-  void update_feature (size_t feature_id);
+  void update_action (const size_t action_id);
+  double compute_action_changed (const size_t action_id) const;
+
+  void update_feature (const size_t feature_id);
 
 public:
 
@@ -125,6 +127,7 @@ void mcmc_slam<ActionModel, ObservationModel>::initialize_features () {
   }
 }
 
+
 template <class ActionModel, class ObservationModel>
 void mcmc_slam<ActionModel, ObservationModel>::update () {
 
@@ -153,7 +156,7 @@ void mcmc_slam<ActionModel, ObservationModel>::update () {
 
 
 template <class ActionModel, class ObservationModel>
-void mcmc_slam<ActionModel, ObservationModel>::update_action (size_t id) {
+void mcmc_slam<ActionModel, ObservationModel>::update_action (const size_t id) {
 
   const action_type new_estimate = action_data[id](random);
   const double new_action_weight = edge_weight(action_data[id], new_estimate);
