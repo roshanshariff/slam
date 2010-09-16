@@ -4,7 +4,7 @@
 
 #include "utilities/random.hpp"
 #include "utilities/arraymap.hpp"
-#include "utilities/cumulative_sequence.hpp"
+#include "utilities/bitree.hpp"
 
 
 template <class ActionModel, class ObservationModel>
@@ -31,11 +31,11 @@ private:
   const action_data_type& action_data;
   const observation_data_type observation_data;
 
-  cumulative_sequence<action_type> action_estimates;
-  cumulative_sequence<double> action_weights;
+  bitree<action_type> action_estimates;
+  bitree<double> action_weights;
 
   std::vector<feature_data> feature_estimates;
-  cumulative_sequence<double> feature_weights;
+  bitree<double> feature_weights;
 
   random_source& random;
 
