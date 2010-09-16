@@ -3,7 +3,7 @@
 
 
 template <class Grp>
-class cumulative_sequence {
+class bitree {
 public:
 
   std::vector<Grp> elements;
@@ -13,12 +13,15 @@ public:
 
 public:
 
-  cumulative_sequence () { }
-  cumulative_sequence (size_t n) : elements(n) { }
+  bitree () { }
+  bitree (size_t n) : elements(n) { }
 
   Grp get (size_t i) const;
-  Grp accumulate (size_t n) const;
   size_t binary_search (const Grp& value) const;
+
+  Grp accumulate (size_t n) const;
+  Grp accumulate (size_t begin, size_t end) const;
+  Grp accumulate () const { return accumulate(size()); }
 
   void set (size_t i, const Grp& value);
   void push_back (const Grp& value);
@@ -31,11 +34,12 @@ public:
   void clear () { elements.clear(); }
   void pop_back () { elements.pop_back(); }
   void reserve (size_t n) { elements.reserve(n); }
+  void resize (size_t n);
 
 };
 
 
-namespace cumulative_sequence_impl {
+namespace bitree_impl {
 
   /** Clears the lowest set bit. */
   inline size_t parent (size_t i) {
@@ -68,8 +72,8 @@ namespace cumulative_sequence_impl {
 
 
 template <class Grp>
-Grp cumulative_sequence<Grp>::accumulate_relative (size_t i, size_t ancestor) const {
-  using namespace cumulative_sequence_impl;
+Grp bitree<Grp>::accumulate_relative (size_t i, size_t ancestor) const {
+  using namespace bitree_impl;
   assert (i < elements.size());
   Grp result = Grp();
   for (; i != ancestor; i = parent(i)) {
@@ -81,8 +85,8 @@ Grp cumulative_sequence<Grp>::accumulate_relative (size_t i, size_t ancestor) co
 
 
 template <class Grp>
-Grp cumulative_sequence<Grp>::compute_element (size_t i, const Grp& value) const {
-  using namespace cumulative_sequence_impl;
+Grp bitree<Grp>::compute_element (size_t i, const Grp& value) const {
+  using namespace bitree_impl;
   assert (i <= elements.size());
   if (i == 0) return value;
   else return accumulate_relative(i-1, parent(i)) + value;
@@ -90,8 +94,8 @@ Grp cumulative_sequence<Grp>::compute_element (size_t i, const Grp& value) const
 
 
 template <class Grp>
-Grp cumulative_sequence<Grp>::get (size_t i) const {
-  using namespace cumulative_sequence_impl;
+Grp bitree<Grp>::get (size_t i) const {
+  using namespace bitree_impl;
   assert (i < elements.size());
   if (i == 0) return elements[0];
   else return -accumulate_relative(i-1, parent(i)) + elements[i];
@@ -99,8 +103,8 @@ Grp cumulative_sequence<Grp>::get (size_t i) const {
 
 
 template <class Grp>
-void cumulative_sequence<Grp>::set (size_t i, const Grp& value) {
-  using namespace cumulative_sequence_impl;
+void bitree<Grp>::set (size_t i, const Grp& value) {
+  using namespace bitree_impl;
   assert (i < elements.size());
   Grp origin = elements[i];
   elements[i] = compute_element(i, value);
@@ -121,14 +125,28 @@ void cumulative_sequence<Grp>::set (size_t i, const Grp& value) {
 
 
 template <class Grp>
-void cumulative_sequence<Grp>::push_back (const Grp& value) {
+void bitree<Grp>::push_back (const Grp& value) {
   elements.push_back (compute_element(elements.size(), value));
 }
 
 
 template <class Grp>
-Grp cumulative_sequence<Grp>::accumulate (size_t n) const {
-  using namespace cumulative_sequence_impl;
+void bitree<Grp>::resize (size_t n) {
+  if (n < elements.size()) {
+    elements.resize(n);
+  }
+  else {
+    elements.reserve(n);
+    for (size_t i = elements.size(); i < n; ++i) {
+      push_back (Grp());
+    }
+  }
+}
+
+
+template <class Grp>
+Grp bitree<Grp>::accumulate (size_t n) const {
+  using namespace bitree_impl;
   assert (n <= elements.size());
   if (n == 0) return Grp();
   else return elements[0] + accumulate_relative(n-1, 0);
@@ -136,8 +154,15 @@ Grp cumulative_sequence<Grp>::accumulate (size_t n) const {
 
 
 template <class Grp>
-size_t cumulative_sequence<Grp>::binary_search (const Grp& value) const {
-  using namespace cumulative_sequence_impl;
+Grp bitree<Grp>::accumulate (size_t begin, size_t end) const {
+  // TODO: make this more efficient
+  return -accumulate(begin) + accumulate(end);
+}
+
+
+template <class Grp>
+size_t bitree<Grp>::binary_search (const Grp& value) const {
+  using namespace bitree_impl;
   if (elements.size() == 0 || value < elements[0]) {
     return 0;
   }

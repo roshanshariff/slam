@@ -3,8 +3,8 @@
 #include <cassert>
 #include <tr1/random>
 
-#include "utilities/cumulative_sequence.hpp"
-#include "utilities/random_source.hpp"
+#include "utilities/bitree.hpp"
+#include "utilities/random.hpp"
 
 using namespace std;
 using namespace std::tr1;
@@ -72,7 +72,7 @@ bool test_1 (random_source& random) {
 
   const int SIZE = 10000;
 
-  cumulative_sequence<int> seq;
+  bitree<int> seq;
   for (int i = 0; i < SIZE; ++i) {
     seq.push_back(i);
   }
@@ -101,7 +101,7 @@ bool test_2 (random_source& random) {
   typedef test_group<PRIME> group;  
 
   vector<group> elements;
-  cumulative_sequence<group> seq;
+  bitree<group> seq;
   for (int i = 0; i < SIZE; ++i) {
     group element (a(random.generator), b(random.generator));
     elements.push_back(element);
@@ -133,7 +133,7 @@ bool test_3 (random_source& random) {
 
   uniform_int<int> element (0, 2);
 
-  cumulative_sequence<int> seq;
+  bitree<int> seq;
   for (int i = 0; i < SIZE; ++i) {
     seq.push_back(element(random.generator));
   }
