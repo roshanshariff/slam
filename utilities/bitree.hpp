@@ -1,3 +1,6 @@
+#ifndef _UTILITIES_BITREE_HPP
+#define _UTILITIES_BITREE_HPP
+
 #include <cassert>
 #include <vector>
 
@@ -183,3 +186,5 @@ size_t bitree<Grp>::binary_search (const Grp& value) const {
     return max;
   }
 }
+
+#endif //_UTILITIES_BITREE_HPP

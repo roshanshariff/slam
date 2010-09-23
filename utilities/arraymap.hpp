@@ -1,3 +1,6 @@
+#ifndef _UTILITIES_ARRAYMAP_HPP
+#define _UTILITIES_ARRAYMAP_HPP
+
 #include <vector>
 #include <utility>
 #include <algorithm>
@@ -14,7 +17,15 @@ public:
   typedef Cmp    key_compare;
   typedef Alloc  allocator_type;
 
-  typedef std::pair<const key_type, mapped_type> value_type;
+  typedef std::pair<key_type, mapped_type> value_type;
+
+private:
+  
+  typedef std::vector<value_type, allocator_type> vector_type;
+  vector_type entries;
+  key_compare cmp;
+
+public:
 
   class value_compare : public std::binary_function<value_type, value_type, bool> {
     friend class arraymap<key_type, mapped_type, key_compare, allocator_type>;
@@ -38,21 +49,16 @@ public:
     }
   };
 
-  typedef std::vector<value_type>::pointer                pointer;
-  typedef std::vector<value_type>::const_pointer          const_pointer;
-  typedef std::vector<value_type>::reference              reference;
-  typedef std::vector<value_type>::const_reference        const_reference;
-  typedef std::vector<value_type>::iterator               iterator;
-  typedef std::vector<value_type>::const_iterator         const_iterator;
-  typedef std::vector<value_type>::size_type              size_type;
-  typedef std::vector<value_type>::difference_type        difference_type;
-  typedef std::vector<value_type>::reverse_iterator       reverse_iterator;
-  typedef std::vector<value_type>::const_reverse_iterator const_reverse_iterator;
-
-private:
-
-  std::vector<value_type, allocator_type> entries;
-  key_compare cmp;
+  typedef typename vector_type::pointer                pointer;
+  typedef typename vector_type::const_pointer          const_pointer;
+  typedef typename vector_type::reference              reference;
+  typedef typename vector_type::const_reference        const_reference;
+  typedef typename vector_type::iterator               iterator;
+  typedef typename vector_type::const_iterator         const_iterator;
+  typedef typename vector_type::size_type              size_type;
+  typedef typename vector_type::difference_type        difference_type;
+  typedef typename vector_type::reverse_iterator       reverse_iterator;
+  typedef typename vector_type::const_reverse_iterator const_reverse_iterator;
 
 public:
 
@@ -104,7 +110,7 @@ public:
   template <class InputIterator>
   arraymap (InputIterator first, InputIterator last, const key_compare& _cmp,
 	    const allocator_type& _alloc = allocator_type())
-    : cmp(_cmp), entries(first, last, allocator_type) {
+    : cmp(_cmp), entries(first, last, _alloc) {
     std::sort (begin(), end(), value_comp());
     entries.erase (std::unique (begin(), end(), value_eq()), end());
   }
@@ -197,7 +203,7 @@ public:
 
   // Miscellaneous utility functions
 
-  void swap (linear_map& other) {
+  void swap (arraymap& other) {
     std::swap (entries, other.entries);
     std::swap (cmp, other.cmp);
   }
@@ -205,9 +211,11 @@ public:
   mapped_type& operator[] (const key_type& key) {
     iterator i = lower_bound(key);
     if (i == end() || key_comp()(key, i->first)) {
-      i = entries.insert(i, entry);
+      i = entries.insert(i, value_type(key, mapped_type()));
     }
     return i->second;
   }
 
 };
+
+#endif //_UTILITIES_ARRAYMAP_HPP

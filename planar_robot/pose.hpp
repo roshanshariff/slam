@@ -1,11 +1,17 @@
+#ifndef _PLANAR_ROBOT_POSE_HPP
+#define _PLANAR_ROBOT_POSE_HPP
+
 #include <complex>
 
 #include "utilities/random.hpp"
 #include "utilities/geometry.hpp"
 
-class observation;
-
 namespace planar_robot {
+
+  // Forward declarations
+  class pose;
+  class observation;
+  inline observation operator+ (const pose&, const observation&);
 
   class pose {
 
@@ -19,7 +25,7 @@ namespace planar_robot {
   
     pose () : translation(), rotation(1) { }
 
-    pose (double x = 0, double y = 0, double bearing = 0)
+    pose (double x, double y, double bearing = 0)
       : translation(x,y), rotation(std::polar(1.0, bearing)) { }
 
     double x () const { return translation.real(); }
@@ -35,11 +41,12 @@ namespace planar_robot {
     }
 
     pose operator- () const {
-      complex<double> inverse_rot = conj(rotation);
+      std::complex<double> inverse_rot = std::complex<double>(1.0)/rotation;
       return pose (-translation*inverse_rot, inverse_rot);
     }
 
     friend class pose_dist;
+
     friend observation operator+ (const pose&, const observation&);
 
   };
@@ -88,3 +95,5 @@ namespace planar_robot {
   };
 
 }
+
+#endif //_PLANAR_ROBOT_POSE_HPP

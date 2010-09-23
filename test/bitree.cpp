@@ -56,6 +56,7 @@ struct test_group {
 template <int P>
 ostream& operator<< (ostream& out, const test_group<P> x) {
   out << '(' << x.a << ',' << x.b << ')';
+  return out;
 }
 
 template <int P>

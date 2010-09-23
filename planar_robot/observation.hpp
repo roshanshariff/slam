@@ -1,3 +1,6 @@
+#ifndef _PLANAR_ROBOT_OBSERVATION_HPP
+#define _PLANAR_ROBOT_OBSERVATION_HPP
+
 #include <complex>
 
 #include "utilities/random.hpp"
@@ -14,7 +17,7 @@ namespace planar_robot {
 
   public:
 
-    observation (double range, double bearing)
+    observation (double range = 0, double bearing = 0)
       : position(std::polar(range, bearing)) { }
 
     double x () const { return position.real(); }
@@ -23,12 +26,18 @@ namespace planar_robot {
     double bearing () const { return std::arg(position); }
 
     friend observation operator+ (const pose&, const observation&);
+    friend observation landmark (double x, double y);
 
   };
 
 
   inline observation operator+ (const pose& p, const observation& o) {
     return observation (p.translation + p.rotation*o.position);
+  }
+
+
+  inline observation landmark (double x, double y) {
+    return observation (std::complex<double>(x, y));
   }
 
 
@@ -41,8 +50,8 @@ namespace planar_robot {
 
     typedef observation result_type;
 
-    observation_dist (const observation& mean,
-		      double range_sigma, double bearing_sigma)
+    observation_dist (const observation& mean = observation(),
+		      double range_sigma = 1, double bearing_sigma = 1)
       : range (mean.range(), range_sigma),
 	bearing (mean.bearing(), bearing_sigma) { }
 
@@ -65,3 +74,5 @@ namespace planar_robot {
   };
 
 }
+
+#endif //_PLANAR_ROBOT_OBSERVATION_HPP
