@@ -24,17 +24,17 @@ const double RADIUS = 50;          // meters
 const double CENTRE_X = RADIUS;            // meters
 const double CENTRE_Y = 0;                 // meters
 
-const double SPEED = 1;                    // meters/second
-const double DELTA_T = 1.0;               // seconds
+const double SPEED = 3; // meters/second
+const double DELTA_T = 0.25; // seconds
 const double RUN_TIME = 1.1*2*PI*RADIUS/SPEED; // seconds
 
-const double OBSERVATION_MAX_DIST = 30;    // meters
-const double OBSERVATION_RANGE_SIGMA = 0.05;  // meters
-const double OBSERVATION_BEARING_SIGMA = 0.02; // radians
+const double OBSERVATION_MAX_RANGE = 30; // meters
+const double OBSERVATION_RANGE_SIGMA = 0.1; // meters
+const double OBSERVATION_BEARING_SIGMA = 1.0*PI/180.0; // radians
 
-const double ACTION_DIST_SIGMA = 0.1*DELTA_T;     // meters/second
-const double ACTION_DIR_SIGMA = 0.02*DELTA_T;     // radians/second
-const double ACTION_BEARING_SIGMA = 0.02*DELTA_T; // radians/second
+const double ACTION_DIST_SIGMA = SPEED*DELTA_T/10; // meters/second
+const double ACTION_DIR_SIGMA = (1.5*PI/180.0)*DELTA_T; // radians/second
+const double ACTION_BEARING_SIGMA = (1.5*PI/180.0)*DELTA_T; // radians/second
 
 static random_source rand_gen;
 
@@ -66,7 +66,7 @@ size_t add_observations (size_t time_step, const pose& position,
     observation_dist distribution (-position + landmarks[i],
 				   OBSERVATION_RANGE_SIGMA, OBSERVATION_BEARING_SIGMA);
     observation measurement = distribution(rand_gen);
-    if (measurement.range() < OBSERVATION_MAX_DIST) {
+    if (measurement.range() < OBSERVATION_MAX_RANGE) {
       observations[i][time_step] = observation_dist (measurement,
 						     OBSERVATION_RANGE_SIGMA*10,
 						     OBSERVATION_BEARING_SIGMA*5);
@@ -80,7 +80,7 @@ size_t add_observations (size_t time_step, const pose& position,
 void print_trajectory (std::ostream& out, pose p, const bitree<pose>& trajectory) {
   out << 0 << '\t' << p.x() << '\t' << p.y() << '\t' << p.bearing() << '\n';
   for (size_t i = 0; i < trajectory.size(); ++i) {
-    p += trajectory.get(i);
+    p += trajectory.at(i);
     out << i+1 << '\t' << p.x() << '\t' << p.y() << '\t' << p.bearing() << '\n';
   }
 }

@@ -79,8 +79,8 @@ bool test_1 (random_source& random) {
   }
 
   int sum = 0;
-  for (int i = 0; i < seq.size(); ++i) {
-    if (i != seq.get(i)) return false;
+  for (int i = 0; i < int(seq.size()); ++i) {
+    if (i != seq[i]) return false;
     if (seq.accumulate(i) != sum) return false;
     sum += i;
   }
@@ -114,14 +114,14 @@ bool test_2 (random_source& random) {
     if (partial_sum != seq.accumulate(0)) return false;
     for (int i = 0; i < SIZE; ++i) {
       partial_sum += elements[i];
-      if (seq.get(i) != elements[i]) return false;
+      if (seq.at(i) != elements[i]) return false;
       if (seq.accumulate(i+1) != partial_sum) return false;
     }
 
     group new_element (a(random.generator), b(random.generator));
     int new_index = index(random.generator);
     elements[new_index] = new_element;
-    seq.set(new_index, new_element);
+    seq[new_index] = new_element;
   }
 
   return true;

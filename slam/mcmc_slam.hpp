@@ -137,7 +137,7 @@ void mcmc_slam<ActionModel, ObservationModel>::initialize_features () {
 
     if (observations.empty()) {
       feature.observed = false;
-      feature_weights.set (i, 0);
+      feature_weights[i] = 0;
     }
     else if (!feature.observed) {
       feature.observed = true;
@@ -149,7 +149,7 @@ void mcmc_slam<ActionModel, ObservationModel>::initialize_features () {
       feature.parent_action = first_observation.first;
       const observation_model_type& distribution = first_observation.second;
       feature.estimate = distribution.mean();
-      feature_weights.set (i, observation_edge_weight (distribution, feature.estimate));
+      feature_weights[i] = observation_edge_weight (distribution, feature.estimate);
     }
   }
 }
@@ -200,19 +200,19 @@ void mcmc_slam<ActionModel, ObservationModel>::update_action (const size_t id) {
   const action_type new_estimate = action_data[id](random);
   const double new_action_weight = action_edge_weight(action_data[id], new_estimate);
 
-  const action_type old_estimate = action_estimates.get(id);
-  const double old_action_weight = action_weights.get(id);
+  const action_type old_estimate = action_estimates.at(id);
+  const double old_action_weight = action_weights.at(id);
 
   double acceptance_probability = new_action_weight / old_action_weight;
   acceptance_probability /= action_change(id);
 
-  action_estimates.set(id, new_estimate);
-  action_weights.set(id, new_action_weight);
+  action_estimates[id] = new_estimate;
+  action_weights[id] = new_action_weight;
   acceptance_probability *= action_change(id);
 
   if (random.uniform() >= acceptance_probability) {
-    action_estimates.set(id, old_estimate);
-    action_weights.set(id, old_action_weight);
+    action_estimates[id] = old_estimate;
+    action_weights[id] = old_action_weight;
   }
 
 }
@@ -268,7 +268,7 @@ void mcmc_slam<ActionModel, ObservationModel>::update_feature (const size_t id) 
   const observation_type new_estimate = distribution(random);
   const double new_feature_weight = observation_edge_weight(distribution, new_estimate);
 
-  double acceptance_probability = new_feature_weight / feature_weights.get(id);
+  double acceptance_probability = new_feature_weight / feature_weights.at(id);
 
   typename arraymap<size_t, observation_model_type>::const_iterator i = observations.begin();
 
@@ -292,7 +292,7 @@ void mcmc_slam<ActionModel, ObservationModel>::update_feature (const size_t id) 
 
   if (random.uniform() < acceptance_probability) {
     feature.estimate = new_estimate;
-    feature_weights.set(id, new_feature_weight);
+    feature_weights[id] = new_feature_weight;
   }
 
 }
