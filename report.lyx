@@ -1,0 +1,366 @@
+#LyX 1.6.7 created this file. For more info see http://www.lyx.org/
+\lyxformat 345
+\begin_document
+\begin_header
+\textclass article
+\begin_preamble
+\usepackage{graphicx}
+\end_preamble
+\use_default_options true
+\language english
+\inputencoding auto
+\font_roman default
+\font_sans default
+\font_typewriter default
+\font_default_family default
+\font_sc false
+\font_osf false
+\font_sf_scale 100
+\font_tt_scale 100
+
+\graphics default
+\paperfontsize default
+\spacing single
+\use_hyperref false
+\papersize default
+\use_geometry false
+\use_amsmath 1
+\use_esint 1
+\cite_engine basic
+\use_bibtopic false
+\paperorientation portrait
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\defskip medskip
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\author "" 
+\author "" 
+\end_header
+
+\begin_body
+
+\begin_layout Title
+CMPUT 499 Probabilistic Robotics
+\begin_inset Newline newline
+\end_inset
+
+MCMC SLAM - Implementation Report
+\end_layout
+
+\begin_layout Author
+Roshan Shariff
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\begin_inset ERT
+status collapsed
+
+\begin_layout Plain Layout
+
+
+\backslash
+centering
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset CommandInset include
+LatexCommand include
+filename "graph1.tex"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+This implementation of the MCMC SLAM algorithm assumes that the edge labels
+ form a group.
+ It stores only the edge labels and recomputes vertex labels when necessary.
+ The spanning tree of the graph is assumed to contain all the state change
+ edges, and one observation edge for each feature.
+ In this implementation, the first observation of a feature is used, but
+ the algorithm's design is not contingent on this.
+\end_layout
+
+\begin_layout Standard
+To efficiently retrieve the label of a state vertex while storing only the
+ edge labels in a way that allows the edge labels to be modified easily,
+ a 
+\emph on
+binary indexed tree
+\emph default
+ is used.
+\end_layout
+
+\begin_layout Subsubsection*
+Binary Indexed Tree
+\end_layout
+
+\begin_layout Standard
+A binary indexed tree stores a sequence of elements (which must form a group)
+ and admits the following operations:
+\end_layout
+
+\begin_layout Itemize
+Retrieve an element of the sequence, in amortised 
+\begin_inset Formula $O(1)$
+\end_inset
+
+ time.
+\end_layout
+
+\begin_layout Itemize
+Append an element to the end of the sequence, in amortised 
+\begin_inset Formula $O(1)$
+\end_inset
+
+ time.
+\end_layout
+
+\begin_layout Itemize
+Modify an element of the sequence, in 
+\begin_inset Formula $O(\lg n)$
+\end_inset
+
+ time.
+\end_layout
+
+\begin_layout Itemize
+Compute the product of any contiguous subsequence, in 
+\begin_inset Formula $O(\lg n)$
+\end_inset
+
+ time where 
+\begin_inset Formula $n$
+\end_inset
+
+ is the length of the subsequence.
+\end_layout
+
+\begin_layout Itemize
+If the group is linearly ordered and the sequence contains only positive
+ elements, then find the largest initial subsequence with product less than
+ some given bound, in 
+\begin_inset Formula $O(\lg n)$
+\end_inset
+
+ time using a modified binary search.
+\end_layout
+
+\begin_layout Standard
+The binary tree structure is stored in a contiguous block of memory, which
+ improves memory locality and therefore has better cache behaviour.
+ An implicit tree structure is defined over the elements, with the root
+ of the tree being the element with index 0.
+ The parent of the element with index 
+\begin_inset Formula $i$
+\end_inset
+
+ is given by zeroing the least significant set bit in the binary representation
+ of 
+\begin_inset Formula $i$
+\end_inset
+
+.
+ Thus the depth of any element is the number of set bits in the binary represent
+ation of its index, which is bounded by 
+\begin_inset Formula $\lg(i)$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+Every index stores the partial product of the elements from its parent to
+ itself.
+ For example, index 
+\begin_inset Formula $6_{10}=110_{2}$
+\end_inset
+
+ has parent 
+\begin_inset Formula $4_{10}=100_{2}$
+\end_inset
+
+, and so the 6th index stores the product of the 5th and 6th elements.
+ To retrieve the partial product up to a given element, the tree is traced
+ back to the root, accumulating products in the correct order.
+ Any particular element can be retrieved by computing the partial product
+ up to that element and the previous element.
+\end_layout
+
+\begin_layout Standard
+The binary indexed tree is used to store the estimates of state changes
+ in the SLAM problem, while allowing the estimates to be modified efficiently.
+ It is also used to sample from the edges, using the modified binary search
+ operation on a binary indexed tree containing the edge weights.
+\end_layout
+
+\begin_layout Standard
+More information on binary indexed trees (but for storing scalar values
+ instead of group elements) is available in 
+\begin_inset CommandInset citation
+LatexCommand citet
+key "fenwick1994new"
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Subsubsection*
+Edge Weighting Function
+\end_layout
+
+\begin_layout Standard
+The original MCMC SLAM paper 
+\begin_inset CommandInset citation
+LatexCommand citet
+key "torma2009markov"
+
+\end_inset
+
+ proposes the edge weighting function 
+\begin_inset Formula \[
+p_{T}(e\mid l)\propto\frac{1}{J_{e}(l(e))}.\]
+
+\end_inset
+
+ However, the use of this function results in failure to converge when the
+ three-parameter odometry model for differential drive robots is used.
+ State edges are almost never resampled; only observation edges are resampled.
+ Much better results were obtained by using the weighting function 
+\begin_inset Formula \[
+p_{T}(e\mid l)\propto\frac{\kappa}{\sqrt[\kappa]{J_{e}(l(e))}}\]
+
+\end_inset
+
+ where 
+\begin_inset Formula $\kappa=2$
+\end_inset
+
+ for observation edges and 
+\begin_inset Formula $\kappa=3$
+\end_inset
+
+ for state change edges.
+ This reflects the fact that for 2D planar robots, each observation represents
+ two independent parameters (for the position of the landmark) whereas each
+ state change represents three independent parameters (two dimensions of
+ translation and one of rotation).
+\end_layout
+
+\begin_layout Subsubsection*
+Pose Representation
+\end_layout
+
+\begin_layout Standard
+The pose of the 2D planar robot is represented as a pair of complex numbers,
+ which allows only multiplication and addition operations to be used to
+ compute compositions of pose changes and invert pose changes.
+ It is also expected that complex arithmetic operations are implemented
+ efficiently on superscalar processor architectures.
+\end_layout
+
+\begin_layout Subsubsection*
+Running Time
+\end_layout
+
+\begin_layout Standard
+MCMC iterations on the graph take running time proportional to the number
+ of edges whose weights must be recomputed for each edge relabelling.
+ Relabelings of the state change edges additionally take time linear in
+ the total number of observed landmarks.
+\end_layout
+
+\begin_layout Subsubsection*
+Experimental Results
+\end_layout
+
+\begin_layout Standard
+Some experiments were run to verify the correctness of the implementation
+ and measure its performance characteristics.
+ The experimental set up was identical to the 
+\begin_inset Quotes eld
+\end_inset
+
+large
+\begin_inset Quotes erd
+\end_inset
+
+ SLAM problem described in the MCMC SLAM paper, with 612 landmarks arranged
+ in an equidistant grid with spacing 25 m, and the robot driving in a circle
+ of radius 200 m.
+ The maximum observation range is 30 m.
+ The robot completes two revolutions in 3518 steps.
+\end_layout
+
+\begin_layout Standard
+The experiments were performed on an Apple MacBook Pro notebook computer
+ with an Intel Core 2 Duo processor running at 2.2 GHz.
+ Running two experiments simultaneously achieved full processor utilisation
+ on both cores with no noticeable slowdown, indicating that the simulation
+ is processor-bound and memory bandwidth is not an issue.
+ The following results were averaged over 10 runs of the simulation:
+\end_layout
+
+\begin_layout Itemize
+MCMC iterations per step: 100
+\end_layout
+
+\begin_layout Itemize
+Average observations per step: 4.47
+\end_layout
+
+\begin_layout Itemize
+Cumulative state error: 46.87 m
+\end_layout
+
+\begin_layout Itemize
+Landmark estimation error: 36.37 m
+\end_layout
+
+\begin_layout Itemize
+Running time: 532.16 s
+\end_layout
+
+\begin_layout Standard
+These results are comparable to those of the original Matlab implementation
+ running on a cluster, with that implementation averaging a running time
+ of 27178.39 s.
+\end_layout
+
+\begin_layout Standard
+\begin_inset CommandInset bibtex
+LatexCommand bibtex
+bibfiles "report"
+options "plain"
+
+\end_inset
+
+
+\end_layout
+
+\end_body
+\end_document

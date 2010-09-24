@@ -25,13 +25,13 @@ using planar_robot::landmark;
 
 const double PI = boost::math::constants::pi<double>();
 const double GRID_PITCH = 25; // meters
-const double RADIUS = 200; // meters
+const double RADIUS = 100; // meters
 const double CENTRE_X = RADIUS; // meters
 const double CENTRE_Y = 0; // meters
 
 const double SPEED = 3; // meters/second
 const double DELTA_T = 0.25; // seconds
-const double RUN_TIME = 2.1*2*PI*RADIUS/SPEED; // seconds
+const double RUN_TIME = 1.1*2*PI*RADIUS/SPEED; // seconds
 
 const double OBSERVATION_MAX_RANGE = 30; // meters
 const double OBSERVATION_RANGE_SIGMA = 0.1; // meters
@@ -44,7 +44,9 @@ const double ACTION_BEARING_SIGMA = (0.75*PI/180.0)*DELTA_T; // radians/second
 */
 
 const planar_robot::pose_dist_odometry
-ODOMETRY_MODEL (0.05, 0.25*PI/180, 0.1, 0.0001*180/PI);
+ODOMETRY_MODEL (0.05, 1.0*PI/180, 0.1, 0.0001*180/PI);
+//const planar_robot::pose_dist_odometry
+//ODOMETRY_MODEL (0.05, 0.25*PI/180, 0.1, 0.0001*180/PI);
 
 const int MCMC_STEPS = 100;
 const double ACTION_DIMENSIONS = 3.0;
