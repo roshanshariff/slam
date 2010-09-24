@@ -1,14 +1,19 @@
+#include <vector>
+#include <map>
 #include <cmath>
 #include <utility>
 #include <iostream>
 #include <fstream>
 #include <iomanip>
-#include <tr1/random>
+#include <ctime>
 #include <boost/math/constants/constants.hpp>
+#include <boost/timer.hpp>
+#include <boost/progress.hpp>
 
 #include "planar_robot/pose.hpp"
 #include "planar_robot/observation.hpp"
 #include "slam/mcmc_slam.hpp"
+#include "slam/slam_data.hpp"
 #include "utilities/arraymap.hpp"
 #include "utilities/random.hpp"
 
@@ -19,30 +24,40 @@ using planar_robot::observation_dist;
 using planar_robot::landmark;
 
 const double PI = boost::math::constants::pi<double>();
-const double GRID_PITCH = 25;              // meters
-const double RADIUS = 50;          // meters
-const double CENTRE_X = RADIUS;            // meters
-const double CENTRE_Y = 0;                 // meters
+const double GRID_PITCH = 25; // meters
+const double RADIUS = 200; // meters
+const double CENTRE_X = RADIUS; // meters
+const double CENTRE_Y = 0; // meters
 
 const double SPEED = 3; // meters/second
 const double DELTA_T = 0.25; // seconds
-const double RUN_TIME = 1.1*2*PI*RADIUS/SPEED; // seconds
+const double RUN_TIME = 2.1*2*PI*RADIUS/SPEED; // seconds
 
 const double OBSERVATION_MAX_RANGE = 30; // meters
 const double OBSERVATION_RANGE_SIGMA = 0.1; // meters
 const double OBSERVATION_BEARING_SIGMA = 1.0*PI/180.0; // radians
 
+/*
 const double ACTION_DIST_SIGMA = SPEED*DELTA_T/10; // meters/second
-const double ACTION_DIR_SIGMA = (1.5*PI/180.0)*DELTA_T; // radians/second
-const double ACTION_BEARING_SIGMA = (1.5*PI/180.0)*DELTA_T; // radians/second
+const double ACTION_DIR_SIGMA = (0.75*PI/180.0)*DELTA_T; // radians/second
+const double ACTION_BEARING_SIGMA = (0.75*PI/180.0)*DELTA_T; // radians/second
+*/
+
+const planar_robot::pose_dist_odometry
+ODOMETRY_MODEL (0.05, 0.25*PI/180, 0.1, 0.0001*180/PI);
+
+const int MCMC_STEPS = 100;
+const double ACTION_DIMENSIONS = 3.0;
+const double OBSERVATION_DIMENSIONS = 2.0;
 
 static random_source rand_gen;
 
-std::vector<observation> generate_circle_map () {
-  std::vector<observation> features;
+std::map<size_t, observation> generate_circle_map () {
+  std::map<size_t, observation> features;
+  size_t feature_id = 0;
   for (double x = 0; x <= 2*RADIUS+GRID_PITCH; x += GRID_PITCH) {
     for (double y = -2*RADIUS; y <= 2*RADIUS+GRID_PITCH; y += GRID_PITCH) {
-      features.push_back (landmark (x, y));
+      features[feature_id++] = landmark (x, y);
     }
   }
   return features;
@@ -56,20 +71,22 @@ pose get_pose (double time) {
   return pose (x, y, heading);
 }
 
-size_t add_observations (size_t time_step, const pose& position,
-		       const std::vector<observation>& landmarks,
-		       std::vector<arraymap<size_t, observation_dist> >& observations) {
+size_t add_observations (const pose& position,
+			 const std::map<size_t, observation>& landmarks,
+			 slam_data<pose_dist, observation_dist>& data) {
 
   size_t num_observations = 0;
 
-  for (size_t i = 0; i < landmarks.size(); ++i) {   
-    observation_dist distribution (-position + landmarks[i],
+  std::map<size_t, observation>::const_iterator i = landmarks.begin();
+  for (; i != landmarks.end(); ++i) {
+    observation_dist distribution (-position + i->second,
 				   OBSERVATION_RANGE_SIGMA, OBSERVATION_BEARING_SIGMA);
     observation measurement = distribution(rand_gen);
     if (measurement.range() < OBSERVATION_MAX_RANGE) {
-      observations[i][time_step] = observation_dist (measurement,
-						     OBSERVATION_RANGE_SIGMA*10,
-						     OBSERVATION_BEARING_SIGMA*5);
+      data.add_observation(i->first,
+			   observation_dist (measurement,
+					     OBSERVATION_RANGE_SIGMA,
+					     OBSERVATION_BEARING_SIGMA));
       ++num_observations;
     }
   }
@@ -85,55 +102,89 @@ void print_trajectory (std::ostream& out, pose p, const bitree<pose>& trajectory
   }
 }
 
-void print_landmarks (std::ostream& out, pose p, const std::vector<observation>& map) {
-  for (size_t i = 0; i < map.size(); ++i) {
-    observation pos = p + map[i];
-    out << pos.x() << '\t' << pos.y() << '\n';
+void print_landmarks (std::ostream& out, const pose& p,
+		      const std::map<size_t, observation>& landmarks) {
+  std::map<size_t, observation>::const_iterator i = landmarks.begin();
+  for (; i != landmarks.end(); ++i) {
+    observation pos = p + i->second;
+    out << i->first << '\t' << pos.x() << '\t' << pos.y() << '\n';
   }
+}
+
+double trajectory_error (const bitree<pose>& a, const bitree<pose>& b) {
+  size_t points = std::min (a.size(), b.size());
+  double error = 0;
+  pose a_pos, b_pos;
+  for (size_t i = 0; i < points; ++i) {
+    a_pos += a.at(i);
+    b_pos += b.at(i);
+    double distance = (-a_pos + b_pos).distance();
+    error += distance * distance;
+  }
+  return std::sqrt (error/points);
+}
+
+double landmark_error (const std::map<size_t, observation>& landmarks,
+		       const pose& p, const std::map<size_t, observation>& estimates) {
+  double error = 0;
+  size_t num_landmarks = 0;
+  std::map<size_t, observation>::const_iterator i = estimates.begin();
+  for (; i != estimates.end(); ++i) {
+    std::map<size_t, observation>::const_iterator j = landmarks.find(i->first);
+    assert (j != landmarks.end());
+    observation estimate = p + i->second;
+    const observation& actual = j->second;
+    double x = estimate.x() - actual.x();
+    double y = estimate.y() - actual.y();
+    error += x*x + y*y;
+    ++num_landmarks;
+  }
+  return std::sqrt(error/num_landmarks);
 }
 
 int main () {
 
-  std::tr1::random_device sysrand;
-  rand_gen.generator.seed(sysrand());
+  const unsigned long seed = std::time(0);
+  rand_gen.generator.seed(seed);
 
-  std::vector<observation> map = generate_circle_map ();
+  std::map<size_t, observation> landmarks = generate_circle_map ();
 
-  std::vector<pose_dist> actions;
-  std::vector<arraymap<size_t, observation_dist> > observations (map.size());
-
-  mcmc_slam<pose_dist, observation_dist> mcmc (actions, observations, rand_gen);
+  slam_data<pose_dist, observation_dist> data;
+  mcmc_slam<slam_data<pose_dist, observation_dist> >
+    mcmc (rand_gen, data, MCMC_STEPS, ACTION_DIMENSIONS, OBSERVATION_DIMENSIONS);
   bitree<pose> expected_trajectory, actual_trajectory;
 
   const pose initial_position = get_pose(0);
 
-  size_t time_step = 0;
-  while (time_step*DELTA_T <= RUN_TIME) {
+  long time_step = 0;
+  long num_steps = RUN_TIME/DELTA_T;
+  long total_observations = 0;
+  boost::progress_display progress (num_steps);
+  boost::timer timer;
+  while (time_step <= num_steps) {
 
     pose expected_position = initial_position + expected_trajectory.accumulate(time_step);
     pose actual_position = initial_position + actual_trajectory.accumulate(time_step);
 
-    size_t num_observations
-      = add_observations(time_step, actual_position, map, observations);
+    total_observations += add_observations(actual_position, landmarks, data);
 
-    std::cout << "Time step: " << time_step
-	      << ", " << num_observations << " observations" <<  std::endl;
-
-    mcmc.initialize();
     mcmc.update();
     ++time_step;
+    ++progress;
 
-    pose expected_change = -expected_position + get_pose (time_step*DELTA_T);
-    expected_trajectory.push_back (expected_change);
+    const pose_dist distribution
+      = ODOMETRY_MODEL (-expected_position + get_pose (time_step*DELTA_T));
 
-    pose_dist distribution (expected_change, ACTION_DIST_SIGMA,
-			    ACTION_DIR_SIGMA, ACTION_BEARING_SIGMA);
-    actions.push_back(distribution);
-
-    pose actual_change = distribution(rand_gen);
-    actual_trajectory.push_back(actual_change);
+    expected_trajectory.push_back (distribution.mean());
+    actual_trajectory.push_back(distribution(rand_gen));
+    data.add_action(distribution);
 
   }
+
+  const double elapsed_time = timer.elapsed();
+
+  const std::map<size_t, observation> estimated_map = mcmc.get_feature_estimates();
+  const bitree<pose>& estimated_trajectory = mcmc.get_action_estimates();
 
   std::ofstream expected_file ("data/expected_trajectory.txt");
   print_trajectory (expected_file, initial_position, expected_trajectory);
@@ -144,16 +195,29 @@ int main () {
   actual_file.close();
 
   std::ofstream estimated_file ("data/estimated_trajectory.txt");
-  print_trajectory (estimated_file, initial_position, mcmc.get_action_estimates());
+  print_trajectory (estimated_file, initial_position, estimated_trajectory);
   estimated_file.close();
 
   std::ofstream map_file ("data/landmarks.txt");
-  print_landmarks (map_file, pose(), map);
+  print_landmarks (map_file, pose(), landmarks);
   map_file.close();
 
   std::ofstream estimated_map_file ("data/estimated_map.txt");
-  print_landmarks (estimated_map_file, initial_position, mcmc.get_feature_estimates());
+  print_landmarks (estimated_map_file, initial_position, estimated_map);
   estimated_map_file.close();
+
+  std::ofstream summary_file ("data/summary.txt");
+  summary_file << "Random seed: " << seed << "\n"
+	       << "MCMC iterations: " << MCMC_STEPS << "\n"
+	       << "Grid spacing: " << GRID_PITCH << " meters\n"
+	       << "Number of landmarks: " << landmarks.size() << "\n"
+	       << "Circle radius: " << RADIUS << " meters \n"
+	       << "Time steps: " << num_steps << "\n"
+	       << "Average observations per step: " << double(total_observations)/num_steps << "\n"
+	       << "Trajectory error: " << trajectory_error (actual_trajectory, estimated_trajectory) << "\n"
+	       << "Landmark error: " << landmark_error (landmarks, initial_position, estimated_map) << "\n"
+	       << "Elapsed time: " << elapsed_time << "\n";
+  summary_file.close();
 
   return 0;
 }

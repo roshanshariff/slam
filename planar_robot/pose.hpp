@@ -94,6 +94,24 @@ namespace planar_robot {
 
   };
 
+  
+  class pose_dist_odometry {
+    const double alpha1, alpha2, alpha3, alpha4;
+  public:
+    pose_dist_odometry (double a1, double a2, double a3, double a4)
+      : alpha1(a1), alpha2(a2), alpha3(a3), alpha4(a4) { }
+    pose_dist operator() (const pose& reading) const {
+      double translation = reading.distance();
+      double direction = reading.direction();
+      double bearing = reading.bearing();
+      double rotation = wrap_angle(bearing - direction);
+      double direction_sigma = alpha1*std::abs(direction) + alpha2*translation;
+      double distance_sigma = alpha3*translation + alpha4*std::abs(bearing);
+      double bearing_sigma = alpha1*std::abs(rotation) + alpha2*translation;
+      return pose_dist (reading, distance_sigma, direction_sigma, bearing_sigma);
+    }
+  };
+
 }
 
 #endif //_PLANAR_ROBOT_POSE_HPP

@@ -2,33 +2,38 @@
 #define _SLAM_MCMC_SLAM_HPP
 
 #include <vector>
+#include <map>
 #include <utility>
 #include <cassert>
 #include <cmath>
+#include <boost/bind.hpp>
+#include <boost/signals2.hpp>
 
+#include "slam/slam_data.hpp"
 #include "utilities/random.hpp"
 #include "utilities/bitree.hpp"
 #include "utilities/arraymap.hpp"
 
 
-const int MCMC_STEPS = 100;
-
-
-template <class ActionModel, class ObservationModel>
+template <class SlamData>
 class mcmc_slam {
-
-  typedef size_t actionid_t;
-  typedef size_t featureid_t;
 
 public:
 
-  typedef ActionModel action_model_type;
-  typedef ObservationModel observation_model_type;
+  typedef SlamData slam_data_type;
+
+  typedef typename slam_data_type::actionid_t actionid_t;
+  typedef typename slam_data_type::featureid_t featureid_t;
+
+  typedef typename slam_data_type::action_data_type action_data_type;
+  typedef typename slam_data_type::feature_data_type feature_data_type;
+  typedef typename slam_data_type::observation_data_type observation_data_type;
+
+  typedef typename slam_data_type::action_model_type action_model_type;
+  typedef typename slam_data_type::observation_model_type  observation_model_type;
+
   typedef typename action_model_type::result_type action_type;
   typedef typename observation_model_type::result_type observation_type;
-  
-  typedef std::vector<action_model_type> action_data_type;
-  typedef std::vector<arraymap<actionid_t, observation_model_type> > observation_data_type;
 
 private:
 
@@ -36,12 +41,18 @@ private:
     bool observed;
     actionid_t parent_action;
     observation_type estimate;
+    feature_data () : observed(false) { }
   };
 
-  const action_data_type& action_data;
-  const observation_data_type& observation_data;
-
   random_source& random;
+
+  const int mcmc_steps;
+  const double action_dimensions;
+  const double observation_dimensions;
+
+  const slam_data_type& data;
+  const boost::signals2::scoped_connection _act_conn;
+  const boost::signals2::scoped_connection _obs_conn;
 
   bitree<action_type> action_estimates;
   bitree<double> action_weights;
@@ -49,40 +60,41 @@ private:
   std::vector<feature_data> feature_estimates;
   bitree<double> feature_weights;
 
+  template <class Model, class Label>
+  double edge_weight (const Model& model, const Label& label, double importance) {
+    return importance * std::pow (model.likelihood(label)+0.0001, -1.0/importance);
+  }
+
   double action_edge_weight (const action_model_type& model, const action_type& estimate) {
-    const double ACTION_SPACE_DIM = 3.0;
-    double likelihood = model.likelihood(estimate) + 0.0001;
-    return ACTION_SPACE_DIM * std::pow (likelihood, -1.0/ACTION_SPACE_DIM);
+    return edge_weight (model, estimate, action_dimensions);
   }
 
   double observation_edge_weight (const observation_model_type& model, const observation_type& estimate) {
-    const double OBSERVATION_SPACE_DIM = 2.0;
-    double likelihood = model.likelihood(estimate) + 0.0001;
-    return OBSERVATION_SPACE_DIM * std::pow (likelihood, -1.0/OBSERVATION_SPACE_DIM);
+    return edge_weight (model, estimate, observation_dimensions);
   }
 
 public:
 
-  void initialize ();
+  void add_action (actionid_t action_id);
+  void add_observation (featureid_t feature_id, actionid_t action_id);
+
   void update ();
+
   const bitree<action_type>& get_action_estimates () const { return action_estimates; }
 
-  std::vector<observation_type> get_feature_estimates () const {
-    std::vector<observation_type> estimates;
+  std::map<size_t, observation_type> get_feature_estimates () const {
+    std::map<size_t, observation_type> estimates;
     for (featureid_t i = 0; i < feature_estimates.size(); ++i) {
       if (!feature_estimates[i].observed) continue;
       const feature_data& feature = feature_estimates[i];
       action_type parent_action = action_estimates.accumulate(feature.parent_action);
-      estimates.push_back(parent_action + feature.estimate);
+      estimates[i] = parent_action + feature.estimate;
     }
     return estimates;
   }
 
 private:
 
-  void initialize_actions ();
-  void initialize_features ();
-  
   void update_action (const actionid_t action_id);
   double action_change (const actionid_t action_id) const;
 
@@ -90,81 +102,58 @@ private:
 
 public:
 
-  mcmc_slam (const action_data_type& _action_data,
-	     const observation_data_type& _observation_data,
-	     random_source& _random)
-    : action_data(_action_data),
-      observation_data(_observation_data),
-      random(_random)
-  { initialize(); }
+  mcmc_slam (random_source& _random, const slam_data_type& _data, int num_steps,
+	     double action_importance, double observation_importance)
+    : random(_random), mcmc_steps(num_steps), action_dimensions(action_importance),
+      observation_dimensions(observation_importance), data (_data),
+      _act_conn (data.connect_action_listener (boost::bind (&mcmc_slam::add_action, this, _1))),
+      _obs_conn (data.connect_observation_listener (boost::bind (&mcmc_slam::add_observation, this, _1, _2)))
+  { }
 
 };
 
 
-template <class ActionModel, class ObservationModel>
-void mcmc_slam<ActionModel, ObservationModel>::initialize () {
-  initialize_actions();
-  initialize_features();
+template <class SlamData>
+void mcmc_slam<SlamData>::add_action (actionid_t action_id) {
+  assert (action_id == action_estimates.size());
+  assert (action_id == action_weights.size());
+  const action_model_type& action_model = data.action(action_id);
+  action_estimates.push_back (action_model.mean());
+  action_weights.push_back (action_edge_weight (action_model, action_estimates[action_id]));
 }
 
 
-template <class ActionModel, class ObservationModel>
-void mcmc_slam<ActionModel, ObservationModel>::initialize_actions () {
-  if (action_data.size() < action_estimates.size()) {
-    action_estimates.resize (action_data.size());
-    action_weights.resize (action_data.size());
+template <class SlamData>
+void mcmc_slam<SlamData>::add_observation (featureid_t feature_id, actionid_t action_id) {
+
+  if (feature_estimates.size() <= feature_id) {
+    feature_estimates.resize(feature_id+1);
+    feature_weights.resize(feature_id+1);
   }
-  else {
-    action_estimates.reserve (action_data.size());
-    action_weights.reserve (action_data.size());
 
-    for (actionid_t i = action_estimates.size(); i < action_data.size(); ++i) {
-      action_type estimate = action_data[i].mean();
-      action_estimates.push_back (estimate);
-      action_weights.push_back (action_edge_weight (action_data[i], estimate));
-    }
-  }
-}
+  assert (feature_id < feature_estimates.size());
+  assert (feature_id < feature_weights.size());
 
+  feature_data& feature = feature_estimates[feature_id];
 
-template <class ActionModel, class ObservationModel>
-void mcmc_slam<ActionModel, ObservationModel>::initialize_features () {
-
-  feature_estimates.resize (observation_data.size());
-  feature_weights.resize (observation_data.size());
-
-  for (featureid_t i = 0; i < feature_estimates.size(); ++i) {
-
-    const arraymap<actionid_t, observation_model_type>& observations = observation_data[i];
-    feature_data& feature = feature_estimates[i];
-
-    if (observations.empty()) {
-      feature.observed = false;
-      feature_weights[i] = 0;
-    }
-    else if (!feature.observed) {
-      feature.observed = true;
-      std::cout << "Observed: " << i << std::endl;
-
-      const std::pair<const actionid_t, observation_model_type>& first_observation = 
-	observations.front();
-
-      feature.parent_action = first_observation.first;
-      const observation_model_type& distribution = first_observation.second;
-      feature.estimate = distribution.mean();
-      feature_weights[i] = observation_edge_weight (distribution, feature.estimate);
-    }
+  if (!feature.observed) {
+    feature.observed = true;
+    feature.parent_action = action_id;
+    const observation_model_type& observation_model = data.observation(feature_id).find(action_id)->second;
+    feature.estimate = observation_model.mean();
+    feature_weights[feature_id] = observation_edge_weight (observation_model, feature.estimate);
+    //std::cout << "setting feature " << feature_id << " parent to " << action_id << std::endl;
   }
 }
 
 
-template <class ActionModel, class ObservationModel>
-void mcmc_slam<ActionModel, ObservationModel>::update () {
+template <class SlamData>
+void mcmc_slam<SlamData>::update () {
 
   int action_updates = 0;
   int feature_updates = 0;
 
-  for (int i = 0; i < MCMC_STEPS; ++i) {
+  for (int i = 0; i < mcmc_steps; ++i) {
 
     const double action_weight = action_weights.accumulate();
     const double feature_weight = feature_weights.accumulate();
@@ -193,15 +182,14 @@ void mcmc_slam<ActionModel, ObservationModel>::update () {
 
   }
 
-  std::cout << action_updates << " action updates, " << feature_updates << " feature updates\n";
-
+  //std::cout << action_updates << " action updates, " << feature_updates << " feature updates\n";
 }
 
-template <class ActionModel, class ObservationModel>
-void mcmc_slam<ActionModel, ObservationModel>::update_action (const actionid_t id) {
+template <class SlamData>
+void mcmc_slam<SlamData>::update_action (const actionid_t id) {
 
-  const action_type new_estimate = action_data[id](random);
-  const double new_action_weight = action_edge_weight(action_data[id], new_estimate);
+  const action_type new_estimate = data.action(id)(random);
+  const double new_action_weight = action_edge_weight(data.action(id), new_estimate);
 
   const action_type old_estimate = action_estimates.at(id);
   const double old_action_weight = action_weights.at(id);
@@ -221,48 +209,52 @@ void mcmc_slam<ActionModel, ObservationModel>::update_action (const actionid_t i
 }
 
 
-template <class ActionModel, class ObservationModel>
-double mcmc_slam<ActionModel, ObservationModel>::action_change (const actionid_t action_id) const {
+template <class SlamData>
+double mcmc_slam<SlamData>::action_change (const actionid_t action_id) const {
 
   double result = 1.0;
+  typename observation_data_type::const_iterator i = data.observations().begin();
 
-  for (featureid_t i = 0; i < feature_estimates.size(); ++i) {
+  for (; i != data.observations().end(); ++i) {
 
-    const arraymap<actionid_t, observation_model_type>& observations = observation_data[i];
-    const feature_data& feature = feature_estimates[i];
+    const feature_data_type& observations = i->second;
+    const feature_data& feature = feature_estimates[i->first];
 
-    if (!feature.observed) continue;
+    //std::cout << "feature " << i->first << std::endl;
 
-    typename arraymap<actionid_t, observation_model_type>::const_iterator i, end;
+    assert (feature.observed);
+
+    typename feature_data_type::const_iterator j, end;
 
     if (feature.parent_action <= action_id) {
-      i = observations.upper_bound(action_id);
+      j = observations.upper_bound(action_id);
       end = observations.end();
     }
     else {
-      i = observations.begin();
+      j = observations.begin();
       end = observations.upper_bound(action_id);
     }
 
     observation_type observation = feature.estimate;
     actionid_t previous_action = feature.parent_action;
 
-    for (; i != end; ++i) {
-      observation = -action_estimates.accumulate(previous_action, i->first) + observation;
-      previous_action = i->first;
-      const observation_model_type& distribution = i->second;
+    for (; j != end; ++j) {
+      observation = -action_estimates.accumulate(previous_action, j->first) + observation;
+      previous_action = j->first;
+      const observation_model_type& distribution = j->second;
       result *= distribution.likelihood(observation);
     }
+
   }
 
   return result;
 }
 
 
-template <class ActionModel, class ObservationModel>
-void mcmc_slam<ActionModel, ObservationModel>::update_feature (const featureid_t id) {
+template <class SlamData>
+void mcmc_slam<SlamData>::update_feature (const featureid_t id) {
 
-  const arraymap<actionid_t, observation_model_type>& observations = observation_data[id];
+  const feature_data_type& observations = data.observation(id);
   feature_data& feature = feature_estimates[id];
 
   const observation_model_type& distribution
@@ -273,11 +265,11 @@ void mcmc_slam<ActionModel, ObservationModel>::update_feature (const featureid_t
 
   double acceptance_probability = new_feature_weight / feature_weights.at(id);
 
-  typename arraymap<actionid_t, observation_model_type>::const_iterator i = observations.begin();
-
   observation_type new_observation = new_estimate;
   observation_type old_observation = feature.estimate;
   actionid_t previous_action = feature.parent_action;
+
+  typename feature_data_type::const_iterator i = observations.begin();
 
   for (; i != observations.end(); ++i) {
 

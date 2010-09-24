@@ -1,6 +1,7 @@
 .DS_Store
 *~
 *.dSYM
+*.o
 data/
 gstlfilt/
 simulator

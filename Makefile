@@ -1,7 +1,15 @@
-geometry.o: geometry.cpp geometry.hpp
+CPPFLAGS := -I. -I/opt/local/include/
+CXXFLAGS := -Wall -O3
 
-pose.o: pose.cpp pose.hpp geometry.hpp
+simulator: simulator.o
+	g++ -o simulator simulator.o
 
-probability.o: probability.cpp probability.hpp
+simulator.o: simulator.cpp planar_robot/pose.hpp utilities/random.hpp \
+  utilities/geometry.hpp planar_robot/observation.hpp \
+  planar_robot/pose.hpp slam/mcmc_slam.hpp slam/slam_data.hpp \
+  utilities/arraymap.hpp utilities/random.hpp utilities/bitree.hpp \
+  utilities/arraymap.hpp slam/slam_data.hpp utilities/arraymap.hpp \
+  utilities/random.hpp
 
-odometry.o: odometry.cpp odometry.hpp geometry.hpp pose.hpp probability.hpp
+clean:
+	-rm simulator simulator.o

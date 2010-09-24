@@ -32,7 +32,7 @@ public:
   typedef RealType result_type;
 
   normal_dist (RealType mean_arg, RealType sigma_arg)
-    : _mean(mean_arg), _sigma(sigma_arg) { }
+    : _mean(mean_arg), _sigma(std::abs(sigma_arg)) { }
 
   RealType mean () const { return _mean; }
   RealType sigma () const { return _sigma; }
