@@ -56,8 +56,8 @@ public:
 
   size_t binary_search (const Grp& value) const;
 
-  Grp accumulate (size_t n) const;
   Grp accumulate (size_t begin, size_t end) const;
+  Grp accumulate (size_t end) const { return accumulate(0, end); }
   Grp accumulate () const { return accumulate(size()); }
 
   void push_back (const Grp& value);
@@ -102,6 +102,19 @@ namespace bitree_impl {
     i ^= i >> 1;
     i += parent;
     return i;
+  }
+
+  /** Returns the closest common ancestor of both a and b. **/
+  inline size_t common_ancestor (size_t a, size_t b) {
+    b ^= a;
+    b |= b >> 1;
+    b |= b >> 2;
+    b |= b >> 4;
+    b |= b >> 8;
+    b |= b >> 16;
+    b |= b >> 32;
+    a &= ~b;
+    return a;
   }
 
 }
@@ -181,18 +194,22 @@ void bitree<Grp>::resize (size_t n) {
 
 
 template <class Grp>
-Grp bitree<Grp>::accumulate (size_t n) const {
-  using namespace bitree_impl;
-  assert (n <= elements.size());
-  if (n == 0) return Grp();
-  else return elements[0] + accumulate_relative(n-1, 0);
-}
-
-
-template <class Grp>
 Grp bitree<Grp>::accumulate (size_t begin, size_t end) const {
-  // TODO: make this more efficient
-  return -accumulate(begin) + accumulate(end);
+  using namespace bitree_impl;
+  assert (begin <= elements.size() && end <= elements.size());
+  if (begin == end) {
+    return Grp();
+  }
+  else if (begin == 0) {
+    return elements[0] + accumulate_relative(end-1, 0);
+  }
+  else if (end == 0) {
+    return -(elements[0] + accumulate_relative(begin-1, 0));
+  }
+  else {
+    size_t ancestor = common_ancestor(begin-1, end-1);
+    return -accumulate_relative(begin-1, ancestor) + accumulate_relative(end-1, ancestor);
+  }
 }
 
 
