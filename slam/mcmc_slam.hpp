@@ -335,7 +335,10 @@ double mcmc_slam<SlamData>::action_change (const actionid_t action_id) const {
 
 
 /** Resamples the observation edge given by id, computes the corresponding acceptance probability,
-    and either accepts or rejects the change. */
+    and either accepts or rejects the change. Changing an observation edge splits the spanning tree
+    of the inference graph into two trees, T1 and T2. T1 contains all the action vertices and all other
+    features, whereas T2 contains only the feature being updated. The affected edges are all observations
+    of the feature whose estimate is being modified. */
 template <class SlamData>
 void mcmc_slam<SlamData>::update_feature (const featureid_t id) {
 
@@ -352,8 +355,8 @@ void mcmc_slam<SlamData>::update_feature (const featureid_t id) {
   const observation_type new_estimate = distribution(random);
   const double new_feature_weight = observation_edge_weight(distribution, new_estimate);
 
-  // These variables will hold store the new and old estimates, computed relative to some action.
-  // Initially, they are relative to the parent action of the feature.
+  // These variables will store the new and old estimates of the feature's position, computed relative to
+  // some action. Initially, they are relative to the parent action of the feature.
   observation_type new_observation = new_estimate;
   observation_type old_observation = feature.estimate;
   actionid_t observation_base = feature.parent_action;
