@@ -2,7 +2,7 @@
 
 simulator=$(dirname "$0")/simulator
 
-runs=10
+runs=100
 cores=2
 runs_per_core=$(($runs / $cores))
 
