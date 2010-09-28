@@ -82,8 +82,8 @@ public:
 
   const bitree<action_type>& get_action_estimates () const { return action_estimates; }
 
-  std::map<size_t, observation_type> get_feature_estimates () const {
-    std::map<size_t, observation_type> estimates;
+  std::map<featureid_t, observation_type> get_feature_estimates () const {
+    std::map<featureid_t, observation_type> estimates;
     for (featureid_t i = 0; i < feature_estimates.size(); ++i) {
       if (!feature_estimates[i].observed) continue;
       const feature_data& feature = feature_estimates[i];
@@ -194,12 +194,13 @@ void mcmc_slam<SlamData>::update_action (const actionid_t id) {
   const action_type old_estimate = action_estimates.at(id);
   const double old_action_weight = action_weights.at(id);
 
-  double acceptance_probability = new_action_weight / old_action_weight;
-  acceptance_probability /= action_change(id);
+  double acceptance_probability = -action_change(id);
 
   action_estimates[id] = new_estimate;
   action_weights[id] = new_action_weight;
-  acceptance_probability *= action_change(id);
+  acceptance_probability += action_change(id);
+
+  acceptance_probability = std::exp(acceptance_probability) * new_action_weight / old_action_weight;
 
   if (random.uniform() >= acceptance_probability) {
     action_estimates[id] = old_estimate;
@@ -212,7 +213,7 @@ void mcmc_slam<SlamData>::update_action (const actionid_t id) {
 template <class SlamData>
 double mcmc_slam<SlamData>::action_change (const actionid_t action_id) const {
 
-  double result = 1.0;
+  double result = 0.0;
   typename observation_data_type::const_iterator i = data.observations().begin();
 
   for (; i != data.observations().end(); ++i) {
@@ -242,7 +243,7 @@ double mcmc_slam<SlamData>::action_change (const actionid_t action_id) const {
       observation = -action_estimates.accumulate(previous_action, j->first) + observation;
       previous_action = j->first;
       const observation_model_type& distribution = j->second;
-      result *= distribution.likelihood(observation);
+      result += distribution.log_likelihood(observation);
     }
 
   }
@@ -263,7 +264,7 @@ void mcmc_slam<SlamData>::update_feature (const featureid_t id) {
   const observation_type new_estimate = distribution(random);
   const double new_feature_weight = observation_edge_weight(distribution, new_estimate);
 
-  double acceptance_probability = new_feature_weight / feature_weights.at(id);
+  double acceptance_probability = 0.0;
 
   observation_type new_observation = new_estimate;
   observation_type old_observation = feature.estimate;
@@ -281,9 +282,11 @@ void mcmc_slam<SlamData>::update_feature (const featureid_t id) {
     previous_action = i->first;
 
     const observation_model_type& distribution = i->second;
-    acceptance_probability *= distribution.likelihood(new_observation) 
-      / distribution.likelihood(old_observation);
+    acceptance_probability += distribution.log_likelihood(new_observation);
+    acceptance_probability -= distribution.log_likelihood(old_observation);
   }
+
+  acceptance_probability = std::exp(acceptance_probability) * new_feature_weight / feature_weights.at(id);
 
   if (random.uniform() < acceptance_probability) {
     feature.estimate = new_estimate;
