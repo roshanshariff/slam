@@ -17,19 +17,21 @@ while (($core < $cores)); do
 	    mkdir data
 	    echo Run $(($i+1))
 	    ../$simulator > /dev/null
-	    sleep 2
 	    mv data ../run_$((i+1))
 	    i=$((i+1))
 	done
 	cd ..
+	rmdir $core
     )&
+    sleep 1
     core=$(($core + 1))
 done
 wait
 i=$(($core * $runs_per_core))
 while (($i < $runs)); do
     mkdir data
-    $simulator $i
+    echo Run $(($i+1))
+    $simulator > /dev/null
     mv data run_$((i+1))
     i=$((i+1))
 done
