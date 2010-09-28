@@ -259,7 +259,7 @@ void mcmc_slam<SlamData>::update_action (const actionid_t id) {
   action_estimates[id] = new_estimate;
   action_weights[id] = new_action_weight;
 
-  // Add the log probability of all edges affected, afte the action edge is updated.
+  // Add the log probability of all edges affected, after the action edge is updated.
   acceptance_probability += action_change(id);
 
   // Compute the acceptance probability as the ratio of probabilities after and before the edge
