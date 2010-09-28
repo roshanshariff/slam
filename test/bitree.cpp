@@ -124,6 +124,12 @@ bool test_2 (random_source& random) {
     seq[new_index] = new_element;
   }
 
+  for (size_t i = 0; i <= seq.size(); ++i) {
+    for (size_t j = 0; j <= seq.size(); ++j) {
+      if (-seq.accumulate(i) + seq.accumulate(j) != seq.accumulate(i, j)) return false;
+    }
+  }
+
   return true;
 }
 
