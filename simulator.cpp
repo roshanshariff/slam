@@ -11,13 +11,13 @@
 
 #include "planar_robot/pose.hpp"
 #include "planar_robot/observation.hpp"
+#include "planar_robot/odometry_model.hpp"
 #include "slam/mcmc_slam.hpp"
 #include "slam/slam_data.hpp"
 #include "utilities/random.hpp"
 
 using planar_robot::pose;
-using planar_robot::pose_dist;
-using planar_robot::pose_dist_odometry;
+using planar_robot::odometry_model;
 using planar_robot::observation;
 using planar_robot::observation_dist;
 using planar_robot::landmark;
@@ -42,8 +42,8 @@ const double OBS_BEARING_SIGMA = 1.0*PI/180.0; // radians; the standard deviatio
 
 // ODOMETRY PARAMETERS
 // see planar_robot/pose.hpp for an explanation of the four parameters of the odometry model.
-//const pose_dist_odometry ODOMETRY_MODEL (0.05, 1.0*PI/180, 0.1, 0.0001*180/PI);
-const pose_dist_odometry ODOMETRY_MODEL (0.05, 0.25*PI/180, 0.1, 0.0001*180/PI);
+const odometry_model::builder ODOMETRY_MODEL (0.05, 1.0*PI/180, 0.1, 0.0001*180/PI);
+//const odometry_model::builder ODOMETRY_MODEL (0.05, 0.25*PI/180, 0.1, 0.0001*180/PI);
 
 const int MCMC_STEPS = 100; // number of MCMC iterations per step.
 const double ACT_DIM = 3.0; // the number of parameters estimated by each action edge.
@@ -82,7 +82,7 @@ pose get_pose (double time) {
     landmarks in range and adds them to the given slam_data object. */
 size_t add_observations (const pose& position,
 			 const std::map<size_t, observation>& landmarks,
-			 slam_data<pose_dist, observation_dist>& data) {
+			 slam_data<odometry_model, observation_dist>& data) {
 
   size_t num_observations = 0;
 
@@ -176,7 +176,7 @@ int main () {
   const std::map<size_t, observation> landmarks = generate_circle_map ();
 
   // A container to hold all the state changes and observations.
-  typedef slam_data<pose_dist, observation_dist> slam_data_type;
+  typedef slam_data<odometry_model, observation_dist> slam_data_type;
   slam_data_type data;
 
   // Initialise the MCMC SLAM object.
@@ -208,7 +208,7 @@ int main () {
     // The odometry reading is the difference between where the robot thinks it is now and where it
     // wants to be at the next time step. Therefore the state change distribution has this reading
     // as the mean.
-    const pose_dist distribution = ODOMETRY_MODEL (-expected_position + get_pose (time_step*DELTA_T));
+    const odometry_model distribution = ODOMETRY_MODEL (-expected_position + get_pose (time_step*DELTA_T));
 
     // The expected trajectory (i.e. the maximum prior likelihood trajectory) just takes the mean of the
     // above distribution ...
