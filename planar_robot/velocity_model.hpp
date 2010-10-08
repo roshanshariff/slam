@@ -3,6 +3,7 @@
 
 #include <cstdlib>
 #include <cmath>
+#include <functional>
 
 #include "planar_robot/pose.hpp"
 #include "utilities/random.hpp"
@@ -82,14 +83,11 @@ namespace planar_robot {
 	+ g.log_likelihood (control.g());
     }
 
-    class builder {
+    class builder : public std::binary_function<velocity_control, double, velocity_model> {
 
       const double alpha1, alpha2, alpha3, alpha4, alpha5, alpha6;
 
     public:
-
-      typedef velocity_control control_type;
-      typedef velocity_model model_type;
 
       builder (double a1, double a2, double a3, double a4, double a5, double a6)
 	: alpha1(a1), alpha2(a2), alpha3(a3), alpha4(a4), alpha5(a5), alpha6(a6) { }

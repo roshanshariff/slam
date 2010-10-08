@@ -4,15 +4,18 @@
 #include <fstream>
 #include <iomanip>
 #include <ctime>
+#include <functional>
 
 #include <boost/math/constants/constants.hpp>
 #include <boost/timer.hpp>
 #include <boost/progress.hpp>
 
+#include "simulator.hpp"
 #include "planar_robot/pose.hpp"
 #include "planar_robot/position.hpp"
 #include "planar_robot/odometry_model.hpp"
 #include "planar_robot/range_bearing_model.hpp"
+#include "planar_robot/circle_controller.hpp"
 #include "slam/mcmc_slam.hpp"
 #include "slam/slam_data.hpp"
 #include "utilities/random.hpp"
@@ -33,25 +36,25 @@ const double CENTRE_Y = 0; // meters; the centre of the circle.
 // SIMULATION PARAMETERS
 const double SPEED = 3; // meters/second; the speed of the robot.
 const double DELTA_T = 0.25; // seconds; the interval between successive actions/observations.
-const double RUN_TIME = 2.1*2*PI*RADIUS/SPEED; // seconds; the total time for which the simulation runs.
-
-// OBSERVATION PARAMETERS
-const double OBS_MAX_RANGE = 30; // meters; the maximum range at which the sensors detect landmarks.
-const double OBS_RANGE_SIGMA = 0.1; // meters; the standard deviation in the measured range to landmarks.
-const double OBS_BEARING_SIGMA = 1.0*PI/180.0; // radians; the standard deviation in the measured bearing.
+const double REVS = 2.1; // the number of times to go around the circle
 
 // ODOMETRY PARAMETERS
 // see planar_robot/pose.hpp for an explanation of the four parameters of the odometry model.
 //const odometry_model::builder ODOMETRY_MODEL (0.05, 1.0*PI/180, 0.1, 0.0001*180/PI);
 const odometry_model::builder ODOMETRY_MODEL (0.05, 0.25*PI/180, 0.1, 0.0001*180/PI);
 
+// OBSERVATION PARAMETERS
+const range_bearing_model::builder SENSOR_MODEL (0.1, 1.0*PI/180.0); // standard deviation in range and bearing noise
+const double OBS_MAX_RANGE = 30; // meters; the maximum range at which the sensors detect landmarks.
+
 const int MCMC_STEPS = 100; // number of MCMC iterations per step.
 const double ACT_DIM = 3.0; // the number of parameters estimated by each action edge.
 const double OBS_DIM = 2.0; // the number of parameters estimated by each observation edge.
 
-// The global random source. TODO: use two generators, one for the simulation itself and another for
-// the MCMC SLAM module.
-static random_source rand_gen;
+
+bool observation_in_range (const position& p) {
+  return p.range() < OBS_MAX_RANGE;
+}
 
 
 /** Generates landmarks in an evenly spaced grid around the expected path of the robot. */
@@ -64,43 +67,6 @@ std::map<size_t, position> generate_circle_map () {
     }
   }
   return features;
-}
-
-
-/** Gets the expected pose of the robot at the given time. The robot expects to drive in a circle with
-    the given radius and center and at the given speed. */
-pose get_pose (double time) {
-  double theta = SPEED * time / RADIUS;
-  double x = CENTRE_X + RADIUS*std::cos(theta);
-  double y = CENTRE_Y + RADIUS*std::sin(theta);
-  double heading = theta + PI/2;
-  return pose (x, y, heading);
-}
-
-
-/** Given the current position of the robot and the list of landmarks, generates observations for the 
-    landmarks in range and adds them to the given slam_data object. */
-size_t add_observations (const pose& sensor_pose, const std::map<size_t, position>& landmarks,
-			 slam_data<odometry_model, range_bearing_model>& data) {
-
-  size_t num_observations = 0;
-
-  std::map<size_t, position>::const_iterator i = landmarks.begin();
-  for (; i != landmarks.end(); ++i) {
-
-    // The measurement is a random sample from the distribution which has the true observation as mean.
-    range_bearing_model distribution (-sensor_pose + i->second, OBS_RANGE_SIGMA, OBS_BEARING_SIGMA);
-    position measurement = distribution(rand_gen);
-
-    if (measurement.range() < OBS_MAX_RANGE) {
-      // The measured observation is a distribution with the measurement as mean.
-      data.add_observation(i->first, range_bearing_model (measurement, OBS_RANGE_SIGMA, OBS_BEARING_SIGMA));
-      ++num_observations;
-    }
-  }
-
-  // Returns the total number of observations added.
-  return num_observations;
 }
 
 
@@ -117,10 +83,10 @@ void print_trajectory (std::ostream& out, pose p, const bitree<pose>& trajectory
 
 /** Prints the given set of landmarks, as offset by the given pose, to ostream& out, with the format
     feature_id  x_position  y_position */
-void print_landmarks (std::ostream& out, const pose& p, const std::map<size_t, position>& landmarks) {
+void print_landmarks (std::ostream& out, const std::map<size_t, position>& landmarks) {
   std::map<size_t, position>::const_iterator i = landmarks.begin();
   for (; i != landmarks.end(); ++i) {
-    position pos = p + i->second;
+    const position& pos = i->second;
     out << i->first << '\t' << pos.x() << '\t' << pos.y() << '\n';
   }
 }
@@ -145,14 +111,14 @@ double trajectory_error (const bitree<pose>& a, const bitree<pose>& b) {
 /** Computes the root mean squared error between the given map and the given set of estimates. The
     estimates are assumed to be relative to the given pose p. */
 double landmark_error (const std::map<size_t, position>& landmarks,
-		       const pose& p, const std::map<size_t, position>& estimates) {
+		       const std::map<size_t, position>& estimates) {
   double error = 0;
   size_t num_landmarks = 0;
   std::map<size_t, position>::const_iterator i = estimates.begin();
   for (; i != estimates.end(); ++i) {
     std::map<size_t, position>::const_iterator j = landmarks.find(i->first);
     assert (j != landmarks.end());
-    position estimate = p + i->second;
+    const position& estimate = i->second;
     const position& actual = j->second;
     double x = estimate.x() - actual.x();
     double y = estimate.y() - actual.y();
@@ -165,92 +131,63 @@ double landmark_error (const std::map<size_t, position>& landmarks,
 
 int main () {
 
+  // The global random source. TODO: use two generators, one for the simulation itself and another for
+  // the MCMC SLAM module.
+  random_source random;
+
   // Seed the random generator from the current time. This is not ideal, but std::tr1::random_device
   // appears to be broken (it always returns the same value) so this is the best we can do.
   const unsigned long seed = std::time(0);
-  rand_gen.generator.seed(seed);
+  random.generator.seed(seed);
 
   // Generate the list of landmarks.
   const std::map<size_t, position> landmarks = generate_circle_map ();
 
-  // A container to hold all the state changes and observations.
-  typedef slam_data<odometry_model, range_bearing_model> slam_data_type;
-  slam_data_type data;
+  // Use a circle controller
+  planar_robot::circle_controller controller (CENTRE_X, CENTRE_Y, RADIUS, SPEED, REVS);
 
-  // Initialise the MCMC SLAM object.
-  mcmc_slam<slam_data_type> mcmc (rand_gen, data, MCMC_STEPS, ACT_DIM, OBS_DIM);
-
-  // The expected and actual trajectories and the initial pose relative to which they are measured.
-  const pose initial_position = get_pose(0);
-  bitree<pose> expected_trajectory, actual_trajectory;
-
-  long time_step = 0;
-  long num_steps = RUN_TIME/DELTA_T;
-  long total_observations = 0;
-  boost::progress_display progress (num_steps);
+  simulator<odometry_model::builder, range_bearing_model::builder> sim
+    (landmarks, std::tr1::ref(controller), controller.initial_pose(),
+     ODOMETRY_MODEL, SENSOR_MODEL, observation_in_range,
+     MCMC_STEPS, ACT_DIM, OBS_DIM);
+     
   boost::timer timer;
 
-  while (time_step <= num_steps) {
-
-    // The expected and actual positions of the robot at this time step.
-    pose expected_position = initial_position + expected_trajectory.accumulate (time_step);
-    pose actual_position = initial_position + actual_trajectory.accumulate (time_step);
-
-    // Keep track of how many observations have been made throughout the simulation.
-    total_observations += add_observations (actual_position, landmarks, data);
-
-    mcmc.update(); // Perform MCMC updates
-    ++time_step;
-    ++progress;
-
-    // The odometry reading is the difference between where the robot thinks it is now and where it
-    // wants to be at the next time step. Therefore the state change distribution has this reading
-    // as the mean.
-    const odometry_model distribution = ODOMETRY_MODEL (-expected_position + get_pose (time_step*DELTA_T));
-
-    // The expected trajectory (i.e. the maximum prior likelihood trajectory) just takes the mean of the
-    // above distribution ...
-    expected_trajectory.push_back (distribution.mean());
-
-    // ... but the actual trajectory is a random sample from the distribution.
-    actual_trajectory.push_back(distribution(rand_gen));
-
-    // Store the distribution as the latest state change. The SLAM module must try to recover the random
-    // sample that describes the actual trajectory of the robot.
-    data.add_action(distribution);
-
+  // Run the simulation
+  while (!controller.finished()) {
+    sim (random, DELTA_T);
+    std::cout << sim.get_num_steps() << '\n';
   }
 
   // Store elapsed time. We don't want to include the time taken by computing errors and doing I/O.
   const double elapsed_time = timer.elapsed();
 
-  // Get the estimated trajectory and landmark positions generated by MCMC SLAM.
-  const std::map<size_t, position> estimated_map = mcmc.get_feature_estimates();
-  const bitree<pose>& estimated_trajectory = mcmc.get_action_estimates();
+  // Get the estimated landmark positions generated by MCMC SLAM.
+  const std::map<size_t, position> estimated_map = sim.get_feature_estimates();
 
   // Store the expected trajectory.
   std::ofstream expected_file ("data/expected_trajectory.txt");
-  print_trajectory (expected_file, initial_position, expected_trajectory);
+  print_trajectory (expected_file, sim.get_initial_state(), sim.get_expected_state());
   expected_file.close();
 
   // Store the actual trajectory.
   std::ofstream actual_file ("data/actual_trajectory.txt");
-  print_trajectory (actual_file, initial_position, actual_trajectory);
+  print_trajectory (actual_file, sim.get_initial_state(), sim.get_state());
   actual_file.close();
 
   // Store the estimated trajectory.
   std::ofstream estimated_file ("data/estimated_trajectory.txt");
-  print_trajectory (estimated_file, initial_position, estimated_trajectory);
+  print_trajectory (estimated_file, sim.get_initial_state(), sim.get_estimated_state());
   estimated_file.close();
 
   // Store the actual landmark positions.
   std::ofstream map_file ("data/landmarks.txt");
-  print_landmarks (map_file, pose(), landmarks);
+  print_landmarks (map_file, landmarks);
   map_file.close();
 
   // Store the estimated landmark positions.
   std::ofstream estimated_map_file ("data/estimated_map.txt");
-  print_landmarks (estimated_map_file, initial_position, estimated_map);
+  print_landmarks (estimated_map_file, estimated_map);
   estimated_map_file.close();
 
   // Summarise key information about this simulation.
@@ -260,12 +197,13 @@ int main () {
 	       << "Grid spacing: " << GRID_PITCH << " meters\n"
 	       << "Number of landmarks: " << landmarks.size() << "\n"
 	       << "Circle radius: " << RADIUS << " meters \n"
-	       << "Time steps: " << num_steps << "\n"
-	       << "Average observations per step: " << double(total_observations)/num_steps << "\n"
-	       << "Trajectory error: " << trajectory_error (actual_trajectory, estimated_trajectory) << "\n"
-	       << "Landmark error: " << landmark_error (landmarks, initial_position, estimated_map) << "\n"
+	       << "Time steps: " << sim.get_num_steps() << "\n"
+	       << "Average observations per step: " << sim.get_observations_per_step() << "\n"
+	       << "Trajectory error: " << trajectory_error (sim.get_state(), sim.get_estimated_state()) << "\n"
+	       << "Landmark error: " << landmark_error (landmarks, estimated_map) << "\n"
 	       << "Elapsed time: " << elapsed_time << "\n";
   summary_file.close();
 
   return 0;
+
 }

@@ -2,6 +2,7 @@
 #define _PLANAR_ROBOT_ODOMETRY_MODEL_HPP
 
 #include <cstdlib>
+#include <functional>
 
 #include "planar_robot/pose.hpp"
 #include "utilities/random.hpp"
@@ -47,14 +48,11 @@ namespace planar_robot {
 	+ bearing.log_likelihood (wrap_angle (p.bearing(), bearing.mean()));
     }
 
-    class builder {
+    class builder : public std::binary_function<pose, double, odometry_model> {
 
       const double alpha1, alpha2, alpha3, alpha4;
 
     public:
-
-      typedef pose control_type;
-      typedef odometry_model model_type;
 
       builder (double a1, double a2, double a3, double a4)
 	: alpha1(a1), alpha2(a2), alpha3(a3), alpha4(a4) { }

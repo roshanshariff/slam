@@ -59,8 +59,6 @@ private:
 
   typedef std::map<featureid_t, feature_estimate> feature_estimates_type;
 
-  random_source& random;
-
   /** MCMC Constants. mcmc_steps is the number of iterations per update. The action and observation
       dimensions are a measure of the number of independent parameters represented by each type of
       edge. */
@@ -85,23 +83,23 @@ private:
 
 public:
 
-  mcmc_slam (random_source& _random, const slam_data_type& _data, int num_steps,
+  mcmc_slam (const slam_data_type& _data, int num_steps,
 	     double action_importance, double observation_importance);
 
   void add_action (actionid_t action_id);
   void add_observation (featureid_t feature_id, actionid_t action_id);
 
-  void update ();
+  void update (random_source&);
 
   const bitree<action_type>& get_action_estimates () const { return action_estimates; }
-  std::map<featureid_t, observation_type> get_feature_estimates () const;
+  std::map<featureid_t, observation_type> get_feature_estimates (const action_type& initial_state) const;
 
 private:
 
-  void update_action (const actionid_t action_id);
+  void update_action (random_source&, const actionid_t action_id);
   double action_change (const actionid_t action_id) const;
 
-  void update_feature (const featureid_t feature_id);
+  void update_feature (random_source&, const featureid_t feature_id);
 
   /** Calculates the edge weight given the probability distribution and label. Uses the formula
       p_e(x) = k * J_e(x)^(-1/k) where p_e is the edge weight, x is the edge label, and J_e is
@@ -144,9 +142,9 @@ private:
     update, and action_importance and observation_importance are the number of independent
     parameters represented by each action and observation edge respectively. */
 template <class SlamData>
-mcmc_slam<SlamData>::mcmc_slam (random_source& _random, const slam_data_type& _data, int num_steps,
+mcmc_slam<SlamData>::mcmc_slam (const slam_data_type& _data, int num_steps,
 				double action_importance, double observation_importance)
-  : random(_random), mcmc_steps(num_steps), action_dimensions(action_importance),
+  : mcmc_steps(num_steps), action_dimensions(action_importance),
     observation_dimensions(observation_importance), data (_data),
     _act_conn (data.connect_action_listener (boost::bind (&mcmc_slam::add_action, this, _1))),
     _obs_conn (data.connect_observation_listener (boost::bind (&mcmc_slam::add_observation, this, _1, _2)))
@@ -196,7 +194,7 @@ void mcmc_slam<SlamData>::add_observation (featureid_t feature_id, actionid_t ac
 
 // Performs the MCMC SLAM iterations 'mcmc_steps' times.
 template <class SlamData>
-void mcmc_slam<SlamData>::update () {
+void mcmc_slam<SlamData>::update (random_source& random) {
 
   int action_updates = 0;
   int feature_updates = 0;
@@ -221,13 +219,13 @@ void mcmc_slam<SlamData>::update () {
       ++action_updates;
       // Identify the action in whose interval the randomly selected number lies.
       actionid_t action_id = action_weights.binary_search (action_range);
-      update_action (action_id);
+      update_action (random, action_id);
     }
     else if (feature_weight > 0) {
       ++feature_updates;
       // Identify the feature in whose interval the randomly selected number lies.
       featureid_t feature_id = feature_weights.binary_search (feature_range);
-      update_feature (feature_id);
+      update_feature (random, feature_id);
     }
   }
   //std::cout << action_updates << " action updates, " << feature_updates << " feature updates\n";
@@ -237,7 +235,7 @@ void mcmc_slam<SlamData>::update () {
 /** Resamples the action edge given by id, computes the corresponding acceptance probability,
     and either accepts or rejects the change. */
 template <class SlamData>
-void mcmc_slam<SlamData>::update_action (const actionid_t id) {
+void mcmc_slam<SlamData>::update_action (random_source& random, const actionid_t id) {
 
   assert (id < action_estimates.size());
 
@@ -340,7 +338,7 @@ double mcmc_slam<SlamData>::action_change (const actionid_t action_id) const {
     features, whereas T2 contains only the feature being updated. The affected edges are all observations
     of the feature whose estimate is being modified. */
 template <class SlamData>
-void mcmc_slam<SlamData>::update_feature (const featureid_t id) {
+void mcmc_slam<SlamData>::update_feature (random_source& random, const featureid_t id) {
 
   // Retrieve the feature estimate to be updated.
   feature_estimate& feature = get_feature (id);
@@ -405,16 +403,16 @@ void mcmc_slam<SlamData>::update_feature (const featureid_t id) {
 /** Returns current estimates of the positions of all observed features. */
 template <class SlamData>
 std::map<typename SlamData::featureid_t, typename SlamData::observation_model_type::result_type>
-mcmc_slam<SlamData>::get_feature_estimates () const {
+mcmc_slam<SlamData>::get_feature_estimates (const action_type& initial_state) const {
   std::map<featureid_t, observation_type> estimates;
   typename feature_estimates_type::const_iterator i = feature_estimates.begin();
   for (; i != feature_estimates.end(); ++i) { // iterate through each feature
     featureid_t feature_id = i->first;
     const feature_estimate& feature = i->second;
     // Compute the state of the robot at the time of this feature's parent action.
-    action_type parent_action = action_estimates.accumulate(feature.parent_action);
+    action_type state = initial_state + action_estimates.accumulate(feature.parent_action);
     // Rebase the estimate to be relative to action 0.
-    estimates.insert (std::make_pair (feature_id, parent_action + feature.estimate));
+    estimates.insert (std::make_pair (feature_id, state + feature.estimate));
   }
   return estimates;
 }

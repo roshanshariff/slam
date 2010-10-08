@@ -1,6 +1,8 @@
 #ifndef _PLANAR_ROBOT_RANGE_BEARING_MODEL_HPP
 #define _PLANAR_ROBOT_RANGE_BEARING_MODEL_HPP
 
+#include <functional>
+
 #include "planar_robot/position.hpp"
 #include "utilities/random.hpp"
 #include "utilities/geometry.hpp"
@@ -41,7 +43,7 @@ namespace planar_robot {
 	+ bearing.log_likelihood (wrap_angle (o.bearing(), bearing.mean()));
     }
 
-    class builder {
+    class builder : public std::unary_function<position, range_bearing_model> {
 
       const double range_sigma, bearing_sigma;
 
