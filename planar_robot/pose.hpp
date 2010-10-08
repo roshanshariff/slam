@@ -3,9 +3,6 @@
 
 #include <complex>
 
-#include "utilities/random.hpp"
-#include "utilities/geometry.hpp"
-
 namespace planar_robot {
 
   // Forward declarations
@@ -34,6 +31,8 @@ namespace planar_robot {
     double distance () const { return std::abs(translation); }
     double direction () const { return std::arg(translation); }
 
+    double distance_squared () const { return std::norm(translation); }
+
     pose& operator+= (const pose& p) {
       translation += rotation * p.translation;
       rotation *= p.rotation;
@@ -45,10 +44,14 @@ namespace planar_robot {
       return pose (-translation*inverse_rot, inverse_rot);
     }
 
+    friend pose pose_polar (double r, double theta, double bearing);
     friend observation operator+ (const pose&, const observation&);
-    friend class odometry_model;
 
   };
+
+  inline pose pose_polar (double r, double theta, double bearing) {
+    return pose (std::polar (r, theta), std::polar (1.0, bearing));
+  }
 
   inline pose operator+ (pose a, const pose& b) { return a += b; }
 
