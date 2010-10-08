@@ -10,17 +10,17 @@
 #include <boost/progress.hpp>
 
 #include "planar_robot/pose.hpp"
-#include "planar_robot/observation.hpp"
+#include "planar_robot/position.hpp"
 #include "planar_robot/odometry_model.hpp"
+#include "planar_robot/range_bearing_model.hpp"
 #include "slam/mcmc_slam.hpp"
 #include "slam/slam_data.hpp"
 #include "utilities/random.hpp"
 
 using planar_robot::pose;
 using planar_robot::odometry_model;
-using planar_robot::observation;
-using planar_robot::observation_dist;
-using planar_robot::landmark;
+using planar_robot::position;
+using planar_robot::range_bearing_model;
 
 const double PI = boost::math::constants::pi<double>();
 
@@ -42,8 +42,8 @@ const double OBS_BEARING_SIGMA = 1.0*PI/180.0; // radians; the standard deviatio
 
 // ODOMETRY PARAMETERS
 // see planar_robot/pose.hpp for an explanation of the four parameters of the odometry model.
-const odometry_model::builder ODOMETRY_MODEL (0.05, 1.0*PI/180, 0.1, 0.0001*180/PI);
-//const odometry_model::builder ODOMETRY_MODEL (0.05, 0.25*PI/180, 0.1, 0.0001*180/PI);
+//const odometry_model::builder ODOMETRY_MODEL (0.05, 1.0*PI/180, 0.1, 0.0001*180/PI);
+const odometry_model::builder ODOMETRY_MODEL (0.05, 0.25*PI/180, 0.1, 0.0001*180/PI);
 
 const int MCMC_STEPS = 100; // number of MCMC iterations per step.
 const double ACT_DIM = 3.0; // the number of parameters estimated by each action edge.
@@ -55,12 +55,12 @@ static random_source rand_gen;
 
 
 /** Generates landmarks in an evenly spaced grid around the expected path of the robot. */
-std::map<size_t, observation> generate_circle_map () {
-  std::map<size_t, observation> features;
+std::map<size_t, position> generate_circle_map () {
+  std::map<size_t, position> features;
   size_t feature_id = 0;
   for (double x = 0; x <= 2*RADIUS+GRID_PITCH; x += GRID_PITCH) {
     for (double y = -2*RADIUS; y <= 2*RADIUS+GRID_PITCH; y += GRID_PITCH) {
-      features[feature_id++] = landmark (x, y);
+      features[feature_id++] = position (x, y);
     }
   }
   return features;
@@ -80,22 +80,21 @@ pose get_pose (double time) {
 
 /** Given the current position of the robot and the list of landmarks, generates observations for the 
     landmarks in range and adds them to the given slam_data object. */
-size_t add_observations (const pose& position,
-			 const std::map<size_t, observation>& landmarks,
-			 slam_data<odometry_model, observation_dist>& data) {
+size_t add_observations (const pose& sensor_pose, const std::map<size_t, position>& landmarks,
+			 slam_data<odometry_model, range_bearing_model>& data) {
 
   size_t num_observations = 0;
 
-  std::map<size_t, observation>::const_iterator i = landmarks.begin();
+  std::map<size_t, position>::const_iterator i = landmarks.begin();
   for (; i != landmarks.end(); ++i) {
 
     // The measurement is a random sample from the distribution which has the true observation as mean.
-    observation_dist distribution (-position + i->second, OBS_RANGE_SIGMA, OBS_BEARING_SIGMA);
-    observation measurement = distribution(rand_gen);
+    range_bearing_model distribution (-sensor_pose + i->second, OBS_RANGE_SIGMA, OBS_BEARING_SIGMA);
+    position measurement = distribution(rand_gen);
 
     if (measurement.range() < OBS_MAX_RANGE) {
       // The measured observation is a distribution with the measurement as mean.
-      data.add_observation(i->first, observation_dist (measurement, OBS_RANGE_SIGMA, OBS_BEARING_SIGMA));
+      data.add_observation(i->first, range_bearing_model (measurement, OBS_RANGE_SIGMA, OBS_BEARING_SIGMA));
       ++num_observations;
     }
   }
@@ -118,10 +117,10 @@ void print_trajectory (std::ostream& out, pose p, const bitree<pose>& trajectory
 
 /** Prints the given set of landmarks, as offset by the given pose, to ostream& out, with the format
     feature_id  x_position  y_position */
-void print_landmarks (std::ostream& out, const pose& p, const std::map<size_t, observation>& landmarks) {
-  std::map<size_t, observation>::const_iterator i = landmarks.begin();
+void print_landmarks (std::ostream& out, const pose& p, const std::map<size_t, position>& landmarks) {
+  std::map<size_t, position>::const_iterator i = landmarks.begin();
   for (; i != landmarks.end(); ++i) {
-    observation pos = p + i->second;
+    position pos = p + i->second;
     out << i->first << '\t' << pos.x() << '\t' << pos.y() << '\n';
   }
 }
@@ -137,8 +136,7 @@ double trajectory_error (const bitree<pose>& a, const bitree<pose>& b) {
   for (size_t i = 0; i < points; ++i) {
     a_pos += a.at(i);
     b_pos += b.at(i);
-    double distance = (-a_pos + b_pos).distance();
-    error += distance * distance;
+    error += (-a_pos + b_pos).distance_squared();
   }
   return std::sqrt (error/points);
 }
@@ -146,16 +144,16 @@ double trajectory_error (const bitree<pose>& a, const bitree<pose>& b) {
 
 /** Computes the root mean squared error between the given map and the given set of estimates. The
     estimates are assumed to be relative to the given pose p. */
-double landmark_error (const std::map<size_t, observation>& landmarks,
-		       const pose& p, const std::map<size_t, observation>& estimates) {
+double landmark_error (const std::map<size_t, position>& landmarks,
+		       const pose& p, const std::map<size_t, position>& estimates) {
   double error = 0;
   size_t num_landmarks = 0;
-  std::map<size_t, observation>::const_iterator i = estimates.begin();
+  std::map<size_t, position>::const_iterator i = estimates.begin();
   for (; i != estimates.end(); ++i) {
-    std::map<size_t, observation>::const_iterator j = landmarks.find(i->first);
+    std::map<size_t, position>::const_iterator j = landmarks.find(i->first);
     assert (j != landmarks.end());
-    observation estimate = p + i->second;
-    const observation& actual = j->second;
+    position estimate = p + i->second;
+    const position& actual = j->second;
     double x = estimate.x() - actual.x();
     double y = estimate.y() - actual.y();
     error += x*x + y*y;
@@ -173,10 +171,10 @@ int main () {
   rand_gen.generator.seed(seed);
 
   // Generate the list of landmarks.
-  const std::map<size_t, observation> landmarks = generate_circle_map ();
+  const std::map<size_t, position> landmarks = generate_circle_map ();
 
   // A container to hold all the state changes and observations.
-  typedef slam_data<odometry_model, observation_dist> slam_data_type;
+  typedef slam_data<odometry_model, range_bearing_model> slam_data_type;
   slam_data_type data;
 
   // Initialise the MCMC SLAM object.
@@ -227,7 +225,7 @@ int main () {
   const double elapsed_time = timer.elapsed();
 
   // Get the estimated trajectory and landmark positions generated by MCMC SLAM.
-  const std::map<size_t, observation> estimated_map = mcmc.get_feature_estimates();
+  const std::map<size_t, position> estimated_map = mcmc.get_feature_estimates();
   const bitree<pose>& estimated_trajectory = mcmc.get_action_estimates();
 
   // Store the expected trajectory.

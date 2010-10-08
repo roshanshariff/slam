@@ -71,7 +71,7 @@ namespace planar_robot {
 	double bearing_sigma =   alpha1 * std::abs(rotation)  + alpha2 * translation;
 
 	return odometry_model (reading, distance_sigma, direction_sigma, bearing_sigma);
-      }
+      };
 
     };
 

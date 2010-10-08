@@ -3,12 +3,15 @@
 
 #include <complex>
 
+
 namespace planar_robot {
+
 
   // Forward declarations
   class pose;
-  class observation;
-  inline observation operator+ (const pose&, const observation&);
+  class position;
+  inline position operator+ (const pose&, const position&);
+
 
   class pose {
 
@@ -30,7 +33,6 @@ namespace planar_robot {
     double bearing () const { return std::arg(rotation); }
     double distance () const { return std::abs(translation); }
     double direction () const { return std::arg(translation); }
-
     double distance_squared () const { return std::norm(translation); }
 
     pose& operator+= (const pose& p) {
@@ -45,16 +47,19 @@ namespace planar_robot {
     }
 
     friend pose pose_polar (double r, double theta, double bearing);
-    friend observation operator+ (const pose&, const observation&);
+    friend position operator+ (const pose&, const position&);
 
   };
+
 
   inline pose pose_polar (double r, double theta, double bearing) {
     return pose (std::polar (r, theta), std::polar (1.0, bearing));
   }
 
+
   inline pose operator+ (pose a, const pose& b) { return a += b; }
 
-}
+
+} // namespace planar_robot
 
 #endif //_PLANAR_ROBOT_POSE_HPP
