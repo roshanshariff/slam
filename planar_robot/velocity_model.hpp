@@ -83,7 +83,7 @@ namespace planar_robot {
 	+ g.log_likelihood (control.g());
     }
 
-    class builder : public std::binary_function<velocity_control, double, velocity_model> {
+    class builder : public std::binary_function<double, velocity_control, velocity_model> {
 
       const double alpha1, alpha2, alpha3, alpha4, alpha5, alpha6;
 
@@ -92,7 +92,7 @@ namespace planar_robot {
       builder (double a1, double a2, double a3, double a4, double a5, double a6)
 	: alpha1(a1), alpha2(a2), alpha3(a3), alpha4(a4), alpha5(a5), alpha6(a6) { }
 
-      velocity_model operator() (const velocity_control& control, double dt) const {
+      velocity_model operator() (double dt, const velocity_control& control) const {
 
 	double v = std::abs (control.v());
 	double w = std::abs (control.w());

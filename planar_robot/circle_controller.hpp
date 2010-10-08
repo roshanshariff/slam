@@ -10,9 +10,9 @@
 namespace planar_robot {
 
 
-  class circle_controller : public std::binary_function<bitree<pose>, double, pose> {
+  class circle_controller : public std::binary_function<double, bitree<pose>, pose> {
 
-    const double centre_x, centre_y, radius, speed, revolutions;
+    double centre_x, centre_y, radius, speed, revolutions;
     double current_time;
     pose current_pose;
 
@@ -28,7 +28,7 @@ namespace planar_robot {
       : centre_x(cx), centre_y(cy), radius(r), speed(v), revolutions(revs),
 	current_time(0.0), current_pose(get_pose(current_time)) { }
 
-    pose operator() (const bitree<pose>&, double dt) {
+    pose operator() (double dt, const bitree<pose>&) {
       pose old_pose = current_pose;
       current_pose = get_pose (current_time += dt);
       return -old_pose + current_pose;

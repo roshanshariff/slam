@@ -48,16 +48,16 @@ namespace planar_robot {
 	+ bearing.log_likelihood (wrap_angle (p.bearing(), bearing.mean()));
     }
 
-    class builder : public std::binary_function<pose, double, odometry_model> {
+    class builder : public std::binary_function<double, pose, odometry_model> {
 
-      const double alpha1, alpha2, alpha3, alpha4;
+      double alpha1, alpha2, alpha3, alpha4;
 
     public:
 
       builder (double a1, double a2, double a3, double a4)
 	: alpha1(a1), alpha2(a2), alpha3(a3), alpha4(a4) { }
 
-      odometry_model operator() (const pose& reading) const {
+      odometry_model operator() (double dt, const pose& reading) const {
 
 	double translation = reading.distance();
 	double direction = reading.direction();

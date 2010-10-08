@@ -20,19 +20,19 @@ class simulator {
   typedef typename observation_model_type::result_type observation_type;
   typedef std::tr1::function<bool (observation_type)> observation_predicate_type;
 
-  typedef typename StateModelBuilder::first_argument_type control_type;
-  typedef std::tr1::function<control_type (bitree<state_type>, double)> controller_type;
+  typedef typename StateModelBuilder::second_argument_type control_type;
+  typedef std::tr1::function<control_type (double, bitree<state_type>)> controller_type;
 
   typedef slam_data<state_model_type, observation_model_type> slam_data_type;
   typedef std::map<typename slam_data_type::featureid_t, observation_type> map_type;
 
 
   const map_type& landmarks;
-  const controller_type controller;
-  const state_type initial_state;
+  controller_type controller;
+  state_type initial_state;
 
-  const StateModelBuilder& state_model_builder;
-  const ObservationModelBuilder& observation_model_builder;
+  StateModelBuilder state_model_builder;
+  ObservationModelBuilder observation_model_builder;
   observation_predicate_type observation_predicate;
 
   slam_data_type data;
@@ -49,11 +49,11 @@ class simulator {
 public:
 
   simulator (const map_type& _landmarks,
-	     controller_type _controller,
+	     const controller_type& _controller,
 	     const state_type& _initial_state,
 	     const StateModelBuilder& _state_model_builder,
 	     const ObservationModelBuilder& _observation_model_builder,
-	     observation_predicate_type _observation_predicate,
+	     const observation_predicate_type& _observation_predicate,
 	     unsigned int mcmc_steps, double state_dim, double obs_dim)
     : landmarks(_landmarks),
       controller(_controller),
@@ -90,8 +90,8 @@ void simulator<MotionModel, ObservationModel>::operator() (random_source& random
   ++num_steps;
   simulation_time += dt;
 
-  control_type control = controller (get_estimated_state(), dt);
-  state_model_type state_change_model = state_model_builder (control);
+  control_type control = controller (dt, get_estimated_state());
+  state_model_type state_change_model = state_model_builder (dt, control);
 
   state.push_back (state_change_model (random));
   expected_state.push_back (state_change_model.mean());
