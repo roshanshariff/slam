@@ -30,16 +30,26 @@ namespace planar_robot {
 
 
   inline velocity_control pose_delta_to_velocity (const pose& dp, double dt = 1.0) {
-    double r = 0.5 * dp.distance_squared() / dp.y();
-    double theta = std::atan2 (dp.x(), r - dp.y());
-    return velocity_control (r*theta/dt, theta/dt, wrap_angle(dp.bearing()-theta)/dt);
+    if (dp.y() == 0) {
+      return velocity_control (dp.x()/dt, 0.0, dp.bearing()/dt);
+    }
+    else {
+      double r = 0.5 * dp.distance_squared() / dp.y();
+      double theta = std::atan2 (dp.x(), r - dp.y());
+      return velocity_control (r*theta/dt, theta/dt, wrap_angle(dp.bearing()-theta)/dt);
+    }
   }
 
 
   inline pose velocity_to_pose_delta (const velocity_control& control, double dt = 1.0) {
-    double r = control.v() / control.w();
-    double theta = control.w() * dt;
-    return pose (r*std::sin(theta), r-r*std::cos(theta), theta+control.g()*dt);
+    if (control.w() == 0) {
+      return pose (control.v() * dt, 0.0, control.g() * dt);
+    }
+    else {
+      double r = control.v() / control.w();
+      double theta = control.w() * dt;
+      return pose (r*std::sin(theta), r-r*std::cos(theta), theta+control.g()*dt);
+    }
   }
 
 
@@ -57,7 +67,7 @@ namespace planar_robot {
     velocity_model (const velocity_control& mean, double v_sigma,
 		    double w_sigma, double g_sigma, double _dt)
       : v (mean.v(), v_sigma), w (mean.w(), w_sigma),
-	g (mean.g(), g_sigma(), dt(_dt)) { }
+	g (mean.g(), g_sigma), dt(_dt) { }
 
     pose mean () const {
       return velocity_to_pose_delta
