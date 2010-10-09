@@ -162,7 +162,7 @@ void mcmc_slam<SlamData>::add_action (actionid_t action_id) {
   // Use the mean of the distribution as the initial estimate.
   action_estimates.push_back (action_model.mean());
   // Compute the edge weight based on the distribution and the initial estimate.
-  action_weights.push_back (action_edge_weight (action_model, action_estimates[action_id]));
+  action_weights.push_back (action_edge_weight (action_model, action_estimates.back()));
 }
 
 
@@ -245,8 +245,8 @@ void mcmc_slam<SlamData>::update_action (random_source& random, const actionid_t
   const double new_action_weight = action_edge_weight(data.action(id), new_estimate);
 
   // The old action estimate and corresponding edge weight.
-  const action_type old_estimate = action_estimates.at(id);
-  const double old_action_weight = action_weights.at(id);
+  const action_type old_estimate = action_estimates[id];
+  const double old_action_weight = action_weights[id];
 
   double acceptance_probability = 0.0; // log of the acceptance probability.
 
@@ -390,7 +390,7 @@ void mcmc_slam<SlamData>::update_feature (random_source& random, const featureid
 
   // Compute the acceptance probability as the ratio of probabilities of the new and the old estimates,
   // multiplied by the ratio between the new and the old edge weights.
-  acceptance_probability = std::exp(acceptance_probability) * new_feature_weight / feature_weights.at(id);
+  acceptance_probability = std::exp(acceptance_probability) * new_feature_weight / feature_weights[id];
 
   // If the change was accepted, replace the old estimate and edge weight by the new ones.
   if (random.uniform() < acceptance_probability) {

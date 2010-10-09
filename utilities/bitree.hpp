@@ -10,33 +10,39 @@ class bitree {
 public:
 
   typedef Grp value_type;
+  typedef typename std::vector<value_type>::size_type size_type;
+  typedef typename std::vector<value_type>::difference_type difference_type;
 
 private:
 
-  std::vector<Grp> elements;
+  std::vector<value_type> elements;
 
-  value_type accumulate_relative (size_t i, size_t ancestor) const;
-  value_type compute_element (size_t i, const value_type& value) const;
-  void update_element (size_t i, const Grp& value);
+  value_type accumulate_relative (size_type i, size_type ancestor) const;
+  value_type compute_element (size_type i, const value_type& value) const;
+  void update_element (size_type i, const value_type& value);
 
 public:
+
+  class reference;
+  friend class reference;
+  typedef const reference const_reference;
 
   class reference {
     friend class bitree;
 
-    bitree& container;
-    const size_t index;
+    bitree* container;
+    size_type index;
 
-    reference (bitree& c, size_t i) : container(c), index(i) { }
+    reference (bitree* c, size_type i) : container(c), index(i) { }
 
   public:
 
     operator value_type () const {
-      return container.at(index);
+      return container->get(index);
     }
 
     reference& operator= (const value_type& value) {
-      container.update_element (index, value);
+      container->update_element (index, value);
       return *this;
     }
 
@@ -45,32 +51,38 @@ public:
     }
 
   };
-  friend class reference;
 
   bitree () { }
-  bitree (size_t n) : elements(n) { }
+  bitree (size_type n) : elements(n) { }
 
-  value_type at (size_t i) const;
-  value_type operator[] (size_t i) const { return at(i); }
-  reference operator[] (size_t i) { return reference (*this, i); }
 
-  size_t binary_search (const Grp& value) const;
-
-  Grp accumulate (size_t begin, size_t end) const;
-  Grp accumulate (size_t end) const { return accumulate(0, end); }
-  Grp accumulate () const { return accumulate(size()); }
-
-  void push_back (const Grp& value);
-
+  size_type size () const { return elements.size(); }
+  size_type capacity () const { return elements.capacity(); }
+  size_type max_size () const { return elements.max_size(); }
   bool empty () const { return elements.empty(); }
-  size_t size () const { return elements.size(); }
-  size_t capacity () const { return elements.capacity(); }
-  size_t max_size () const { return elements.max_size(); }
 
-  void clear () { elements.clear(); }
+  reference operator[] (size_type n) { return reference (this, n); }
+  const_reference operator[] (size_type n) const { return const_cast<bitree&>(*this)[n]; }
+
+  reference front () { return (*this)[0]; }
+  reference back () { return (*this)[size()-1]; }
+  const_reference front () const { return *this[0]; }
+  const_reference back () const { return *this[size()-1]; }
+
   void pop_back () { elements.pop_back(); }
-  void reserve (size_t n) { elements.reserve(n); }
-  void resize (size_t n);
+  void push_back (const value_type& value) { elements.push_back (compute_element(size(), value)); }
+
+  void resize (size_type n, value_type v = value_type());
+  void reserve (size_type n) { elements.reserve(n); }
+  void clear () { elements.clear(); }
+
+  void swap (bitree& o) { elements.swap (o.elements); } 
+
+  value_type get (size_type i) const;
+  value_type accumulate (size_type begin, size_type end) const;
+  value_type accumulate (size_type end) const { return accumulate(0, end); }
+  value_type accumulate () const { return accumulate(size()); }
+  size_type binary_search (const value_type& value) const;
 
 };
 
@@ -121,10 +133,10 @@ namespace bitree_impl {
 
 
 template <class Grp>
-Grp bitree<Grp>::accumulate_relative (size_t i, size_t ancestor) const {
+Grp bitree<Grp>::accumulate_relative (size_type i, size_type ancestor) const {
   using namespace bitree_impl;
   assert (i < elements.size());
-  Grp result = Grp();
+  value_type result = value_type();
   for (; i != ancestor; i = parent(i)) {
     assert (i > 0);
     result = elements[i] + result;
@@ -134,7 +146,7 @@ Grp bitree<Grp>::accumulate_relative (size_t i, size_t ancestor) const {
 
 
 template <class Grp>
-Grp bitree<Grp>::compute_element (size_t i, const Grp& value) const {
+Grp bitree<Grp>::compute_element (size_type i, const value_type& value) const {
   using namespace bitree_impl;
   assert (i <= elements.size());
   if (i == 0) return value;
@@ -143,10 +155,10 @@ Grp bitree<Grp>::compute_element (size_t i, const Grp& value) const {
 
 
 template <class Grp>
-void bitree<Grp>::update_element (size_t i, const Grp& value) {
+void bitree<Grp>::update_element (size_type i, const value_type& value) {
   using namespace bitree_impl;
   assert (i < elements.size());
-  Grp origin = elements[i];
+  value_type origin = elements[i];
   elements[i] = compute_element(i, value);
   origin += -elements[i];
   if (i > 0) {
@@ -156,7 +168,7 @@ void bitree<Grp>::update_element (size_t i, const Grp& value) {
       while ((i = parent(i)) != next_parent) {
 	origin = elements[i] + origin + (-elements[i]);
       }
-      Grp old_value = elements[next];
+      value_type old_value = elements[next];
       elements[next] = -origin + elements[next];
       origin = old_value + (-elements[next]);
     }
@@ -165,7 +177,7 @@ void bitree<Grp>::update_element (size_t i, const Grp& value) {
 
 
 template <class Grp>
-Grp bitree<Grp>::at (size_t i) const {
+Grp bitree<Grp>::get (size_type i) const {
   using namespace bitree_impl;
   assert (i < elements.size());
   if (i == 0) return elements[0];
@@ -174,31 +186,25 @@ Grp bitree<Grp>::at (size_t i) const {
 
 
 template <class Grp>
-void bitree<Grp>::push_back (const Grp& value) {
-  elements.push_back (compute_element(elements.size(), value));
-}
-
-
-template <class Grp>
-void bitree<Grp>::resize (size_t n) {
+void bitree<Grp>::resize (size_type n, value_type v) {
   if (n < elements.size()) {
     elements.resize(n);
   }
   else {
     elements.reserve(n);
-    for (size_t i = elements.size(); i < n; ++i) {
-      push_back (Grp());
+    for (size_type i = elements.size(); i < n; ++i) {
+      push_back (v);
     }
   }
 }
 
 
 template <class Grp>
-Grp bitree<Grp>::accumulate (size_t begin, size_t end) const {
+Grp bitree<Grp>::accumulate (size_type begin, size_type end) const {
   using namespace bitree_impl;
   assert (begin <= elements.size() && end <= elements.size());
   if (begin == end) {
-    return Grp();
+    return value_type();
   }
   else if (begin == 0) {
     return elements[0] + accumulate_relative(end-1, 0);
@@ -207,24 +213,24 @@ Grp bitree<Grp>::accumulate (size_t begin, size_t end) const {
     return -(elements[0] + accumulate_relative(begin-1, 0));
   }
   else {
-    size_t ancestor = common_ancestor(begin-1, end-1);
+    size_type ancestor = common_ancestor(begin-1, end-1);
     return -accumulate_relative(begin-1, ancestor) + accumulate_relative(end-1, ancestor);
   }
 }
 
 
 template <class Grp>
-size_t bitree<Grp>::binary_search (const Grp& value) const {
+typename bitree<Grp>::size_type bitree<Grp>::binary_search (const value_type& value) const {
   using namespace bitree_impl;
   if (elements.size() == 0 || value < elements[0]) {
     return 0;
   }
   else {
-    size_t min = 0;
-    size_t max = elements.size();
-    Grp origin = elements[min];
+    size_type min = 0;
+    size_type max = elements.size();
+    value_type origin = elements[min];
     while (min + 1 < max) {
-      size_t mid = child_containing(min, max-1);
+      size_type mid = child_containing(min, max-1);
       if (value < origin + elements[mid]) {
 	max = mid;
       }

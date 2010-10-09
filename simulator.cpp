@@ -241,7 +241,7 @@ std::vector<position> read_waypoints_from_file (const char* filename) {
 void print_trajectory (std::ostream& out, pose p, const bitree<pose>& trajectory) {
   out << 0 << '\t' << p.x() << '\t' << p.y() << '\t' << p.bearing() << '\n';
   for (size_t i = 0; i < trajectory.size(); ++i) {
-    p += trajectory.at(i);
+    p += trajectory[i];
     out << i+1 << '\t' << p.x() << '\t' << p.y() << '\t' << p.bearing() << '\n';
   }
 }
@@ -266,8 +266,8 @@ double trajectory_error (const bitree<pose>& a, const bitree<pose>& b) {
   double error = 0;
   pose a_pos, b_pos;
   for (size_t i = 0; i < points; ++i) {
-    a_pos += a.at(i);
-    b_pos += b.at(i);
+    a_pos += a[i];
+    b_pos += b[i];
     error += (-a_pos + b_pos).distance_squared();
   }
   return std::sqrt (error/points);
