@@ -82,15 +82,16 @@ public:
 };
 
 
-template <class MotionModel, class ObservationModel>
-void simulator<MotionModel, ObservationModel>::operator() (random_source& random, double dt) {
+template <class StateModelBuilder, class ObservationModelBuilder>
+void simulator<StateModelBuilder, ObservationModelBuilder>
+::operator() (random_source& random, double dt) {
 
-  add_observations (random, initial_state + state.accumulate());
+  add_observations (random, get_initial_state() + get_state().accumulate());
   mcmc.update(random);
   ++num_steps;
   simulation_time += dt;
 
-  control_type control = controller (dt, get_estimated_state());
+  control_type control = controller (dt, get_state() /* get_estimated_state() */);
   state_model_type state_change_model = state_model_builder (dt, control);
 
   state.push_back (state_change_model (random));
@@ -99,9 +100,9 @@ void simulator<MotionModel, ObservationModel>::operator() (random_source& random
 }
 
 
-template <class MotionModel, class ObservationModel>
-void simulator<MotionModel, ObservationModel>::add_observations
-(random_source& random, const state_type& state) {
+template <class StateModelBuilder, class ObservationModelBuilder>
+void simulator<StateModelBuilder, ObservationModelBuilder>
+::add_observations (random_source& random, const state_type& state) {
 
   typename map_type::const_iterator i = landmarks.begin();
   for (; i != landmarks.end(); ++i) {
