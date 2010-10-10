@@ -13,6 +13,8 @@
 template <class StateModelBuilder, class ObservationModelBuilder>
 class simulator {
 
+public:
+
   typedef typename StateModelBuilder::result_type state_model_type;
   typedef typename ObservationModelBuilder::result_type observation_model_type;
 
@@ -26,6 +28,7 @@ class simulator {
   typedef slam_data<state_model_type, observation_model_type> slam_data_type;
   typedef std::map<typename slam_data_type::featureid_t, observation_type> map_type;
 
+private:
 
   const map_type& landmarks;
   controller_type controller;
