@@ -2,44 +2,40 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
-#include <iomanip>
-#include <ctime>
-#include <functional>
+#include <cstdio>
 
 #include <boost/math/constants/constants.hpp>
+#include <boost/program_options.hpp>
+#include <boost/nondet_random.hpp>
+#include <boost/lexical_cast.hpp>
 #include <boost/timer.hpp>
-#include <boost/progress.hpp>
 
 #include "simulator.hpp"
 #include "planar_robot/pose.hpp"
 #include "planar_robot/position.hpp"
 #include "planar_robot/odometry_model.hpp"
+#include "planar_robot/velocity_model.hpp"
 #include "planar_robot/range_bearing_model.hpp"
 #include "planar_robot/circle_controller.hpp"
 #include "planar_robot/waypoint_controller.hpp"
-#include "slam/mcmc_slam.hpp"
-#include "slam/slam_data.hpp"
 #include "utilities/random.hpp"
 
 using planar_robot::pose;
 using planar_robot::position;
-using planar_robot::range_bearing_model;
 
 const double PI = boost::math::constants::pi<double>();
 
 // FORWARD DECLARATIONS
 
-template <class StateModelBuilder, class ObservationModelBuilder>
-void simulate (const StateModelBuilder&, const ObservationModelBuilder&);
-
 std::map<size_t, position> generate_grid_map (double x, double y, double width, double height, double pitch);
 std::vector<position> generate_circle_waypoints (double x, double y, double r, double points);
 std::map<size_t, position> read_landmarks_from_file (const char* filename);
 std::vector<position> read_waypoints_from_file (const char* filename);
-void print_trajectory (std::ostream& out, pose p, const bitree<pose>& trajectory);
-void print_landmarks (std::ostream& out, const std::map<size_t, position>& landmarks);
+void print_trajectory (FILE* out, pose p, const bitree<pose>& trajectory);
+void print_landmarks (FILE* out, const std::map<size_t, position>& landmarks);
 double trajectory_error (const bitree<pose>& a, const bitree<pose>& b);
 double landmark_error (const std::map<size_t, position>& landmarks, const std::map<size_t, position>& estimates);
+FILE* fopen (const std::string& filename, const char* mode);
 
 
 // -------------------------------------------------------------------------------------------------
@@ -61,20 +57,20 @@ const double REPETITIONS = 1.1; // the number of times to go around the circle
 
 // MCMC PARAMETERS
 const int MCMC_STEPS = 100; // number of MCMC iterations per step.
-const double ACT_DIM = 3.0; // the number of parameters estimated by each action edge.
-const double OBS_DIM = 2.0; // the number of parameters estimated by each observation edge.
+const double STATE_PARAMS = 3.0; // the number of parameters estimated by each action edge.
+const double OBSERVATION_PARAMS = 2.0; // the number of parameters estimated by each observation edge.
 
 // -------------------------------------------------------------------------------------------------
 
 // FEATURE GENERATION
-const std::map<size_t, position> landmarks =
-  read_landmarks_from_file("input/example_webmap.landmarks.txt");
-//generate_grid_map (0, -2*RADIUS, 2*RADIUS, 4*RADIUS, GRID_PITCH);
+const char* LANDMARKS_FILE = "input/example_webmap.landmarks.txt";
+const std::map<size_t, position> LANDMARKS = read_landmarks_from_file (LANDMARKS_FILE);
+//const std::map<size_t, position> LANDMARKS = generate_grid_map (0, -2*RADIUS, 2*RADIUS, 4*RADIUS, GRID_PITCH);
 
 // WAYPOINT GENERATION
-const std::vector<position> waypoints =
-  read_waypoints_from_file("input/example_webmap.waypoints.txt");
-//generate_circle_waypoints (CENTRE_X, CENTRE_Y, RADIUS, 20);
+const char* WAYPOINTS_FILE = "input/example_webmap.waypoints.txt";
+const std::vector<position> WAYPOINTS = read_waypoints_from_file (WAYPOINTS_FILE);
+//const std::vector<position> WAYPOINTS = generate_circle_waypoints (CENTRE_X, CENTRE_Y, RADIUS, 20);
 
 // -------------------------------------------------------------------------------------------------
 /*
@@ -84,7 +80,7 @@ const planar_robot::odometry_model::builder STATE_MODEL_BUILDER
 (0.05, 1.0*PI/180, 0.1, 0.0001*180/PI);
 
 // CIRCLE CONTROLLER
-planar_robot::circle_controller controller
+planar_robot::circle_controller CONTROLLER
 (CENTRE_X, CENTRE_Y, RADIUS, SPEED, REPETITIONS);
 
 */
@@ -95,95 +91,144 @@ const planar_robot::velocity_model::builder STATE_MODEL_BUILDER
 (0.1, 0.00001, 1.0*PI/180, 0.0001*PI/180, 0.00001, 0.0001*PI/180);
 
 // WAYPOINT CONTROLLER
-planar_robot::waypoint_controller controller
-(pose(), waypoints, 1.0, REPETITIONS, SPEED, STEERING_MAX, STEERING_RATE);
+planar_robot::waypoint_controller CONTROLLER
+(pose(), WAYPOINTS, 1.0, REPETITIONS, SPEED, STEERING_MAX, STEERING_RATE);
 
 // -------------------------------------------------------------------------------------------------
 
 // OBSERVATION MODEL
 
-const range_bearing_model::builder OBSERVATION_MODEL_BUILDER (0.1, 1.0*PI/180.0); // range and bearing sigma
+// range and bearing sigma
+const planar_robot::range_bearing_model::builder OBSERVATION_MODEL_BUILDER (0.1, 1.0*PI/180.0);
 
-const double OBS_MAX_RANGE = 30; // meters; the maximum range at which the sensors detect landmarks.
-
-bool observation_predicate (const position& p) { return p.range() < OBS_MAX_RANGE; }
+// predicate to filter out observations
+bool OBSERVATION_PREDICATE (const position& p) { return p.range() < 30; }
 
 // -------------------------------------------------------------------------------------------------
 
-int main () {
-  simulate (STATE_MODEL_BUILDER, OBSERVATION_MODEL_BUILDER);
-}
-
-template <class StateModelBuilder, class ObservationModelBuilder>
-void simulate (const StateModelBuilder& state_model_builder,
-	       const ObservationModelBuilder& observation_model_builder) {
+template <class S, class O, class Controller>
+void simulate (const S& state_model_builder,
+	       const O& observation_model_builder,
+	       Controller& controller,
+	       const typename simulator<S, O>::map_type& landmarks,
+	       const typename simulator<S, O>::observation_predicate_type& observation_predicate,
+	       const double dt, const unsigned int mcmc_steps,
+	       const double state_dim, const double obs_dim,
+	       const boost::program_options::variables_map& options)
+{
 
   // The global random source. TODO: use two generators, one for the simulation itself and another for
   // the MCMC SLAM module.
   random_source random;
+  const unsigned int seed = options.count("seed")
+    ? options["seed"].as<unsigned int>()
+    : boost::random_device()();
+  random.generator.seed (seed);
 
-  // Seed the random generator from the current time. This is not ideal, but std::tr1::random_device
-  // appears to be broken (it always returns the same value) so this is the best we can do.
-  const unsigned long seed = std::time(0);
-  random.generator.seed(seed);
-
-  simulator<StateModelBuilder, ObservationModelBuilder> sim
-    (landmarks, std::tr1::ref(controller), controller.initial_pose(),
-     state_model_builder, observation_model_builder, observation_predicate,
-     MCMC_STEPS, ACT_DIM, OBS_DIM);
+  simulator<S, O> sim (landmarks, std::tr1::ref(controller), controller.initial_pose(),
+		       state_model_builder, observation_model_builder, observation_predicate,
+		       mcmc_steps, state_dim, obs_dim);
      
   boost::timer timer;
 
   // Run the simulation
   while (!controller.finished()) {
-    sim (random, DELTA_T);
-    //std::cout << sim.get_num_steps() << '\n';
+
+    sim (random, dt);
+
+    if (options.count ("verbose") && options.count ("output-prefix")) {
+      
+      const std::string& output_prefix = options["output-prefix"].as<std::string>();
+
+      // Store the estimated trajectory.
+      FILE* trajectory_estimated_file = fopen (output_prefix + "trajectory.estimated."
+					       + boost::lexical_cast<std::string>(sim.get_num_steps())
+					       + ".txt", "w");
+      if (trajectory_estimated_file != NULL) {
+	print_trajectory (trajectory_estimated_file, sim.get_initial_state(), sim.get_estimated_state());
+	std::fclose (trajectory_estimated_file);
+      }
+
+      // Store the estimated landmark positions.
+      FILE* landmarks_estimated_file = fopen (output_prefix + "landmarks.estimated."
+					      + boost::lexical_cast<std::string>(sim.get_num_steps())
+					      + ".txt", "w");
+      if (landmarks_estimated_file != NULL) {
+	print_landmarks (landmarks_estimated_file, sim.get_feature_estimates());
+	std::fclose (landmarks_estimated_file);
+      }
+
+    }
   }
+  // Simulation is done
 
   // Store elapsed time. We don't want to include the time taken by computing errors and doing I/O.
   const double elapsed_time = timer.elapsed();
 
   // Get the estimated landmark positions generated by MCMC SLAM.
-  const std::map<size_t, position> estimated_map = sim.get_feature_estimates();
+  const typename simulator<S, O>::map_type estimated_landmarks = sim.get_feature_estimates();
 
-  // Store the expected trajectory.
-  std::ofstream expected_file ("data/expected_trajectory.txt");
-  print_trajectory (expected_file, sim.get_initial_state(), sim.get_expected_state());
-  expected_file.close();
+  FILE* summary_file = NULL;
 
-  // Store the actual trajectory.
-  std::ofstream actual_file ("data/actual_trajectory.txt");
-  print_trajectory (actual_file, sim.get_initial_state(), sim.get_state());
-  actual_file.close();
+  if (options.count ("output-prefix")) {
 
-  // Store the estimated trajectory.
-  std::ofstream estimated_file ("data/estimated_trajectory.txt");
-  print_trajectory (estimated_file, sim.get_initial_state(), sim.get_estimated_state());
-  estimated_file.close();
+    const std::string& output_prefix = options["output-prefix"].as<std::string>();
 
-  // Store the actual landmark positions.
-  std::ofstream map_file ("data/landmarks.txt");
-  print_landmarks (map_file, landmarks);
-  map_file.close();
+    summary_file = fopen (output_prefix + "summary.txt", "w");
 
-  // Store the estimated landmark positions.
-  std::ofstream estimated_map_file ("data/estimated_map.txt");
-  print_landmarks (estimated_map_file, estimated_map);
-  estimated_map_file.close();
+    // Store the actual trajectory.
+    FILE* trajectory_file = fopen (output_prefix + "trajectory.txt", "w");
+    if (trajectory_file != NULL) {
+      print_trajectory (trajectory_file, sim.get_initial_state(), sim.get_state());
+      std::fclose (trajectory_file);
+    }
+
+    // Store the estimated trajectory.
+    FILE* trajectory_estimated_file = fopen (output_prefix + "trajectory.estimated.txt", "w");
+    if (trajectory_estimated_file != NULL) {
+      print_trajectory (trajectory_estimated_file, sim.get_initial_state(), sim.get_estimated_state());
+      std::fclose (trajectory_estimated_file);
+    }
+
+    // Store the expected trajectory.
+    FILE* trajectory_expected_file = fopen (output_prefix + "trajectory.expected.txt", "w");
+    if (trajectory_expected_file != NULL) {
+      print_trajectory (trajectory_expected_file, sim.get_initial_state(), sim.get_expected_state());
+      std::fclose (trajectory_expected_file);
+    }
+
+    // Store the actual landmark positions.
+    FILE* landmarks_file = fopen (output_prefix + "landmarks.txt", "w");
+    if (landmarks_file != NULL) {
+      print_landmarks (landmarks_file, sim.get_landmarks());
+      std::fclose (landmarks_file);
+    }
+
+    // Store the estimated landmark positions.
+    FILE* landmarks_estimated_file = fopen (output_prefix + "landmarks.estimated.txt", "w");
+    if (landmarks_estimated_file != NULL) {
+      print_landmarks (landmarks_estimated_file, estimated_landmarks);
+      std::fclose (landmarks_estimated_file);
+    }
+  }
+  else {
+    summary_file = stdout;
+  }
 
   // Summarise key information about this simulation.
-  std::ofstream summary_file ("data/summary.txt");
-  summary_file << "Random seed: " << seed << "\n"
-	       << "MCMC iterations: " << MCMC_STEPS << "\n"
-	       << "Grid spacing: " << GRID_PITCH << " meters\n"
-	       << "Number of landmarks: " << landmarks.size() << "\n"
-	       << "Circle radius: " << RADIUS << " meters \n"
-	       << "Time steps: " << sim.get_num_steps() << "\n"
-	       << "Average observations per step: " << sim.get_observations_per_step() << "\n"
-	       << "Trajectory error: " << trajectory_error (sim.get_state(), sim.get_estimated_state()) << "\n"
-	       << "Landmark error: " << landmark_error (landmarks, estimated_map) << "\n"
-	       << "Elapsed time: " << elapsed_time << "\n";
-  summary_file.close();
+  if (summary_file != NULL) {
+    std::fprintf (summary_file, "Random seed: %u\n", seed);
+    std::fprintf (summary_file, "MCMC iterations: %u\n", mcmc_steps);
+    std::fprintf (summary_file, "Landmarks: %zu\n", landmarks.size());
+    std::fprintf (summary_file, "Observations per step: %f\n", sim.get_observations_per_step());
+    std::fprintf (summary_file, "Time steps: %lu\n", sim.get_num_steps());
+    std::fprintf (summary_file, "Time delta: %f\n", dt);
+    std::fprintf (summary_file, "Simulated time: %f\n", sim.get_simulation_time());
+    std::fprintf (summary_file, "Elapsed time: %f\n", elapsed_time);
+    std::fprintf (summary_file, "Trajectory error: %f\n", trajectory_error (sim.get_state(), sim.get_estimated_state()));
+    std::fprintf (summary_file, "Landmark error: %f\n", landmark_error (landmarks, estimated_landmarks));
+    std::fclose (summary_file);
+  }
 
 }
 
@@ -238,22 +283,25 @@ std::vector<position> read_waypoints_from_file (const char* filename) {
 
 /** Prints the given trajectory, as offset by the given pose, to ostream& out, with the format
     time_step  x_position  y_position  bearing */
-void print_trajectory (std::ostream& out, pose p, const bitree<pose>& trajectory) {
-  out << 0 << '\t' << p.x() << '\t' << p.y() << '\t' << p.bearing() << '\n';
+void print_trajectory (FILE* out, pose p, const bitree<pose>& trajectory) {
+  const char* fmt = "%f\t%f\t%f\n";
+  std::fprintf (out, "# X\tY\tBEARING\n");
+  std::fprintf (out, fmt, p.x(), p.y(), p.bearing());
   for (size_t i = 0; i < trajectory.size(); ++i) {
     p += trajectory[i];
-    out << i+1 << '\t' << p.x() << '\t' << p.y() << '\t' << p.bearing() << '\n';
+    std::fprintf (out, fmt, p.x(), p.y(), p.bearing());
   }
 }
 
 
 /** Prints the given set of landmarks, as offset by the given pose, to ostream& out, with the format
     feature_id  x_position  y_position */
-void print_landmarks (std::ostream& out, const std::map<size_t, position>& landmarks) {
+void print_landmarks (FILE* out, const std::map<size_t, position>& landmarks) {
+  const char* fmt = "%2$f\t%3$f\t%1$zu\n";
+  std::fprintf (out, "# X\tY\tID\n");
   std::map<size_t, position>::const_iterator i = landmarks.begin();
   for (; i != landmarks.end(); ++i) {
-    const position& pos = i->second;
-    out << i->first << '\t' << pos.x() << '\t' << pos.y() << '\n';
+    std::fprintf (out, fmt, i->first, i->second.x(), i->second.y());
   }
 }
 
@@ -295,3 +343,31 @@ double landmark_error (const std::map<size_t, position>& landmarks,
 }
 
 
+FILE* fopen (const std::string& filename, const char* mode) {
+  return std::fopen (filename.c_str(), mode);
+}
+
+
+int main (int argc, char* argv[]) {
+
+  namespace po = boost::program_options;
+
+  po::options_description options ("Allowed options");
+  options.add_options()
+    ("help,h", "usage information")
+    ("output-prefix,o", po::value<std::string>(), "prefix for simulation output files")
+    ("verbose,v", "produce detailed simulation logs")
+    ("seed,s", po::value<unsigned int>(), "seed for random number generator");
+
+  po::variables_map values;
+  po::store (po::parse_command_line (argc, argv, options), values);
+  po::notify (values);
+
+  if (values.count ("help")) {
+    std::cout << options << "\n";
+    return 0;
+  }
+
+  simulate (STATE_MODEL_BUILDER, OBSERVATION_MODEL_BUILDER, CONTROLLER, LANDMARKS, OBSERVATION_PREDICATE,
+	    DELTA_T, MCMC_STEPS, STATE_PARAMS, OBSERVATION_PARAMS, values);
+}
