@@ -1,37 +1,13 @@
 #!/bin/bash
 
-simulator=$(dirname "$0")/simulator
-
+prefix=$1
 runs=100
 cores=2
-runs_per_core=$(($runs / $cores))
 
-core=0
-while (($core < $cores)); do
-    (
-	mkdir $core
-	cd $core
-	i=$(($core * $runs_per_core))
-	end=$(($i + $runs_per_core))
-	while (($i < $end)); do
-	    mkdir data
-	    echo Run $(($i+1))
-	    ../$simulator > /dev/null
-	    mv data ../run_$((i+1))
-	    i=$((i+1))
-	done
-	cd ..
-	rmdir $core
-    )&
-    sleep 1
-    core=$(($core + 1))
-done
-wait
-i=$(($core * $runs_per_core))
-while (($i < $runs)); do
-    mkdir data
-    echo Run $(($i+1))
-    $simulator > /dev/null
-    mv data run_$((i+1))
-    i=$((i+1))
+eval echo {1..$runs} | xargs -n 1 -P $cores -I XXX ./simulator -o "${prefix}runXXX."
+
+summary_files="echo \\\"\\\${prefix}run{1..$runs}.summary.txt\\\""
+for i in "Elapsed time" "Trajectory error" "Landmark error"; do
+    echo -n "$i: "
+    eval sed -n "'s/$i: \(.*\)/\1/p'" $(eval $summary_files) | average
 done
