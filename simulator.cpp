@@ -56,7 +56,7 @@ const double DELTA_T = 0.25; // seconds; the interval between successive actions
 const double REPETITIONS = 1.1; // the number of times to go around the circle
 
 // MCMC PARAMETERS
-const int MCMC_STEPS = 100; // number of MCMC iterations per step.
+const int MCMC_STEPS = 10; // number of MCMC iterations per step.
 const double STATE_PARAMS = 3.0; // the number of parameters estimated by each action edge.
 const double OBSERVATION_PARAMS = 2.0; // the number of parameters estimated by each observation edge.
 
@@ -88,7 +88,7 @@ planar_robot::circle_controller CONTROLLER
 
 // VELOCITY MODEL
 const planar_robot::velocity_model::builder STATE_MODEL_BUILDER
-(0.1, 0.00001, 1.0*PI/180, 0.0001*PI/180, 0.00001, 0.0001*PI/180);
+(0.1, 1.0, 1.0*PI/180, 0.05*PI/180, 0.1*PI/180, 0.005*PI/180);
 
 // WAYPOINT CONTROLLER
 planar_robot::waypoint_controller CONTROLLER
