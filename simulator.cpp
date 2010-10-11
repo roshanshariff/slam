@@ -31,9 +31,9 @@ std::map<size_t, position> generate_grid_map (double x, double y, double width, 
 std::vector<position> generate_circle_waypoints (double x, double y, double r, double points);
 std::map<size_t, position> read_landmarks_from_file (const char* filename);
 std::vector<position> read_waypoints_from_file (const char* filename);
-void print_trajectory (FILE* out, pose p, const bitree<pose>& trajectory);
+void print_state (FILE* out, pose p, const bitree<pose>& state);
 void print_landmarks (FILE* out, const std::map<size_t, position>& landmarks);
-double trajectory_error (const bitree<pose>& a, const bitree<pose>& b);
+double state_error (const bitree<pose>& a, const bitree<pose>& b);
 double landmark_error (const std::map<size_t, position>& landmarks, const std::map<size_t, position>& estimates);
 FILE* fopen (const std::string& filename, const char* mode);
 
@@ -140,13 +140,13 @@ void simulate (const S& state_model_builder,
       
       const std::string& output_prefix = options["output-prefix"].as<std::string>();
 
-      // Store the estimated trajectory.
-      FILE* trajectory_estimated_file = fopen (output_prefix + "trajectory.estimated."
+      // Store the estimated state.
+      FILE* state_estimated_file = fopen (output_prefix + "state.estimated."
 					       + boost::lexical_cast<std::string>(sim.get_num_steps())
 					       + ".txt", "w");
-      if (trajectory_estimated_file != NULL) {
-	print_trajectory (trajectory_estimated_file, sim.get_initial_state(), sim.get_estimated_state());
-	std::fclose (trajectory_estimated_file);
+      if (state_estimated_file != NULL) {
+	print_state (state_estimated_file, sim.get_initial_state(), sim.get_estimated_state());
+	std::fclose (state_estimated_file);
       }
 
       // Store the estimated landmark positions.
@@ -176,25 +176,25 @@ void simulate (const S& state_model_builder,
 
     summary_file = fopen (output_prefix + "summary.txt", "w");
 
-    // Store the actual trajectory.
-    FILE* trajectory_file = fopen (output_prefix + "trajectory.txt", "w");
-    if (trajectory_file != NULL) {
-      print_trajectory (trajectory_file, sim.get_initial_state(), sim.get_state());
-      std::fclose (trajectory_file);
+    // Store the actual state.
+    FILE* state_file = fopen (output_prefix + "state.txt", "w");
+    if (state_file != NULL) {
+      print_state (state_file, sim.get_initial_state(), sim.get_state());
+      std::fclose (state_file);
     }
 
-    // Store the estimated trajectory.
-    FILE* trajectory_estimated_file = fopen (output_prefix + "trajectory.estimated.txt", "w");
-    if (trajectory_estimated_file != NULL) {
-      print_trajectory (trajectory_estimated_file, sim.get_initial_state(), sim.get_estimated_state());
-      std::fclose (trajectory_estimated_file);
+    // Store the estimated state.
+    FILE* state_estimated_file = fopen (output_prefix + "state.estimated.txt", "w");
+    if (state_estimated_file != NULL) {
+      print_state (state_estimated_file, sim.get_initial_state(), sim.get_estimated_state());
+      std::fclose (state_estimated_file);
     }
 
-    // Store the expected trajectory.
-    FILE* trajectory_expected_file = fopen (output_prefix + "trajectory.expected.txt", "w");
-    if (trajectory_expected_file != NULL) {
-      print_trajectory (trajectory_expected_file, sim.get_initial_state(), sim.get_expected_state());
-      std::fclose (trajectory_expected_file);
+    // Store the expected state.
+    FILE* state_expected_file = fopen (output_prefix + "state.expected.txt", "w");
+    if (state_expected_file != NULL) {
+      print_state (state_expected_file, sim.get_initial_state(), sim.get_expected_state());
+      std::fclose (state_expected_file);
     }
 
     // Store the actual landmark positions.
@@ -225,8 +225,8 @@ void simulate (const S& state_model_builder,
     std::fprintf (summary_file, "Time delta: %f\n", dt);
     std::fprintf (summary_file, "Simulated time: %f\n", sim.get_simulation_time());
     std::fprintf (summary_file, "Elapsed time: %f\n", elapsed_time);
-    std::fprintf (summary_file, "Trajectory error: %f\n", trajectory_error (sim.get_state(), sim.get_estimated_state()));
     std::fprintf (summary_file, "Landmark error: %f\n", landmark_error (landmarks, estimated_landmarks));
+    std::fprintf (summary_file, "State error: %f\n", state_error (sim.get_state(), sim.get_estimated_state()));
     std::fclose (summary_file);
   }
 
@@ -283,12 +283,12 @@ std::vector<position> read_waypoints_from_file (const char* filename) {
 
 /** Prints the given trajectory, as offset by the given pose, to ostream& out, with the format
     time_step  x_position  y_position  bearing */
-void print_trajectory (FILE* out, pose p, const bitree<pose>& trajectory) {
+void print_state (FILE* out, pose p, const bitree<pose>& state) {
   const char* fmt = "%f\t%f\t%f\n";
   std::fprintf (out, "# X\tY\tBEARING\n");
   std::fprintf (out, fmt, p.x(), p.y(), p.bearing());
-  for (size_t i = 0; i < trajectory.size(); ++i) {
-    p += trajectory[i];
+  for (size_t i = 0; i < state.size(); ++i) {
+    p += state[i];
     std::fprintf (out, fmt, p.x(), p.y(), p.bearing());
   }
 }
@@ -309,7 +309,7 @@ void print_landmarks (FILE* out, const std::map<size_t, position>& landmarks) {
 /** Computes the cumulative root mean squared error between the two given trajectories. Ignores the
     bearing of the robot, but an incorrect bearing will drastically increase the error on future
     positions in the trajectory. */
-double trajectory_error (const bitree<pose>& a, const bitree<pose>& b) {
+double state_error (const bitree<pose>& a, const bitree<pose>& b) {
   size_t points = std::min (a.size(), b.size());
   double error = 0;
   pose a_pos, b_pos;
@@ -318,7 +318,7 @@ double trajectory_error (const bitree<pose>& a, const bitree<pose>& b) {
     b_pos += b[i];
     error += (-a_pos + b_pos).distance_squared();
   }
-  return std::sqrt (error/points);
+  return error/points;
 }
 
 
@@ -339,7 +339,7 @@ double landmark_error (const std::map<size_t, position>& landmarks,
     error += x*x + y*y;
     ++num_landmarks;
   }
-  return std::sqrt(error/num_landmarks);
+  return error/num_landmarks;
 }
 
 
