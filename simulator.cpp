@@ -52,7 +52,6 @@ const double CENTRE_X = RADIUS; // meters; the centre of the circle.
 const double CENTRE_Y = 0; // meters; the centre of the circle.
 
 // SIMULATION PARAMETERS
-const double DELTA_T = 0.25; // seconds; the interval between successive actions/observations.
 const double REPETITIONS = 1.1; // the number of times to go around the circle
 
 // MCMC PARAMETERS
@@ -92,7 +91,7 @@ const planar_robot::velocity_model::builder STATE_MODEL_BUILDER
 
 // WAYPOINT CONTROLLER
 planar_robot::waypoint_controller CONTROLLER
-(pose(), WAYPOINTS, 1.0, REPETITIONS, SPEED, STEERING_MAX, STEERING_RATE);
+(WAYPOINTS, 1.0, REPETITIONS, SPEED, STEERING_MAX, STEERING_RATE);
 
 // -------------------------------------------------------------------------------------------------
 
@@ -112,7 +111,6 @@ void simulate (const S& state_model_builder,
 	       Controller& controller,
 	       const typename simulator<S, O>::map_type& landmarks,
 	       const typename simulator<S, O>::observation_predicate_type& observation_predicate,
-	       const double dt, const unsigned int mcmc_steps,
 	       const double state_dim, const double obs_dim,
 	       const boost::program_options::variables_map& options)
 {
@@ -124,6 +122,9 @@ void simulate (const S& state_model_builder,
     ? options["seed"].as<unsigned int>()
     : boost::random_device()();
   random.generator.seed (seed);
+
+  const unsigned int mcmc_steps = options["mcmc-steps"].as<unsigned int>();
+  const double dt = options["time-delta"].as<double>();
 
   simulator<S, O> sim (landmarks, std::tr1::ref(controller), controller.initial_pose(),
 		       state_model_builder, observation_model_builder, observation_predicate,
@@ -357,7 +358,9 @@ int main (int argc, char* argv[]) {
     ("help,h", "usage information")
     ("output-prefix,o", po::value<std::string>(), "prefix for simulation output files")
     ("verbose,v", "produce detailed simulation logs")
-    ("seed,s", po::value<unsigned int>(), "seed for random number generator");
+    ("seed,s", po::value<unsigned int>(), "seed for random number generator")
+    ("mcmc-steps,m", po::value<unsigned int>()->default_value(1), "mcmc steps per update")
+    ("time-delta,t", po::value<double>()->default_value(0.25), "time delta per update");
 
   po::variables_map values;
   po::store (po::parse_command_line (argc, argv, options), values);
@@ -369,5 +372,5 @@ int main (int argc, char* argv[]) {
   }
 
   simulate (STATE_MODEL_BUILDER, OBSERVATION_MODEL_BUILDER, CONTROLLER, LANDMARKS, OBSERVATION_PREDICATE,
-	    DELTA_T, MCMC_STEPS, STATE_PARAMS, OBSERVATION_PARAMS, values);
+	    STATE_PARAMS, OBSERVATION_PARAMS, values);
 }

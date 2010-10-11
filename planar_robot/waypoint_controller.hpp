@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdlib>
 #include <functional>
+#include <cassert>
 
 #include "planar_robot/pose.hpp"
 #include "planar_robot/position.hpp"
@@ -16,7 +17,6 @@ namespace planar_robot {
 
   class waypoint_controller : public std::binary_function<double, bitree<pose>, velocity_control> {
 
-    pose initial;
     std::vector<position> waypoints;
     double proximity, repetitions;
     double speed, steering_max, steering_rate;
@@ -26,15 +26,18 @@ namespace planar_robot {
 
   public:
 
-    waypoint_controller (const pose& _initial, const std::vector<position>& _waypoints,
+    waypoint_controller (const std::vector<position>& _waypoints,
 			 double _proximity, double _repetitions, double _speed,
 			 double _steering_max, double _steering_rate)
-      : initial(_initial), waypoints(_waypoints), proximity(_proximity), repetitions(_repetitions),
+      : waypoints(_waypoints), proximity(_proximity), repetitions(_repetitions),
 	speed(_speed), steering_max(_steering_max), steering_rate(_steering_rate),
-	current_steering(0.0), current_waypoint(0) { }
+	current_steering(0.0), current_waypoint(0)
+    {
+      assert (!waypoints.empty());
+    }
 
     pose initial_pose () const {
-      return initial;
+      return pose (waypoints.front().x(), waypoints.front().y(), 0.0);
     }
 
     bool finished () const {
