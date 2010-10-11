@@ -61,7 +61,7 @@ namespace planar_robot {
 
 	if (to_waypoint.range() < proximity) {
 	  ++current_waypoint;
-	  std::cout << "Seeking waypoint " << current_waypoint << '\n';
+	  //std::cout << "Seeking waypoint " << current_waypoint << '\n';
 	}
 
       }
