@@ -52,7 +52,7 @@ const double CENTRE_X = RADIUS; // meters; the centre of the circle.
 const double CENTRE_Y = 0; // meters; the centre of the circle.
 
 // SIMULATION PARAMETERS
-const double REPETITIONS = 1.1; // the number of times to go around the circle
+const double REPETITIONS = 2.1; // the number of times to go around the circle
 
 // MCMC PARAMETERS
 const int MCMC_STEPS = 10; // number of MCMC iterations per step.
@@ -296,7 +296,7 @@ void print_state (FILE* out, pose p, const bitree<pose>& state) {
 
 
 /** Prints the given set of landmarks, as offset by the given pose, to ostream& out, with the format
-    feature_id  x_position  y_position */
+    x_position  y_position feature_id */
 void print_landmarks (FILE* out, const std::map<size_t, position>& landmarks) {
   const char* fmt = "%2$f\t%3$f\t%1$zu\n";
   std::fprintf (out, "# X\tY\tID\n");
@@ -307,7 +307,7 @@ void print_landmarks (FILE* out, const std::map<size_t, position>& landmarks) {
 }
 
 
-/** Computes the cumulative root mean squared error between the two given trajectories. Ignores the
+/** Computes the cumulative mean squared error between the two given trajectories. Ignores the
     bearing of the robot, but an incorrect bearing will drastically increase the error on future
     positions in the trajectory. */
 double state_error (const bitree<pose>& a, const bitree<pose>& b) {
@@ -323,8 +323,7 @@ double state_error (const bitree<pose>& a, const bitree<pose>& b) {
 }
 
 
-/** Computes the root mean squared error between the given map and the given set of estimates. The
-    estimates are assumed to be relative to the given pose p. */
+/** Computes the mean squared error between the given map and the given set of estimates. */
 double landmark_error (const std::map<size_t, position>& landmarks,
 		       const std::map<size_t, position>& estimates) {
   double error = 0;
