@@ -1,0 +1,96 @@
+%% LyX 1.6.7 created this file.  For more info, see http://www.lyx.org/.
+%% Do not edit unless you really know what you are doing.
+\documentclass[10pt,english]{article}
+\usepackage{mathptmx}
+\usepackage[T1]{fontenc}
+\usepackage[latin9]{inputenc}
+\setlength{\parskip}{\medskipamount}
+\setlength{\parindent}{0pt}
+
+\makeatletter
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% User specified LaTeX commands.
+\usepackage{nips10submit_e,times}
+\usepackage{microtype}
+\nipsfinalcopy
+
+\makeatother
+
+\usepackage{babel}
+
+\begin{document}
+
+\title{A Markov-Chain Monte Carlo Approach to Simultaneous Localization
+and Mapping}
+
+
+\author{Péter Torma\\
+GusGus AB\\
+Hungary\\
+\And András György\\
+Machine Learning Res. Group\\
+MTA SZTAKI, Hungary\\
+\And Csaba Szepesvári, Roshan Shariff\\
+Dept. of Computing Sciences\\
+University of Alberta, Canada}
+
+\maketitle
+\thispagestyle{empty}
+
+Simultaneous Localization and Mapping (SLAM) is the intensively studied
+problem of determining a mobile robot's position in an unknown environment,
+while simultaneously building a consistent map of the environment.
+The robot is assumed to be moving under a known control input, which
+it follows with some uncertainty, in an environment containing landmarks
+which it can observe. It is assumed that the control and observation
+uncertainties can be modelled probabilistically.
+
+These probabilistic dynamics and observation models give rise to a
+posterior distribution over the robot's trajectory and landmark positions.
+Assuming a prior distribution over the landmark positions, the theory
+of Markov-chain Monte Carlo (MCMC) methods allows us to represent
+the posterior as the stationary distribution of a Markov process.
+We describe a provably consistent and rapidly converging algorithm
+that samples from the SLAM posterior using MCMC methods for arbitrary
+dynamics and observation models.
+
+Previous SLAM algorithms either assume linearized models and Gaussian
+noise (e.g. EKF-SLAM) or use particle filters (e.g. FastSLAM). Since
+real-world robots usually have non-linear dynamics, the former approach
+may fail to converge. Particle filters approximate the posterior distribution
+over robot trajectories with a set of samples drawn from it. This
+fails when the certainty in the robot's position increases sharply,
+which happens when the robot observes a landmark it has seen earlier
+({}``a loop is closed'') and is thus able to correct accumulated
+errors in its position. If no sample in the set lies close to the
+true trajectory, the particle set collapses to an inaccurate estimate.
+
+The new algorithm constructs an \emph{inference graph} in which the
+vertices represent the parameters to be estimated (i.e. robot and
+landmark locations) and the edges represent the constraints between
+them (i.e. the robot's movements and observations). A labeling of
+this graph is an estimate of each of the unknown parameters and constraints,
+and is said to be \emph{consistent} if all the parameter values satisfy
+the constraints. The robot dynamics and observation models assign
+a probability density to any labeling of the inference graph. By randomly
+selecting and resampling an edge label from a spanning tree of the
+graph, we are able to sample from a proposal distribution that maintains
+the consistency property. We then use a generalized Metropolis-Hastings
+algorithm to sample a consistent labeling, thus determining a map
+and trajectory which are sampled, in the limit, from the SLAM posterior
+distribution. Since the graph stores the entire history of observations
+and controls, the edge resampling technique is able to correct errors
+arbitrarily far back in time, thereby successfully tracking the robot's
+position even after long loops have been closed.
+
+We describe how the structure of the SLAM inference graph makes this
+edge resampling algorithm efficient, and suggest implementation techniques.
+We present results demonstrating that the resulting Markov process
+converges rapidly to the correct map and trajectory estimates. MCMC
+methods allow the algorithm to improve on previous techniques without
+compromising correctness or losing convergence guarantees.
+
+\bibliographystyle{plain}
+\nocite{*}
+\bibliography{abstract}
+
+\end{document}
