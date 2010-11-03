@@ -23,6 +23,13 @@
 							<builder buildPath="${workspace_loc:/slam/Debug}" id="cdt.managedbuild.target.gnu.builder.macosx.exe.debug.1624628887" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="Gnu Make Builder" superClass="cdt.managedbuild.target.gnu.builder.macosx.exe.debug"/>
 							<tool id="cdt.managedbuild.tool.macosx.c.linker.macosx.exe.debug.1661990288" name="MacOS X C Linker" superClass="cdt.managedbuild.tool.macosx.c.linker.macosx.exe.debug"/>
 							<tool id="cdt.managedbuild.tool.macosx.cpp.linker.macosx.exe.debug.1747690799" name="MacOS X C++ Linker" superClass="cdt.managedbuild.tool.macosx.cpp.linker.macosx.exe.debug">
+								<option id="macosx.cpp.link.option.paths.2511909" superClass="macosx.cpp.link.option.paths" valueType="libPaths">
+									<listOptionValue builtIn="false" value="/opt/local/lib"/>
+								</option>
+								<option id="macosx.cpp.link.option.libs.996035523" superClass="macosx.cpp.link.option.libs" valueType="libs">
+									<listOptionValue builtIn="false" value="boost_random"/>
+									<listOptionValue builtIn="false" value="boost_program_options"/>
+								</option>
 								<inputType id="cdt.managedbuild.tool.macosx.cpp.linker.input.1641269612" superClass="cdt.managedbuild.tool.macosx.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
@@ -30,7 +37,8 @@
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.assembler.macosx.exe.debug.2001848882" name="GCC Assembler" superClass="cdt.managedbuild.tool.gnu.assembler.macosx.exe.debug">
 								<option id="gnu.both.asm.option.include.paths.1722717177" name="Include paths (-I)" superClass="gnu.both.asm.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="/opt/local/include/boost"/>
+									<listOptionValue builtIn="false" value="/opt/local/include"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/slam/src}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.1756543276" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
@@ -39,7 +47,8 @@
 								<option id="gnu.cpp.compilermacosx.exe.debug.option.optimization.level.1723319476" name="Optimization Level" superClass="gnu.cpp.compilermacosx.exe.debug.option.optimization.level" value="gnu.cpp.compiler.optimization.level.none" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.macosx.exe.debug.option.debugging.level.1999288338" name="Debug Level" superClass="gnu.cpp.compiler.macosx.exe.debug.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.109806128" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="/opt/local/include/boost"/>
+									<listOptionValue builtIn="false" value="/opt/local/include"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/slam/src}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1358464910" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
@@ -47,7 +56,8 @@
 								<option defaultValue="gnu.c.optimization.level.none" id="gnu.c.compiler.macosx.exe.debug.option.optimization.level.193317549" name="Optimization Level" superClass="gnu.c.compiler.macosx.exe.debug.option.optimization.level" valueType="enumerated"/>
 								<option id="gnu.c.compiler.macosx.exe.debug.option.debugging.level.1526864459" name="Debug Level" superClass="gnu.c.compiler.macosx.exe.debug.option.debugging.level" value="gnu.c.debugging.level.max" valueType="enumerated"/>
 								<option id="gnu.c.compiler.option.include.paths.184132930" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="/opt/local/include/boost"/>
+									<listOptionValue builtIn="false" value="/opt/local/include"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/slam/src}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.1037118997" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>
@@ -55,7 +65,6 @@
 					</folderInfo>
 					<sourceEntries>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="src"/>
-						<entry excluding="src" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
@@ -476,6 +485,7 @@
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
 			<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
+			<storageModule moduleId="org.eclipse.cdt.core.language.mapping"/>
 		</cconfiguration>
 		<cconfiguration id="cdt.managedbuild.config.macosx.exe.release.585480278">
 			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="cdt.managedbuild.config.macosx.exe.release.585480278" moduleId="org.eclipse.cdt.core.settings" name="Release">
@@ -497,6 +507,13 @@
 							<builder buildPath="${workspace_loc:/slam/Release}" id="cdt.managedbuild.target.gnu.builder.macosx.exe.release.1743106732" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="Gnu Make Builder" superClass="cdt.managedbuild.target.gnu.builder.macosx.exe.release"/>
 							<tool id="cdt.managedbuild.tool.macosx.c.linker.macosx.exe.release.636811829" name="MacOS X C Linker" superClass="cdt.managedbuild.tool.macosx.c.linker.macosx.exe.release"/>
 							<tool id="cdt.managedbuild.tool.macosx.cpp.linker.macosx.exe.release.217532659" name="MacOS X C++ Linker" superClass="cdt.managedbuild.tool.macosx.cpp.linker.macosx.exe.release">
+								<option id="macosx.cpp.link.option.paths.1581089603" superClass="macosx.cpp.link.option.paths" valueType="libPaths">
+									<listOptionValue builtIn="false" value="/opt/local/lib"/>
+								</option>
+								<option id="macosx.cpp.link.option.libs.1241700310" superClass="macosx.cpp.link.option.libs" valueType="libs">
+									<listOptionValue builtIn="false" value="boost_random"/>
+									<listOptionValue builtIn="false" value="boost_program_options"/>
+								</option>
 								<inputType id="cdt.managedbuild.tool.macosx.cpp.linker.input.1618075269" superClass="cdt.managedbuild.tool.macosx.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
@@ -505,6 +522,8 @@
 							<tool id="cdt.managedbuild.tool.gnu.assembler.macosx.exe.release.569295216" name="GCC Assembler" superClass="cdt.managedbuild.tool.gnu.assembler.macosx.exe.release">
 								<option id="gnu.both.asm.option.include.paths.1790501879" name="Include paths (-I)" superClass="gnu.both.asm.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="/opt/local/include/boost"/>
+									<listOptionValue builtIn="false" value="/opt/local/include"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/slam/src}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.163056740" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
@@ -514,6 +533,8 @@
 								<option id="gnu.cpp.compiler.macosx.exe.release.option.debugging.level.1841186145" name="Debug Level" superClass="gnu.cpp.compiler.macosx.exe.release.option.debugging.level" value="gnu.cpp.compiler.debugging.level.none" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.1763844870" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="/opt/local/include/boost"/>
+									<listOptionValue builtIn="false" value="/opt/local/include"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/slam/src}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1941435378" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
@@ -522,6 +543,8 @@
 								<option id="gnu.c.compiler.macosx.exe.release.option.debugging.level.1493733500" name="Debug Level" superClass="gnu.c.compiler.macosx.exe.release.option.debugging.level" value="gnu.c.debugging.level.none" valueType="enumerated"/>
 								<option id="gnu.c.compiler.option.include.paths.776863600" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="/opt/local/include/boost"/>
+									<listOptionValue builtIn="false" value="/opt/local/include"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/slam/src}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.1726218595" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>
@@ -950,6 +973,7 @@
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
 			<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
+			<storageModule moduleId="org.eclipse.cdt.core.language.mapping"/>
 		</cconfiguration>
 	</storageModule>
 	<storageModule moduleId="cdtBuildSystem" version="4.0.0">
