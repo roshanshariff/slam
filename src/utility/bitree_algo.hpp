@@ -1,5 +1,5 @@
-#ifndef _UTILITIES_BITREE_ALGO_HPP
-#define _UTILITIES_BITREE_ALGO_HPP
+#ifndef _UTILITY_BITREE_ALGO_HPP
+#define _UTILITY_BITREE_ALGO_HPP
 
 #include <iterator>
 
@@ -191,4 +191,4 @@ namespace bitree_algorithms {
 
 } // namespace bitree_algorithms
 
-#endif //_UTILITIES_BITREE_ALGO_HPP
+#endif //_UTILITY_BITREE_ALGO_HPP

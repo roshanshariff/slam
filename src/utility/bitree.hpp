@@ -1,5 +1,5 @@
-#ifndef _UTILITIES_BITREE_HPP
-#define _UTILITIES_BITREE_HPP
+#ifndef _UTILITY_BITREE_HPP
+#define _UTILITY_BITREE_HPP
 
 #include <cassert>
 #include <vector>
@@ -243,4 +243,4 @@ typename bitree<Grp>::size_type bitree<Grp>::binary_search (const value_type& va
   }
 }
 
-#endif //_UTILITIES_BITREE_HPP
+#endif //_UTILITY_BITREE_HPP

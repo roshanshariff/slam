@@ -7,7 +7,7 @@
 
 #include <boost/signals2.hpp>
 
-#include "utilities/arraymap.hpp"
+#include "utility/arraymap.hpp"
 
 /** This class stores a record of all state changes and observations, as probability distributions.
     It is also responsible for notifying listeners when new state changes and observations are added.

@@ -9,8 +9,8 @@
 #include <boost/signals2.hpp>
 
 #include "slam/slam_data.hpp"
-#include "utilities/random.hpp"
-#include "utilities/bitree.hpp"
+#include "utility/random.hpp"
+#include "utility/bitree.hpp"
 
 /** This class implements the MCMC SLAM algorithm. To use it, construct an instance passing in
     a reference to a slam_data object and a random generator. This class will register to listen

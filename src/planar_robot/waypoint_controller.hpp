@@ -9,7 +9,7 @@
 #include "planar_robot/pose.hpp"
 #include "planar_robot/position.hpp"
 #include "planar_robot/velocity_model.hpp"
-#include "utilities/bitree.hpp"
+#include "utility/bitree.hpp"
 
 
 namespace planar_robot {

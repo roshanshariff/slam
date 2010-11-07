@@ -1,5 +1,5 @@
-#ifndef _UTILITIES_RANDOM_HPP
-#define _UTILITIES_RANDOM_HPP
+#ifndef _UTILITY_RANDOM_HPP
+#define _UTILITY_RANDOM_HPP
 
 #include <boost/random.hpp>
 #include <boost/math/constants/constants.hpp>
@@ -53,4 +53,4 @@ public:
 
 };
 
-#endif //_UTILITIES_RANDOM_HPP
+#endif //_UTILITY_RANDOM_HPP

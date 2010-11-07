@@ -1,5 +1,5 @@
-#ifndef _UTILITIES_GEOMETRY_HPP
-#define _UTILITIES_GEOMETRY_HPP
+#ifndef _UTILITY_GEOMETRY_HPP
+#define _UTILITY_GEOMETRY_HPP
 
 #include <boost/math/constants/constants.hpp>
 #include <cmath>
@@ -14,4 +14,4 @@ inline double wrap_angle (double angle, double base = 0.0) {
   return angle;
 }
 
-#endif //_UTILITIES_GEOMETRY_HPP
+#endif //_UTILITY_GEOMETRY_HPP

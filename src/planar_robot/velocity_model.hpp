@@ -6,8 +6,8 @@
 #include <functional>
 
 #include "planar_robot/pose.hpp"
-#include "utilities/random.hpp"
-#include "utilities/geometry.hpp"
+#include "utility/random.hpp"
+#include "utility/geometry.hpp"
 
 
 namespace planar_robot {

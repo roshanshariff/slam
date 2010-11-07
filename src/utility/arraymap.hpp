@@ -1,5 +1,5 @@
-#ifndef _UTILITIES_ARRAYMAP_HPP
-#define _UTILITIES_ARRAYMAP_HPP
+#ifndef _UTILITY_ARRAYMAP_HPP
+#define _UTILITY_ARRAYMAP_HPP
 
 #include <vector>
 #include <utility>
@@ -218,4 +218,4 @@ public:
 
 };
 
-#endif //_UTILITIES_ARRAYMAP_HPP
+#endif //_UTILITY_ARRAYMAP_HPP

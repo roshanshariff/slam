@@ -6,8 +6,8 @@
 
 #include "slam/slam_data.hpp"
 #include "slam/mcmc_slam.hpp"
-#include "utilities/random.hpp"
-#include "utilities/bitree.hpp"
+#include "utility/random.hpp"
+#include "utility/bitree.hpp"
 
 
 template <class StateModelBuilder, class ObservationModelBuilder>

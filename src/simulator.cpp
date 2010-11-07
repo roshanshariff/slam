@@ -18,7 +18,7 @@
 #include "planar_robot/range_bearing_model.hpp"
 #include "planar_robot/circle_controller.hpp"
 #include "planar_robot/waypoint_controller.hpp"
-#include "utilities/random.hpp"
+#include "utility/random.hpp"
 
 using planar_robot::pose;
 using planar_robot::position;

@@ -4,7 +4,7 @@
 #include <functional>
 
 #include "planar_robot/pose.hpp"
-#include "utilities/bitree.hpp"
+#include "utility/bitree.hpp"
 
 
 namespace planar_robot {
