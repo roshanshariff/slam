@@ -2,7 +2,5 @@
 *~
 *.dSYM
 *.o
-data/
-gstlfilt/
 Debug/
 Release/
