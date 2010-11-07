@@ -4,4 +4,5 @@
 *.o
 data/
 gstlfilt/
-simulator
+Debug/
+Release/
