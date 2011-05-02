@@ -3,8 +3,8 @@
 #include <cassert>
 #include <tr1/random>
 
-#include "utilities/bitree.hpp"
-#include "utilities/random.hpp"
+#include "utility/bitree.hpp"
+#include "utility/random.hpp"
 
 using namespace std;
 using namespace std::tr1;
@@ -114,7 +114,7 @@ bool test_2 (random_source& random) {
     if (partial_sum != seq.accumulate(0)) return false;
     for (int i = 0; i < SIZE; ++i) {
       partial_sum += elements[i];
-      if (seq.at(i) != elements[i]) return false;
+      if (seq.get(i) != elements[i]) return false;
       if (seq.accumulate(i+1) != partial_sum) return false;
     }
 

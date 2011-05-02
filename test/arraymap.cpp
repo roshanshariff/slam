@@ -1,7 +1,7 @@
 #include <string>
 #include <iostream>
 
-#include "utilities/arraymap.hpp"
+#include "utility/arraymap.hpp"
 
 using std::string;
 
