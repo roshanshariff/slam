@@ -4,9 +4,10 @@
 #include <fstream>
 #include <cstdio>
 
+#include <tr1/random>
+
 #include <boost/math/constants/constants.hpp>
 #include <boost/program_options.hpp>
-#include <boost/nondet_random.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/timer.hpp>
 
@@ -120,7 +121,7 @@ void simulate (const S& state_model_builder,
   random_source random;
   const unsigned int seed = options.count("seed")
     ? options["seed"].as<unsigned int>()
-    : boost::random_device()();
+    : std::tr1::random_device()();
   random.generator.seed (seed);
 
   const unsigned int mcmc_steps = options["mcmc-steps"].as<unsigned int>();
