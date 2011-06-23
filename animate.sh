@@ -37,6 +37,6 @@ unset output
 EOF
 
 ffmpeg -y -v 1 -i "${prefix}%d.gif" -vcodec libx264 -vpre normal "${prefix}video.mp4"
-rm $(eval echo "${prefix}{1..${steps}}.gif")
-rm $(eval echo "${prefix}landmarks.estimated.{1..${steps}}.txt")
-rm $(eval echo "${prefix}state.estimated.{1..${steps}}.txt")
+#rm $(eval echo "${prefix}{1..${steps}}.gif")
+#rm $(eval echo "${prefix}landmarks.estimated.{1..${steps}}.txt")
+#rm $(eval echo "${prefix}state.estimated.{1..${steps}}.txt")
