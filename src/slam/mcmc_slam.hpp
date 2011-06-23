@@ -107,7 +107,7 @@ private:
       the number of independent dimensions in the probability distribution. */
   template <class Model, class Label>
   double edge_weight (const Model& model, const Label& label, double importance) {
-    return importance * std::pow (model.likelihood(label)+0.0001, -1.0/importance);
+    return importance * std::pow (model.likelihood(label), -1.0/importance);
   }
 
   /** Use action_dimensions as the importance for action edges. */
