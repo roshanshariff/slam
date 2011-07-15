@@ -5,6 +5,8 @@
 #include <cmath>
 #include <functional>
 
+#include <Eigen/Core>
+
 #include "planar_robot/pose.hpp"
 #include "utility/random.hpp"
 #include "utility/geometry.hpp"
@@ -15,16 +17,15 @@ namespace planar_robot {
 
   class velocity_control {
 
-    double _v, _w, _g;
+    Eigen::Vector3d control;
 
   public:
 
-    velocity_control (double v, double w, double g = 0)
-      : _v(v), _w(w), _g(g) { }
+    velocity_control (double v, double w, double g = 0) : control(v, w, g) { }
 
-    double v () const { return _v; }
-    double w () const { return _w; }
-    double g () const { return _g; }
+    double v () const { return control.x(); }
+    double w () const { return control.y(); }
+    double g () const { return control.z(); }
 
   };
 
