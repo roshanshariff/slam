@@ -373,4 +373,7 @@ int main (int argc, char* argv[]) {
 
   simulate (STATE_MODEL_BUILDER, OBSERVATION_MODEL_BUILDER, CONTROLLER, LANDMARKS, OBSERVATION_PREDICATE,
 	    STATE_PARAMS, OBSERVATION_PARAMS, values);
+
+  return 0;
+
 }

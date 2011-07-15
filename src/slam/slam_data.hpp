@@ -86,12 +86,12 @@ public:
     _observation_signal(feature_id, actions().size()); // Trigger the signal to notify listeners.
   }
 
-  /** Connect a listener to recieve notifications of new state changes. */
+  /** Connect a listener to receive notifications of new state changes. */
   boost::signals2::connection connect_action_listener (const action_listener_type& l) const {
     return _action_signal.connect(l);
   }
 
-  /** Connect a listener to recieve notifications of new observations. */
+  /** Connect a listener to receive notifications of new observations. */
   boost::signals2::connection connect_observation_listener (const observation_listener_type& l) const {
     return _observation_signal.connect(l);
   }
