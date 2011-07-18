@@ -2,5 +2,6 @@
 *~
 *.dSYM
 *.o
+build/
 Debug/
 Release/
