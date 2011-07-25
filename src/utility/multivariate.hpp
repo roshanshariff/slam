@@ -8,6 +8,7 @@
 #ifndef MULTIVARIATE_HPP_
 #define MULTIVARIATE_HPP_
 
+#include <cmath>
 #include <boost/math/constants/constants.hpp>
 
 #include <Eigen/Core>
@@ -50,14 +51,30 @@ public:
     vector_type operator() (const random_source& random) const {
 	vector_type result;
 	for (int i=0; i<result.size(); ++i) result[i] = Scalar(random.normal());
-	result = sqrt_cov() * result;
+	result = sqrt_cov().triangularView<Eigen::Lower>() * result;
 	result += mean();
 	return result;
     }
 
     template <class V>
-    double likelihood (const Eigen::MatrixBase<V>& x) {
+    double likelihood_exp (const Eigen::MatrixBase<V>& x) {
+        vector_type v = x - mean();
+        sqrt_cov().triangularView<Eigen::Lower>().solveInPlace(v);
+      return -0.5 * v.transpose() * v;
+    }
 
+    template <class V>
+    double likelihood (const Eigen::MatrixBase<V>& x) {
+      const double C = std::pow(boost::math::constants::root_two_pi<double>(), N)
+	* sqrt_cov().triangularView<Eigen::Lower>().determinant();
+      return std::exp(likelihood_exp(x)) / C;
+    }
+
+    template <class V>
+    double log_likelihood (const Eigen::MatrixBase<V>& x) {
+      const double C = 0.5*N*std::log(2*boost::math::constants::pi<double>())
+	+ sqrt_cov().diagonal().array().log().sum();
+      return likelihood_exp(x) - C;
     }
 
 };
