@@ -3,8 +3,9 @@ cmake_minimum_required (VERSION 2.8)
 project (slam CXX)
 add_executable (simulator simulator.cpp)
 
-include_directories (${PROJECT_SOURCE_DIR})
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+
+set (CMAKE_INCLUDE_CURRENT_DIR true)
 
 find_package (Boost COMPONENTS program_options REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
