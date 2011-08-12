@@ -13,7 +13,7 @@
 					</externalSetting>
 				</externalSettings>
 				<extensions>
-					<extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
+					<extension id="org.eclipse.cdt.core.MachO64" point="org.eclipse.cdt.core.BinaryParser"/>
 					<extension id="org.eclipse.cdt.core.GCCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
 					<extension id="org.eclipse.cdt.core.GASErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
 					<extension id="org.eclipse.cdt.core.GLDErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
@@ -24,179 +24,36 @@
 			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
 				<configuration artifactName="${ProjName}" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.debug,org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe" cleanCommand="rm -rf" description="" id="cdt.managedbuild.config.gnu.macosx.exe.debug.700686636" name="Debug" parent="cdt.managedbuild.config.gnu.macosx.exe.debug">
 					<folderInfo id="cdt.managedbuild.config.gnu.macosx.exe.debug.700686636." name="/" resourcePath="">
-						<toolChain id="cdt.managedbuild.toolchain.gnu.base.171296400" name="Linux GCC" superClass="cdt.managedbuild.toolchain.gnu.base">
-							<targetPlatform archList="all" id="cdt.managedbuild.target.gnu.platform.base.761454234" name="Debug Platform" osList="linux,hpux,aix,qnx" superClass="cdt.managedbuild.target.gnu.platform.base"/>
-							<builder buildPath="${workspace_loc:/slam/Debug}" id="cdt.managedbuild.target.gnu.builder.base.552812778" keepEnvironmentInBuildfile="false" name="Gnu Make Builder" superClass="cdt.managedbuild.target.gnu.builder.base"/>
-							<tool id="cdt.managedbuild.tool.gnu.archiver.base.244189285" name="GCC Archiver" superClass="cdt.managedbuild.tool.gnu.archiver.base"/>
-							<tool id="cdt.managedbuild.tool.gnu.cpp.compiler.base.2062450248" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.base">
-								<option id="gnu.cpp.compiler.option.optimization.level.262703860" name="Optimization Level" superClass="gnu.cpp.compiler.option.optimization.level" value="gnu.cpp.compiler.optimization.level.none" valueType="enumerated"/>
-								<option id="gnu.cpp.compiler.option.debugging.level.2086165699" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
-								<option id="gnu.cpp.compiler.option.include.paths.208556686" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/slam/src}&quot;"/>
-								</option>
-								<option id="gnu.cpp.compiler.option.preprocessor.undef.1698211992" name="Undefined symbols (-U)" superClass="gnu.cpp.compiler.option.preprocessor.undef" valueType="undefDefinedSymbols">
-									<listOptionValue builtIn="false" value="__x86_64"/>
-									<listOptionValue builtIn="false" value="__FLT_EVAL_METHOD__"/>
-									<listOptionValue builtIn="false" value="__FLT_EPSILON__"/>
-									<listOptionValue builtIn="false" value="__DEC64_MANT_DIG__"/>
-									<listOptionValue builtIn="false" value="__FLT_MAX_EXP__"/>
-									<listOptionValue builtIn="false" value="__DBL_MIN__"/>
-									<listOptionValue builtIn="false" value="__LDBL_EPSILON__"/>
-									<listOptionValue builtIn="false" value="__DEC64_MIN__"/>
-									<listOptionValue builtIn="false" value="__SCHAR_MAX__"/>
-									<listOptionValue builtIn="false" value="__DEC128_MANT_DIG__"/>
-									<listOptionValue builtIn="false" value="_LP64"/>
-									<listOptionValue builtIn="false" value="__DBL_MIN_10_EXP__"/>
-									<listOptionValue builtIn="false" value="__unix__"/>
-									<listOptionValue builtIn="false" value="__DBL_DENORM_MIN__"/>
-									<listOptionValue builtIn="false" value="__REGISTER_PREFIX__"/>
-									<listOptionValue builtIn="false" value="__SHRT_MAX__"/>
-									<listOptionValue builtIn="false" value="__DBL_HAS_DENORM__"/>
-									<listOptionValue builtIn="false" value="__SIZEOF_WCHAR_T__"/>
-									<listOptionValue builtIn="false" value="__SIZEOF_PTRDIFF_T__"/>
-									<listOptionValue builtIn="false" value="__DEC32_MAX__"/>
-									<listOptionValue builtIn="false" value="__linux__"/>
-									<listOptionValue builtIn="false" value="__SIZEOF_DOUBLE__"/>
-									<listOptionValue builtIn="false" value="__LDBL_HAS_QUIET_NAN__"/>
-									<listOptionValue builtIn="false" value="__FLT_MIN_EXP__"/>
-									<listOptionValue builtIn="false" value="__LDBL_MANT_DIG__"/>
-									<listOptionValue builtIn="false" value="__DEC32_EPSILON__"/>
-									<listOptionValue builtIn="false" value="__FLT_DENORM_MIN__"/>
-									<listOptionValue builtIn="false" value="__CHAR32_TYPE__"/>
-									<listOptionValue builtIn="false" value="__LDBL_DIG__"/>
-									<listOptionValue builtIn="false" value="__ELF__"/>
-									<listOptionValue builtIn="false" value="__LDBL_DENORM_MIN__"/>
-									<listOptionValue builtIn="false" value="__DEC32_MIN_EXP__"/>
-									<listOptionValue builtIn="false" value="__DEC128_MAX__"/>
-									<listOptionValue builtIn="false" value="__GCC_HAVE_SYNC_COMPARE_AND_SWAP_8"/>
-									<listOptionValue builtIn="false" value="_GNU_SOURCE"/>
-									<listOptionValue builtIn="false" value="__FLT_MIN_10_EXP__"/>
-									<listOptionValue builtIn="false" value="__WCHAR_MAX__"/>
-									<listOptionValue builtIn="false" value="__LDBL_HAS_DENORM__"/>
-									<listOptionValue builtIn="false" value="__GNUC_PATCHLEVEL__"/>
-									<listOptionValue builtIn="false" value="__DEC32_SUBNORMAL_MIN__"/>
-									<listOptionValue builtIn="false" value="__GXX_ABI_VERSION"/>
-									<listOptionValue builtIn="false" value="__SIZEOF_POINTER__"/>
-									<listOptionValue builtIn="false" value="__SSE2_MATH__"/>
-									<listOptionValue builtIn="false" value="__DBL_MIN_EXP__"/>
-									<listOptionValue builtIn="false" value="__LDBL_HAS_INFINITY__"/>
-									<listOptionValue builtIn="false" value="__FLT_MAX_10_EXP__"/>
-									<listOptionValue builtIn="false" value="__DEC64_MIN_EXP__"/>
-									<listOptionValue builtIn="false" value="__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4"/>
-									<listOptionValue builtIn="false" value="__GCC_HAVE_SYNC_COMPARE_AND_SWAP_1"/>
-									<listOptionValue builtIn="false" value="__SIZEOF_LONG_DOUBLE__"/>
-									<listOptionValue builtIn="false" value="__DEC32_MIN__"/>
-									<listOptionValue builtIn="false" value="__GCC_HAVE_SYNC_COMPARE_AND_SWAP_2"/>
-									<listOptionValue builtIn="false" value="__MMX__"/>
-									<listOptionValue builtIn="false" value="__EXCEPTIONS"/>
-									<listOptionValue builtIn="false" value="__LDBL_MIN_10_EXP__"/>
-									<listOptionValue builtIn="false" value="__SIZEOF_LONG_LONG__"/>
-									<listOptionValue builtIn="false" value="__x86_64__"/>
-									<listOptionValue builtIn="false" value="__DEPRECATED"/>
-									<listOptionValue builtIn="false" value="__DEC64_MAX_EXP__"/>
-									<listOptionValue builtIn="false" value="__FLT_MIN__"/>
-									<listOptionValue builtIn="false" value="__DBL_EPSILON__"/>
-									<listOptionValue builtIn="false" value="__GXX_RTTI"/>
-									<listOptionValue builtIn="false" value="__LDBL_MAX_EXP__"/>
-									<listOptionValue builtIn="false" value="__DEC128_MAX_EXP__"/>
-									<listOptionValue builtIn="false" value="__k8__"/>
-									<listOptionValue builtIn="false" value="__SIZEOF_SIZE_T__"/>
-									<listOptionValue builtIn="false" value="__DBL_DIG__"/>
-									<listOptionValue builtIn="false" value="_FORTIFY_SOURCE"/>
-									<listOptionValue builtIn="false" value="__FLT_MANT_DIG__"/>
-									<listOptionValue builtIn="false" value="__SSE__"/>
-									<listOptionValue builtIn="false" value="__FLT_RADIX__"/>
-									<listOptionValue builtIn="false" value="__GNUC_MINOR__"/>
-									<listOptionValue builtIn="false" value="__DEC64_MAX__"/>
-									<listOptionValue builtIn="false" value="__BIGGEST_ALIGNMENT__"/>
-									<listOptionValue builtIn="false" value="__gnu_linux__"/>
-									<listOptionValue builtIn="false" value="__INTMAX_TYPE__"/>
-									<listOptionValue builtIn="false" value="__FLT_DIG__"/>
-									<listOptionValue builtIn="false" value="__LDBL_MIN_EXP__"/>
-									<listOptionValue builtIn="false" value="__DECIMAL_BID_FORMAT__"/>
-									<listOptionValue builtIn="false" value="__INT_MAX__"/>
-									<listOptionValue builtIn="false" value="__DEC64_EPSILON__"/>
-									<listOptionValue builtIn="false" value="__LONG_LONG_MAX__"/>
-									<listOptionValue builtIn="false" value="__amd64"/>
-									<listOptionValue builtIn="false" value="__DBL_HAS_INFINITY__"/>
-									<listOptionValue builtIn="false" value="__FLT_HAS_QUIET_NAN__"/>
-									<listOptionValue builtIn="false" value="__DBL_MAX_10_EXP__"/>
-									<listOptionValue builtIn="false" value="__FLT_HAS_DENORM__"/>
-									<listOptionValue builtIn="false" value="__STDC__"/>
-									<listOptionValue builtIn="false" value="__LDBL_MIN__"/>
-									<listOptionValue builtIn="false" value="__NO_INLINE__"/>
-									<listOptionValue builtIn="false" value="__SSE2__"/>
-									<listOptionValue builtIn="false" value="__DEC128_EPSILON__"/>
-									<listOptionValue builtIn="false" value="__GNUC__"/>
-									<listOptionValue builtIn="false" value="__SIZEOF_FLOAT__"/>
-									<listOptionValue builtIn="false" value="__INTMAX_MAX__"/>
-									<listOptionValue builtIn="false" value="__DEC32_MAX_EXP__"/>
-									<listOptionValue builtIn="false" value="__unix"/>
-									<listOptionValue builtIn="false" value="__k8"/>
-									<listOptionValue builtIn="false" value="__VERSION__"/>
-									<listOptionValue builtIn="false" value="__DEC128_MIN_EXP__"/>
-									<listOptionValue builtIn="false" value="__SIZEOF_WINT_T__"/>
-									<listOptionValue builtIn="false" value="__SIZEOF_INT__"/>
-									<listOptionValue builtIn="false" value="__USER_LABEL_PREFIX__"/>
-									<listOptionValue builtIn="false" value="__LONG_MAX__"/>
-									<listOptionValue builtIn="false" value="__SSP__"/>
-									<listOptionValue builtIn="false" value="__PTRDIFF_TYPE__"/>
-									<listOptionValue builtIn="false" value="__CHAR_BIT__"/>
-									<listOptionValue builtIn="false" value="__DEC128_SUBNORMAL_MIN__"/>
-									<listOptionValue builtIn="false" value="__DBL_HAS_QUIET_NAN__"/>
-									<listOptionValue builtIn="false" value="__SSE_MATH__"/>
-									<listOptionValue builtIn="false" value="__SIZEOF_SHORT__"/>
-									<listOptionValue builtIn="false" value="__DBL_MAX_EXP__"/>
-									<listOptionValue builtIn="false" value="__WINT_TYPE__"/>
-									<listOptionValue builtIn="false" value="__DEC_EVAL_METHOD__"/>
-									<listOptionValue builtIn="false" value="__DEC64_SUBNORMAL_MIN__"/>
-									<listOptionValue builtIn="false" value="__amd64__"/>
-									<listOptionValue builtIn="false" value="__DBL_MANT_DIG__"/>
-									<listOptionValue builtIn="false" value="__FLT_MAX__"/>
-									<listOptionValue builtIn="false" value="__linux"/>
-									<listOptionValue builtIn="false" value="__GNUC_GNU_INLINE__"/>
-									<listOptionValue builtIn="false" value="__DEC128_MIN__"/>
-									<listOptionValue builtIn="false" value="__SIZE_TYPE__"/>
-									<listOptionValue builtIn="false" value="__FLT_HAS_INFINITY__"/>
-									<listOptionValue builtIn="false" value="__DEC32_MANT_DIG__"/>
-									<listOptionValue builtIn="false" value="__GCC_HAVE_DWARF2_CFI_ASM"/>
-									<listOptionValue builtIn="false" value="__STDC_HOSTED__"/>
-									<listOptionValue builtIn="false" value="linux"/>
-									<listOptionValue builtIn="false" value="__DECIMAL_DIG__"/>
-									<listOptionValue builtIn="false" value="__LDBL_MAX_10_EXP__"/>
-									<listOptionValue builtIn="false" value="__GXX_WEAK__"/>
-									<listOptionValue builtIn="false" value="__DBL_MAX__"/>
-									<listOptionValue builtIn="false" value="__SIZEOF_LONG__"/>
-									<listOptionValue builtIn="false" value="__UINTMAX_TYPE__"/>
-									<listOptionValue builtIn="false" value="__LDBL_MAX__"/>
-									<listOptionValue builtIn="false" value="__FINITE_MATH_ONLY__"/>
-									<listOptionValue builtIn="false" value="__WCHAR_TYPE__"/>
-									<listOptionValue builtIn="false" value="__LP64__"/>
-									<listOptionValue builtIn="false" value="__GNUG__"/>
-									<listOptionValue builtIn="false" value="unix"/>
-									<listOptionValue builtIn="false" value="__CHAR16_TYPE__"/>
-									<listOptionValue builtIn="false" value="__cplusplus"/>
-								</option>
-								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.386525092" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
-							</tool>
-							<tool id="cdt.managedbuild.tool.gnu.c.compiler.base.1910116939" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.base">
-								<option defaultValue="gnu.c.optimization.level.none" id="gnu.c.compiler.option.optimization.level.1731338392" name="Optimization Level" superClass="gnu.c.compiler.option.optimization.level" valueType="enumerated"/>
-								<option id="gnu.c.compiler.option.debugging.level.68445555" name="Debug Level" superClass="gnu.c.compiler.option.debugging.level" value="gnu.c.debugging.level.max" valueType="enumerated"/>
-								<option id="gnu.c.compiler.option.include.paths.958100507" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths"/>
-								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.1833680301" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
-							</tool>
-							<tool id="cdt.managedbuild.tool.gnu.c.linker.base.1559638052" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.base"/>
-							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.base.1451800438" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.base">
-								<option id="gnu.cpp.link.option.libs.629985189" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
+						<toolChain id="cdt.managedbuild.toolchain.gnu.macosx.base.918314862" name="MacOSX GCC" superClass="cdt.managedbuild.toolchain.gnu.macosx.base">
+							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.MachO64" id="cdt.managedbuild.target.gnu.platform.macosx.base.141469519" name="Debug Platform" osList="macosx" superClass="cdt.managedbuild.target.gnu.platform.macosx.base"/>
+							<builder buildPath="${workspace_loc:/slam/build}" id="cdt.managedbuild.target.gnu.builder.macosx.base.1169577026" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="cdt.managedbuild.target.gnu.builder.macosx.base"/>
+							<tool id="cdt.managedbuild.tool.macosx.c.linker.macosx.base.499893579" name="MacOS X C Linker" superClass="cdt.managedbuild.tool.macosx.c.linker.macosx.base"/>
+							<tool id="cdt.managedbuild.tool.macosx.cpp.linker.macosx.base.1007650111" name="MacOS X C++ Linker" superClass="cdt.managedbuild.tool.macosx.cpp.linker.macosx.base">
+								<option id="macosx.cpp.link.option.libs.1852033769" name="Libraries (-l)" superClass="macosx.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="boost_program_options"/>
 								</option>
-								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.1086301602" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
+								<inputType id="cdt.managedbuild.tool.macosx.cpp.linker.input.1147158891" superClass="cdt.managedbuild.tool.macosx.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
 								</inputType>
 							</tool>
-							<tool id="cdt.managedbuild.tool.gnu.assembler.base.382046850" name="GCC Assembler" superClass="cdt.managedbuild.tool.gnu.assembler.base">
-								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.1290686489" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
+							<tool id="cdt.managedbuild.tool.gnu.assembler.macosx.base.1233486293" name="GCC Assembler" superClass="cdt.managedbuild.tool.gnu.assembler.macosx.base">
+								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.880796910" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
+							</tool>
+							<tool id="cdt.managedbuild.tool.gnu.archiver.macosx.base.44833560" name="GCC Archiver" superClass="cdt.managedbuild.tool.gnu.archiver.macosx.base"/>
+							<tool id="cdt.managedbuild.tool.gnu.cpp.compiler.macosx.base.1771285651" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.macosx.base">
+								<option id="gnu.cpp.compiler.option.include.paths.1144984370" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/slam/src}&quot;"/>
+									<listOptionValue builtIn="false" value="/opt/local/include/eigen3"/>
+								</option>
+								<option id="gnu.cpp.compiler.option.optimization.level.1871901991" name="Optimization Level" superClass="gnu.cpp.compiler.option.optimization.level" value="gnu.cpp.compiler.optimization.level.none" valueType="enumerated"/>
+								<option id="gnu.cpp.compiler.option.debugging.level.1378262626" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
+								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1964432898" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
+							</tool>
+							<tool id="cdt.managedbuild.tool.gnu.c.compiler.macosx.base.367932643" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.macosx.base">
+								<option defaultValue="gnu.c.optimization.level.none" id="gnu.c.compiler.option.optimization.level.1389612631" name="Optimization Level" superClass="gnu.c.compiler.option.optimization.level" valueType="enumerated"/>
+								<option id="gnu.c.compiler.option.debugging.level.1861461084" name="Debug Level" superClass="gnu.c.compiler.option.debugging.level" value="gnu.c.debugging.level.max" valueType="enumerated"/>
+								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.475770747" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>
 						</toolChain>
 					</folderInfo>
@@ -238,6 +95,7 @@
 								<option id="gnu.cpp.compiler.option.other.other.1385471974" name="Other flags" superClass="gnu.cpp.compiler.option.other.other" value="-c -fmessage-length=0 -fPIC" valueType="string"/>
 								<option id="gnu.cpp.compiler.option.include.paths.692096759" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/slam/src}&quot;"/>
+									<listOptionValue builtIn="false" value="/opt/local/include/eigen3"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.435841758" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
@@ -277,6 +135,9 @@
 	<storageModule moduleId="cdtBuildSystem" version="4.0.0">
 		<project id="slam.cdt.managedbuild.target.macosx.exe.650426994" name="Executable" projectType="cdt.managedbuild.target.macosx.exe"/>
 	</storageModule>
+	<storageModule moduleId="refreshScope" versionNumber="1">
+		<resource resourceType="PROJECT" workspacePath="/slam"/>
+	</storageModule>
 	<storageModule moduleId="scannerConfiguration">
 		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.macosx.exe.release.585480278;cdt.managedbuild.config.macosx.exe.release.585480278.;cdt.managedbuild.tool.gnu.cpp.compiler.base.979002806;cdt.managedbuild.tool.gnu.cpp.compiler.input.435841758">
@@ -285,16 +146,22 @@
 		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.macosx.exe.debug.700686636;cdt.managedbuild.config.gnu.macosx.exe.debug.700686636.;cdt.managedbuild.tool.gnu.c.compiler.base.1910116939;cdt.managedbuild.tool.gnu.c.compiler.input.1833680301">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="org.eclipse.cdt.managedbuilder.core.GCCManagedMakePerProjectProfileC"/>
 		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.macosx.exe.debug.700686636;cdt.managedbuild.config.gnu.macosx.exe.debug.700686636.;cdt.managedbuild.tool.gnu.cpp.compiler.macosx.base.1771285651;cdt.managedbuild.tool.gnu.cpp.compiler.input.1964432898">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="org.eclipse.cdt.managedbuilder.core.GCCManagedMakePerProjectProfileCPP"/>
+		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.macosx.exe.debug.700686636;cdt.managedbuild.config.gnu.macosx.exe.debug.700686636.;cdt.managedbuild.tool.gnu.cpp.compiler.macosx.exe.debug.994833698;cdt.managedbuild.tool.gnu.cpp.compiler.input.1358464910">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="org.eclipse.cdt.managedbuilder.core.GCCManagedMakePerProjectProfileCPP"/>
 		</scannerConfigBuildInfo>
-		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.macosx.exe.debug.700686636;cdt.managedbuild.config.gnu.macosx.exe.debug.700686636.;cdt.managedbuild.tool.gnu.cpp.compiler.base.2062450248;cdt.managedbuild.tool.gnu.cpp.compiler.input.386525092">
-			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="org.eclipse.cdt.managedbuilder.core.GCCManagedMakePerProjectProfileCPP"/>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.macosx.exe.debug.700686636;cdt.managedbuild.config.gnu.macosx.exe.debug.700686636.;cdt.managedbuild.tool.gnu.c.compiler.macosx.exe.debug.1225870310;cdt.managedbuild.tool.gnu.c.compiler.input.1037118997">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="org.eclipse.cdt.managedbuilder.core.GCCManagedMakePerProjectProfileC"/>
 		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.macosx.exe.release.585480278;cdt.managedbuild.config.macosx.exe.release.585480278.;cdt.managedbuild.tool.gnu.c.compiler.macosx.exe.release.1538244476;cdt.managedbuild.tool.gnu.c.compiler.input.1726218595">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="org.eclipse.cdt.managedbuilder.core.GCCManagedMakePerProjectProfileC"/>
 		</scannerConfigBuildInfo>
-		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.macosx.exe.debug.700686636;cdt.managedbuild.config.gnu.macosx.exe.debug.700686636.;cdt.managedbuild.tool.gnu.c.compiler.macosx.exe.debug.1225870310;cdt.managedbuild.tool.gnu.c.compiler.input.1037118997">
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.macosx.exe.debug.700686636;cdt.managedbuild.config.gnu.macosx.exe.debug.700686636.;cdt.managedbuild.tool.gnu.cpp.compiler.base.2062450248;cdt.managedbuild.tool.gnu.cpp.compiler.input.386525092">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="org.eclipse.cdt.managedbuilder.core.GCCManagedMakePerProjectProfileCPP"/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.macosx.exe.debug.700686636;cdt.managedbuild.config.gnu.macosx.exe.debug.700686636.;cdt.managedbuild.tool.gnu.c.compiler.macosx.base.367932643;cdt.managedbuild.tool.gnu.c.compiler.input.475770747">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="org.eclipse.cdt.managedbuilder.core.GCCManagedMakePerProjectProfileC"/>
 		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.macosx.exe.release.585480278;cdt.managedbuild.config.macosx.exe.release.585480278.;cdt.managedbuild.tool.gnu.c.compiler.base.1607636855;cdt.managedbuild.tool.gnu.c.compiler.input.629464303">
