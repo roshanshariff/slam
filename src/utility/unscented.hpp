@@ -14,6 +14,51 @@
 #include <Eigen/Eigen>
 #include <Eigen/Cholesky>
 
+#include "utility/multivariate.hpp"
+
+template <int N, class MinusFunc = std::minus>
+class unscented_filter {
+
+	typedef multivariate_normal_dist<N> dist_type;
+
+	dist_type& state;
+
+	DifferenceFunc difference;
+
+	double alpha, kappa, beta;
+
+public:
+
+	unscented_filter (dist_type& _state) : state(_state) { }
+
+	template <class PredictFunc>
+	void predict (const PredictFunc f) {
+
+		const double lambda = alpha*alpha*(N + kappa) - N;
+
+		Eigen::Matrix<double, N, 2*N> sigmapts;
+		sigmapts.leftCols<N>() = std::sqrt(N + lambda) * state.sqrt_cov();
+		sigmapts.rightCols<N>() = -sigmapts.leftCols<N>();
+		sigmapts += state.mean().rowwise().replicate<2*N>();
+
+		const Eigen::Matrix<double, N, 1> base = f(state.mean());
+		for (int i = 0; i < 2*N; ++i) sigmapts.col(i) = difference(base, f(sigmapts.col(i)));
+
+		const Eigen::Matrix<double, N, 1> base_innov = sigmapts.rowwise().sum() / (2*(N + lambda));
+		for (int i = 0; i < 2*N; ++i) sigmapts.col(i) = difference(base_innov, sigmapts.col(i));
+		sigmapts /= std::sqrt(2*(N + lambda));
+
+		state.mean() = difference(base, base_innov);
+		state.sqrt_cov() = sigmapts.transpose().householderQr().matrixQR().topLeftCorner<N,N>().triangularView<Eigen::Upper>().transpose();
+
+		// TODO Cholesky rank-one update
+		// cholupdate(state.sqrt_cov(), std::sqrt(lambda/(L + lambda) + (1 - alpha*alpha + beta))*base_innov)
+
+	}
+
+};
+
+
 struct unscented_params {
     double alpha, kappa, beta;
 };
