@@ -61,17 +61,17 @@ void cholesky_update (Eigen::Matrix<double, N, N>& L, Eigen::Matrix<double, N, 1
 template <int N>
 void cholesky_downdate (Eigen::Matrix<double, N, N>& L, Eigen::Matrix<double, N, 1> v) {
 
-	L.template triangularView<Eigen::Lower>().solveInPlace(v);
+	Eigen::Matrix<double, N, 1> p = L.template triangularView<Eigen::Lower>().solve(v);
+	v.setZero();
 
-	double rho = std::sqrt(1 - v.squaredNorm());
-	assert(rho > 0);
+	double rho = std::sqrt(1 - p.squaredNorm());
+	assert(rho > 0); // otherwise the downdate would destroy positive definiteness.
 
 	Eigen::JacobiRotation<double> rot;
-	Eigen::Matrix<double, N, 1> temp = Eigen::Matrix<double, N, 1>::Zero();
 
 	for (int i = N-1; i >= 0; --i) {
-		rot.makeGivens(rho, v(i), &rho), v(i) = 0;
-		apply_jacobi_rotation(temp, L.col(i), rot);
+		rot.makeGivens(rho, p(i), &rho), p(i) = 0;
+		apply_jacobi_rotation(v, L.col(i), rot);
 	}
 }
 
