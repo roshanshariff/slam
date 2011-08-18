@@ -72,7 +72,7 @@ public:
 	template <class V>
 	double likelihood (const Eigen::MatrixBase<V>& x) {
 		const double C = std::pow(boost::math::constants::root_two_pi<double>(), N)
-							* sqrt_cov().triangularView<Eigen::Lower>().determinant();
+							* sqrt_cov().diagonal().array().product();
 		return std::exp(likelihood_exp(x)) / C;
 	}
 
