@@ -37,7 +37,6 @@ void apply_jacobi_rotation (
 }
 
 
-
 /* See M. Seeger, "Low Rank Updates for the Cholesky Decomposition", 2008 at
  * 	http://lapmal.epfl.ch/papers/cholupdate.pdf
  * for more an explanation of the algorithm used here.
@@ -59,20 +58,28 @@ void cholesky_update (Eigen::Matrix<double, N, N>& L, Eigen::Matrix<double, N, 1
  * for more an explanation of the algorithm used here.
  */
 template <int N>
-void cholesky_downdate (Eigen::Matrix<double, N, N>& L, Eigen::Matrix<double, N, 1> v) {
+void cholesky_downdate (Eigen::Matrix<double, N, N>& L, Eigen::Matrix<double, N, 1> p) {
 
-	Eigen::Matrix<double, N, 1> p = L.template triangularView<Eigen::Lower>().solve(v);
-	v.setZero();
+	L.template triangularView<Eigen::Lower>().solveInPlace(p);
 
 	double rho = std::sqrt(1 - p.squaredNorm());
 	assert(rho > 0); // otherwise the downdate would destroy positive definiteness.
 
 	Eigen::JacobiRotation<double> rot;
+	Eigen::Matrix<double, N, 1> temp;
+	temp.setZero();
 
 	for (int i = N-1; i >= 0; --i) {
 		rot.makeGivens(rho, p(i), &rho), p(i) = 0;
-		apply_jacobi_rotation(v, L.col(i), rot);
+		apply_jacobi_rotation(temp, L.col(i), rot);
 	}
+}
+
+
+template <int N>
+void cholesky_update (Eigen::Matrix<double, N, N>& L, const Eigen::Matrix<double, N, 1>& v, double k) {
+	if (k > 0) cholesky_update(L, std::sqrt(k)*v);
+	else if (k < 0) cholesky_downdate(L, std::sqrt(-k)*v);
 }
 
 
