@@ -32,13 +32,18 @@ private:
 	const double lambda, eta, weight_first, weight_rest;
 
 
+	/* Uses the unscented transform to apply the function f to the current state and produce the
+	 * new distribution "result". delta should be a function such that delta(a,b) is roughly a - b,
+	 * taking into account the topology of the space. Optionally, if cross_cov is not null, its
+	 * referee is set to the cross-covariance between the state and its transformation by f.
+	 */
 	template <int M, class TransformFunc, class DeltaFunc>
 	void apply_transform (
 			TransformFunc f, DeltaFunc delta, multivariate_normal_dist<M>& result,
 			Eigen::Matrix<double, N, M>* cross_cov = 0
 	) {
 
-		typedef Eigen::Matrix<double, M, 1> vector_type;
+		typedef Eigen::Matrix<double, M, 1> vector_type; // the result type of f
 
 		const vector_type base = f(state.mean());
 
@@ -74,13 +79,17 @@ public:
 	{ }
 
 
+	/* Modifies the state to take into account a transformation by f; i.e. the prediction step of
+	 * the Kalman filter.
+	 */
 	template <class PredictFunc, class DeltaFunc = std::minus<Eigen::Matrix<double, N, 1> > >
 	void predict (PredictFunc f = PredictFunc(), DeltaFunc delta = DeltaFunc()) {
 		apply_transform(f, delta, state);
 	}
 
 
-	/* NOTE: the code below assumes that the observation has additive noise with zero mean and
+	/* Modifies the state to take into account measurements under h.
+	 * NOTE: the code below assumes that the observation has additive noise with zero mean and
 	 * covariance equal to the covariance of the sensor noise (i.e. the covariance part of the
 	 * observation parameter).
 	 */
