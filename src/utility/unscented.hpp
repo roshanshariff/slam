@@ -27,8 +27,6 @@ public:
 private:
 
 	dist_type& state;
-	StateDeltaFunc state_delta;
-
 	const double lambda, eta, weight_first, weight_rest;
 
 
@@ -117,7 +115,6 @@ public:
 
 		kalman_gain.noalias() *= predicted.sqrt_cov();
 		for (int i = 0; i < M; ++i) cholesky_downdate(state.sqrt_cov(), kalman_gain.col(i));
-
 	}
 
 
