@@ -3,42 +3,54 @@
 
 #include <complex>
 
+#include <Eigen/Core>
+
 #include "planar_robot/pose.hpp"
 
 
 namespace planar_robot {
 
 
-  class position {
+class position {
 
-    std::complex<double> pos;
+	std::complex<double> pos;
 
-    position (const std::complex<double>& p) : pos(p) { }
+protected:
 
-  public:
+	position (const std::complex<double>& p) : pos(p) { }
 
-    position (double x = 0.0, double y = 0.0) : pos(x, y) { }
+public:
 
-    double x () const { return pos.real(); }
-    double y () const { return pos.imag(); }
-    double range () const { return std::abs(pos); }
-    double bearing () const { return std::arg(pos); }
-    double range_squared () const { return std::norm(pos); }
+	static const int vector_dim = 2;
+	typedef Eigen::Vector2d vector_type;
 
-    friend position position_polar (double range, double bearing);
-    friend position operator+ (const pose&, const position&);
+	static position cartesian (double x, double y) {
+		return position (std::complex<double>(x, y));
+	}
 
-  };
+	static position polar (double distance, double direction) {
+		return position (std::polar(range, bearing));
+	}
+
+	double x () const { return pos.real(); }
+	double y () const { return pos.imag(); }
+	double distance () const { return std::abs(pos); }
+	double direction () const { return std::arg(pos); }
+	double distance_squared () const { return std::norm(pos); }
+
+	vector_type to_vector () const { return vector_type (x(), y()); }
+
+	static position from_vector (const vector_type& v) { return cartesian (v(0), v(1)); }
+
+	friend position operator+ (const pose&, const position&);
+
+};
 
 
-  inline position position_polar (double range, double bearing) {
-    return position (std::polar (range, bearing));
-  }
 
-
-  inline position operator+ (const pose& p, const position& o) {
-    return position (p.translation + p.rotation*o.pos);
-  }
+inline position operator+ (const pose& p, const position& o) {
+	return position (p.translation + p.rotation*o.pos);
+}
 
 
 } // namespace planar_robot

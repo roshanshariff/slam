@@ -4,76 +4,58 @@
 #include <cstdlib>
 #include <functional>
 
+#include <Eigen/Core>
+
 #include "planar_robot/pose.hpp"
 #include "utility/random.hpp"
+#include "utility/multivariate.hpp"
 #include "utility/geometry.hpp"
 
 
 namespace planar_robot {
 
 
-  class odometry_model {
+struct odometry_model : public independent_normal_base<3, odometry_model> {
 
-    normal_dist<double> distance;
-    normal_dist<double> direction;
-    normal_dist<double> bearing;
+	typedef pose state_type;
 
-  public:
+	odometry_model (const vector_type& mean, const vector_type& stddev)
+	: independent_normal_base(mean, stddev) { }
 
-    typedef pose result_type;
+	static vector_type subtract (const vector_type& a, const vector_type& b) {
+		return vector_type (a(0)-b(0), wrap_angle(a(1)-b(1)), wrap_angle(a(2)-b(2)));
+	}
 
-    odometry_model (const pose& mean, double distance_sigma,
-	       double direction_sigma, double bearing_sigma)
-      : distance (mean.distance(), distance_sigma),
-	direction (mean.direction(), direction_sigma),
-	bearing (mean.bearing(), bearing_sigma) { }
+	static vector_type from_state_change (const pose& dp) {
+		return vector_type (dp.distance(), dp.direction(), wrap_angle(dp.bearing()-dp.direction()));
+	}
 
-    pose mean () const {
-      return pose_polar (distance.mean(), direction.mean(), bearing.mean());
-    }
+	static pose to_state_change (const vector_type& control) {
+		return pose::polar (control(0), control(1), control(1)+control(2));
+	}
 
-    pose operator() (random_source& random) const {
-      return pose_polar (distance(random), direction(random), bearing(random));
-    }
+	class builder : public std::unary_function<vector_type, odometry_model> {
 
-    double likelihood (const pose& p) const {
-      return distance.likelihood (p.distance())
-	* direction.likelihood (wrap_angle (p.direction(), direction.mean()))
-	* bearing.likelihood (wrap_angle (p.bearing(), bearing.mean()));
-    }
+		Eigen::Matrix3d mat_stddev;
 
-    double log_likelihood (const pose& p) const {
-      return distance.log_likelihood (p.distance())
-	+ direction.log_likelihood (wrap_angle (p.direction(), direction.mean()))
-	+ bearing.log_likelihood (wrap_angle (p.bearing(), bearing.mean()));
-    }
+	public:
 
-    class builder : public std::binary_function<double, pose, odometry_model> {
+		builder (double a1, double a2, double a3, double a4) {
+			mat_stddev << a3, a4, a4,
+					      a2, a1,  0,
+					      a2,  0, a1;
+		}
 
-      double alpha1, alpha2, alpha3, alpha4;
+		odometry_model operator() (const vector_type& control) const {
+			vector_type stddev = mat_stddev * subtract(control, vector_type(0,0,0)).cwiseAbs();
+			return odometry_model (control, stddev);
+		}
 
-    public:
+	};
+};
 
-      builder (double a1, double a2, double a3, double a4)
-	: alpha1(a1), alpha2(a2), alpha3(a3), alpha4(a4) { }
 
-      odometry_model operator() (double dt, const pose& reading) const {
-
-	double translation = reading.distance();
-	double direction = reading.direction();
-	double bearing = reading.bearing();
-	double rotation = wrap_angle(bearing - direction);
-
-	double direction_sigma = alpha1 * std::abs(direction) + alpha2 * translation;
-	double distance_sigma =  alpha3 * translation         + alpha4 * std::abs(bearing);
-	double bearing_sigma =   alpha1 * std::abs(rotation)  + alpha2 * translation;
-
-	return odometry_model (reading, distance_sigma, direction_sigma, bearing_sigma);
-      };
-
-    };
-
-  };
+};
 
 
 } // namespace planar_robot

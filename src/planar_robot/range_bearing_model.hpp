@@ -3,60 +3,45 @@
 
 #include <functional>
 
+#include <Eigen/Core>
+
 #include "planar_robot/position.hpp"
 #include "utility/random.hpp"
+#include "utility/multivariate.hpp"
 #include "utility/geometry.hpp"
 
 namespace planar_robot {
 
 
-class range_bearing_model {
+struct range_bearing_model : public independent_normal_base<2, range_bearing_model> {
 
-	normal_dist<double> range;
-	normal_dist<double> bearing;
+	typedef position feature_type;
 
-public:
+	range_bearing_model (const vector_type& mean, const vector_type& stddev)
+	: independent_normal_base(mean, stddev) { }
 
-	typedef position result_type;
-
-	range_bearing_model () : range(1.0, 1.0), bearing(0.0, 1.0) { }
-
-	range_bearing_model (const position& mean,
-			double range_sigma, double bearing_sigma)
-	: range (mean.range(), range_sigma),
-	  bearing (mean.bearing(), bearing_sigma) { }
-
-	position mean () const {
-		return position_polar (range.mean(), bearing.mean()); }
-
-	position operator() (random_source& random) const {
-		return position_polar (range(random), bearing(random));
+	static vector_type subtract (const vector_type& a, const vector_type& b) {
+		return vector_type (a(0)-b(0), wrap_angle(a(1)-b(1)));
 	}
 
-	double likelihood (const position& o) const {
-		return range.likelihood (o.range())
-				* bearing.likelihood (wrap_angle (o.bearing(), bearing.mean()));
+	static vector_type from_feature (const position& f) {
+		return vector_type (f.distance(), f.direction());
 	}
 
-	double log_likelihood (const position& o) const {
-		return range.log_likelihood (o.range())
-				+ bearing.log_likelihood (wrap_angle (o.bearing(), bearing.mean()));
+	static position to_feature (const vector_type& observation) {
+		return position::polar (observation(0), observation(1));
 	}
 
-	class builder : public std::unary_function<position, range_bearing_model> {
+	class builder : public std::unary_function<vector_type, range_bearing_model> {
 
-		const double range_sigma, bearing_sigma;
+		const vector_type stddev;
 
 	public:
 
-		typedef position observation_type;
-		typedef range_bearing_model model_type;
+		builder (double range_stddev, bearing_stddev) : stddev(range_stddev, bearing_stddev) { }
 
-		builder (double _range_sigma, double _bearing_sigma)
-		: range_sigma(_range_sigma), bearing_sigma(_bearing_sigma) { }
-
-		range_bearing_model operator() (const position& observation) const {
-			return range_bearing_model (observation, range_sigma, bearing_sigma);
+		odometry_model operator() (const vector_type& observation) const {
+			return odometry_model (observation, stddev);
 		}
 
 	};

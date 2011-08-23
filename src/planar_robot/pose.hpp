@@ -3,61 +3,70 @@
 
 #include <complex>
 
+#include <Eigen/Core>
 
 namespace planar_robot {
 
 
-  // Forward declarations
-  class pose;
-  class position;
-  inline position operator+ (const pose&, const position&);
+// Forward declarations
+class pose;
+class position;
+inline position operator+ (const pose&, const position&);
 
 
-  class pose {
+class pose {
 
-    std::complex<double> translation;
-    std::complex<double> rotation;
+	std::complex<double> translation;
+	std::complex<double> rotation;
 
-    pose (const std::complex<double>& t, const std::complex<double>& r)
-      : translation(t), rotation(r) { }
+protected:
 
-  public:
-  
-    pose () : translation(), rotation(1) { }
+	pose (const std::complex<double>& trans, const std::complex<double>& rot)
+	: translation(trans), rotation(rot) { }
 
-    pose (double x, double y, double bearing = 0)
-      : translation(x,y), rotation(std::polar(1.0, bearing)) { }
+public:
 
-    double x () const { return translation.real(); }
-    double y () const { return translation.imag(); }
-    double bearing () const { return std::arg(rotation); }
-    double distance () const { return std::abs(translation); }
-    double direction () const { return std::arg(translation); }
-    double distance_squared () const { return std::norm(translation); }
+	static const int vector_dim = 3;
+	typedef Eigen::Vector3d vector_type;
 
-    pose& operator+= (const pose& p) {
-      translation += rotation * p.translation;
-      rotation *= p.rotation;
-      return *this;
-    }
+	pose () : translation(), rotation(1) { }
 
-    pose operator- () const {
-      std::complex<double> inverse_rot = std::complex<double>(1.0)/rotation;
-      return pose (-translation*inverse_rot, inverse_rot);
-    }
+	static pose cartesian (double x, double y, double bearing) {
+		return pose (std::complex<double>(x,y), std::polar(1.0, bearing));
+	}
 
-    friend pose pose_polar (double r, double theta, double bearing);
-    friend position operator+ (const pose&, const position&);
+	static pose polar (double distance, double direction, double bearing) {
+		return pose (std::polar(distance, direction), std::polar(1.0, bearing));
+	}
 
-  };
+	double x () const { return translation.real(); }
+	double y () const { return translation.imag(); }
+	double bearing () const { return std::arg(rotation); }
+	double distance () const { return std::abs(translation); }
+	double direction () const { return std::arg(translation); }
+	double distance_squared () const { return std::norm(translation); }
+
+	vector_type to_vector () const { return vector_type(x(), y(), bearing()); }
+
+	static pose from_vector (const vector_type& v) { return cartesian (v(0), v(1), v(2)); }
+
+	pose& operator+= (const pose& p) {
+		translation += rotation * p.translation;
+		rotation *= p.rotation;
+		return *this;
+	}
+
+	pose operator- () const {
+		std::complex<double> inverse_rot = std::complex<double>(1.0)/rotation;
+		return pose (-translation*inverse_rot, inverse_rot);
+	}
+
+	friend position operator+ (const pose&, const position&);
+
+};
 
 
-  inline pose pose_polar (double r, double theta, double bearing) {
-    return pose (std::polar (r, theta), std::polar (1.0, bearing));
-  }
-
-
-  inline pose operator+ (pose a, const pose& b) { return a += b; }
+inline pose operator+ (pose a, const pose& b) { return a += b; }
 
 
 } // namespace planar_robot
