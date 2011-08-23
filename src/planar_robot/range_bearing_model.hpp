@@ -14,7 +14,7 @@ namespace planar_robot {
 
 struct range_bearing_model : public independent_normal_base<2, range_bearing_model> {
 
-	typedef position feature_type;
+	typedef position associated_type;
 
 	range_bearing_model (const vector_type& mean, const vector_type& stddev)
 	: independent_normal_base(mean, stddev) { }
@@ -23,11 +23,11 @@ struct range_bearing_model : public independent_normal_base<2, range_bearing_mod
 		return vector_type (a(0)-b(0), wrap_angle(a(1)-b(1)));
 	}
 
-	static vector_type from_feature (const position& f) {
-		return vector_type (f.distance(), f.direction());
+	static vector_type to_vector (const associated_type& pos) {
+		return vector_type (pos.distance(), pos.direction());
 	}
 
-	static position to_feature (const vector_type& observation) {
+	static associated_type from_vector (const vector_type& observation) {
 		return position::polar (observation(0), observation(1));
 	}
 

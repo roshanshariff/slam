@@ -17,14 +17,14 @@ namespace planar_robot {
 
 struct velocity_model : public independent_normal_base<3, velocity_model> {
 
-	typedef pose state_type;
+	typedef pose associated_type;
 
 	velocity_model (const vector_type& mean, const vector_type& stddev)
 	: independent_normal_base(mean, stddev) { }
 
 	static vector_type subtract (const vector_type& a, const vector_type& b) { return a - b; }
 
-	static vector_type from_state_change (const pose& dp) {
+	static vector_type to_vector (const associated_type& dp) {
 		if (dp.y() == 0) {
 			return vector_type (dp.x(), 0.0, dp.bearing());
 		}
@@ -35,7 +35,7 @@ struct velocity_model : public independent_normal_base<3, velocity_model> {
 		}
 	}
 
-	static pose to_state_change (const vector_type& control) {
+	static associated_type from_vector (const vector_type& control) {
 		const double v = control(0), w = control(1), g = control(2);
 		if (w == 0) {
 			return pose (v, 0.0, g);

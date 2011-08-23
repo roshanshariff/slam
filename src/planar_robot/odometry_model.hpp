@@ -16,7 +16,7 @@ namespace planar_robot {
 
 struct odometry_model : public independent_normal_base<3, odometry_model> {
 
-	typedef pose state_type;
+	typedef pose associated_type;
 
 	odometry_model (const vector_type& mean, const vector_type& stddev)
 	: independent_normal_base(mean, stddev) { }
@@ -25,11 +25,11 @@ struct odometry_model : public independent_normal_base<3, odometry_model> {
 		return vector_type (a(0)-b(0), wrap_angle(a(1)-b(1)), wrap_angle(a(2)-b(2)));
 	}
 
-	static vector_type from_state_change (const pose& dp) {
+	static vector_type to_vector (const associated_type& dp) {
 		return vector_type (dp.distance(), dp.direction(), wrap_angle(dp.bearing()-dp.direction()));
 	}
 
-	static pose to_state_change (const vector_type& control) {
+	static associated_type from_vector (const vector_type& control) {
 		return pose::polar (control(0), control(1), control(1)+control(2));
 	}
 
