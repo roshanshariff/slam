@@ -1,8 +1,13 @@
 #ifndef _UTILITY_RANDOM_HPP
 #define _UTILITY_RANDOM_HPP
 
+#include <functional>
+
 #include <boost/random.hpp>
 #include <boost/math/constants/constants.hpp>
+
+#include "utility/geometry.hpp"
+
 
 struct random_source {
 
@@ -20,37 +25,5 @@ struct random_source {
 
 };
 
-
-template <class RealType>
-class normal_dist {
-  
-  RealType _mean;
-  RealType _sigma;
-
-public:
-
-  typedef RealType result_type;
-
-  normal_dist (RealType mean_arg, RealType sigma_arg)
-    : _mean(mean_arg), _sigma(std::abs(sigma_arg)) { }
-
-  RealType mean () const { return _mean; }
-  RealType sigma () const { return _sigma; }
-  
-  RealType operator() (random_source& random) const {
-    return mean() + sigma() * RealType(random.normal());
-  }
-
-  double likelihood (RealType x) const {
-    x = (x - mean()) / sigma();
-    return std::exp(-x*x/2.0) / (sigma() * boost::math::constants::root_two_pi<double>());
-  }
-
-  double log_likelihood (RealType x) const {
-    x = (x - mean()) / sigma();
-    return -x*x/2.0 - std::log(sigma() * boost::math::constants::root_two_pi<double>());
-  }
-
-};
 
 #endif //_UTILITY_RANDOM_HPP
