@@ -7,7 +7,6 @@
 
 #include "planar_robot/position.hpp"
 #include "utility/random.hpp"
-#include "utility/multivariate.hpp"
 #include "utility/geometry.hpp"
 
 namespace planar_robot {

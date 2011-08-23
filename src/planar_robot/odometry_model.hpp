@@ -8,7 +8,6 @@
 
 #include "planar_robot/pose.hpp"
 #include "utility/random.hpp"
-#include "utility/multivariate.hpp"
 #include "utility/geometry.hpp"
 
 
