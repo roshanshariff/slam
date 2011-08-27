@@ -14,10 +14,13 @@ namespace planar_robot {
 
 struct range_bearing_model : public independent_normal_base<2, range_bearing_model> {
 
+	typedef independent_normal_base<2, range_bearing_model> base_type;
+	typedef base_type::vector_type vector_type;
+	typedef base_type::matrix_type matrix_type;
+
 	typedef position associated_type;
 
-	range_bearing_model (const vector_type& mean, const vector_type& stddev)
-	: independent_normal_base(mean, stddev) { }
+	range_bearing_model (const vector_type& mean, const vector_type& stddev) : base_type(mean, stddev) { }
 
 	static vector_type subtract (const vector_type& a, const vector_type& b) {
 		return vector_type (a(0)-b(0), wrap_angle(a(1)-b(1)));
@@ -37,10 +40,10 @@ struct range_bearing_model : public independent_normal_base<2, range_bearing_mod
 
 	public:
 
-		builder (double range_stddev, bearing_stddev) : stddev(range_stddev, bearing_stddev) { }
+		builder (double range_stddev, double bearing_stddev) : stddev(range_stddev, bearing_stddev) { }
 
-		odometry_model operator() (const vector_type& observation) const {
-			return odometry_model (observation, stddev);
+		range_bearing_model operator() (const vector_type& observation) const {
+			return range_bearing_model (observation, stddev);
 		}
 
 	};

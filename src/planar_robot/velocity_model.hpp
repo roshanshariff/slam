@@ -17,10 +17,13 @@ namespace planar_robot {
 
 struct velocity_model : public independent_normal_base<3, velocity_model> {
 
+	typedef independent_normal_base<3, velocity_model> base_type;
+	typedef base_type::vector_type vector_type;
+	typedef base_type::matrix_type matrix_type;
+
 	typedef pose associated_type;
 
-	velocity_model (const vector_type& mean, const vector_type& stddev)
-	: independent_normal_base(mean, stddev) { }
+	velocity_model (const vector_type& mean, const vector_type& stddev) : base_type(mean, stddev) { }
 
 	static vector_type subtract (const vector_type& a, const vector_type& b) { return a - b; }
 
@@ -38,11 +41,11 @@ struct velocity_model : public independent_normal_base<3, velocity_model> {
 	static associated_type from_vector (const vector_type& control) {
 		const double v = control(0), w = control(1), g = control(2);
 		if (w == 0) {
-			return pose (v, 0.0, g);
+			return pose::cartesian (v, 0.0, g);
 		}
 		else {
 			const double r = v / w;
-			return pose (r*std::sin(w), r-r*std::cos(w), w+g);
+			return pose::cartesian (r*std::sin(w), r-r*std::cos(w), w+g);
 		}
 	}
 
@@ -60,8 +63,7 @@ struct velocity_model : public independent_normal_base<3, velocity_model> {
 		}
 
 		velocity_model operator() (const vector_type& control) const {
-			control *= dt;
-			return velocity_model (control, mat_stddev*control.cwiseAbs());
+			return velocity_model (control*dt, mat_stddev*control.cwiseAbs()*dt);
 		}
 
 	};

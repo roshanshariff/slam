@@ -16,10 +16,13 @@ namespace planar_robot {
 
 struct odometry_model : public independent_normal_base<3, odometry_model> {
 
+	typedef independent_normal_base<3, odometry_model> base_type;
+	typedef base_type::vector_type vector_type;
+	typedef base_type::matrix_type matrix_type;
+
 	typedef pose associated_type;
 
-	odometry_model (const vector_type& mean, const vector_type& stddev)
-	: independent_normal_base(mean, stddev) { }
+	odometry_model (const vector_type& mean, const vector_type& stddev) : base_type(mean, stddev) { }
 
 	static vector_type subtract (const vector_type& a, const vector_type& b) {
 		return vector_type (a(0)-b(0), wrap_angle(a(1)-b(1)), wrap_angle(a(2)-b(2)));
@@ -51,8 +54,6 @@ struct odometry_model : public independent_normal_base<3, odometry_model> {
 		}
 
 	};
-};
-
 
 };
 
