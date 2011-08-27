@@ -5,13 +5,13 @@
 
 #include <Eigen/Core>
 
+#include "planar_robot/position.hpp"
+
+
 namespace planar_robot {
 
 
-// Forward declarations
-class pose;
-class position;
-inline position operator+ (const pose&, const position&);
+inline position operator+ (const pose&, const position&); // Forward declaration
 
 
 class pose {
@@ -37,6 +37,10 @@ public:
 
 	static pose polar (double distance, double direction, double bearing) {
 		return pose (std::polar(distance, direction), std::polar(1.0, bearing));
+	}
+
+	static pose from_position (const position& position, double bearing) {
+		return pose (position.pos, std::polar(1.0, bearing));
 	}
 
 	double x () const { return translation.real(); }
@@ -65,8 +69,11 @@ public:
 
 };
 
-
 inline pose operator+ (pose a, const pose& b) { return a += b; }
+
+inline position operator+ (const pose& p, const position& o) {
+	return position (p.translation + p.rotation*o.pos);
+}
 
 
 } // namespace planar_robot

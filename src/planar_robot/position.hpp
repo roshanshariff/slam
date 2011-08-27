@@ -5,10 +5,11 @@
 
 #include <Eigen/Core>
 
-#include "planar_robot/pose.hpp"
-
 
 namespace planar_robot {
+
+
+class pose; // Forward declaration
 
 
 class position {
@@ -42,15 +43,10 @@ public:
 
 	static position from_vector (const vector_type& v) { return cartesian (v(0), v(1)); }
 
+	friend class pose;
 	friend position operator+ (const pose&, const position&);
 
 };
-
-
-
-inline position operator+ (const pose& p, const position& o) {
-	return position (p.translation + p.rotation*o.pos);
-}
 
 
 } // namespace planar_robot
