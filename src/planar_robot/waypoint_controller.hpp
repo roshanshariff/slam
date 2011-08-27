@@ -2,77 +2,52 @@
 #define _PLANAR_ROBOT_WAYPOINT_CONTROLLER_HPP
 
 #include <vector>
-#include <cstdlib>
 #include <functional>
-#include <cassert>
+
+#include <boost/program_options.hpp>
 
 #include "planar_robot/pose.hpp"
 #include "planar_robot/position.hpp"
 #include "planar_robot/velocity_model.hpp"
-#include "utility/bitree.hpp"
-
+#include "slam/vector_model.hpp"
 
 namespace planar_robot {
 
 
-  class waypoint_controller : public std::binary_function<double, bitree<pose>, velocity_control> {
+struct waypoint_controller {
 
-    std::vector<position> waypoints;
-    double proximity, repetitions;
-    double speed, steering_max, steering_rate;
+	typedef vector_model_adapter<velocity_model> model_type;
 
-    double current_steering;
-    size_t current_waypoint;
+	static boost::program_options::options_description program_options ();
+	static waypoint_controller parse_options (const boost::program_options::variables_map&);
 
-  public:
+	model_type control (const pose& state);
 
-    waypoint_controller (const std::vector<position>& _waypoints,
-			 double _proximity, double _repetitions, double _speed,
-			 double _steering_max, double _steering_rate)
-      : waypoints(_waypoints), proximity(_proximity), repetitions(_repetitions),
-	speed(_speed), steering_max(_steering_max), steering_rate(_steering_rate),
-	current_steering(0.0), current_waypoint(0)
-    {
-      assert (!waypoints.empty());
-    }
+private:
 
-    pose initial_pose () const {
-      return pose (waypoints.front().x(), waypoints.front().y(), 0.0);
-    }
+	const double speed, steering_max, steering_rate;
 
-    bool finished () const {
-      return current_waypoint > waypoints.size() * repetitions;
-    }
+	const std::vector<position> waypoints;
+	const double proximity, repetitions;
 
-    velocity_control operator() (double dt, const bitree<pose>& trajectory) {
+	const model_type::builder model_builder;
 
-      if (!waypoints.empty()) {
+	double current_steering;
+	size_t current_waypoint;
 
-	position to_waypoint = -(initial_pose() + trajectory.accumulate())
-	  + waypoints[current_waypoint % waypoints.size()];
+	waypoint_controller (double speed_, double steering_max_, double steering_rate_,
+			const std::vector<position>& waypoints_, double proximity_, double repetitions_,
+			const velocity_model::builder& velocity_model_builder_)
+	: speed(speed_), steering_max(steering_max_), steering_rate(steering_rate_),
+	  waypoints(waypoints_), proximity(proximity_), repetitions(repetitions_),
+	  model_builder(velocity_model_builder_), current_steering(0.0), current_waypoint(0) { }
 
-	double steering_change = to_waypoint.bearing()/dt - current_steering;
-	double steering_change_max = steering_rate * dt;
-	if (std::abs(steering_change) > steering_change_max) {
-	  steering_change = steering_change < 0 ? -steering_change_max : steering_change_max;
-	}
+public:
 
-	current_steering += steering_change;
-	if (std::abs(current_steering) > steering_max) {
-	  current_steering = current_steering < 0 ? -steering_max : steering_max;
-	}
+	pose initial_state () const { return pose::from_position (waypoints.front(), 0.0); }
+	bool finished () const { return current_waypoint > waypoints.size() * repetitions; }
 
-	if (to_waypoint.range() < proximity) {
-	  ++current_waypoint;
-	  //std::cout << "Seeking waypoint " << current_waypoint << '\n';
-	}
-
-      }
-
-      return velocity_control (speed, current_steering);
-    }
-
-  };
+};
 
 
 } // namespace planar_robot
