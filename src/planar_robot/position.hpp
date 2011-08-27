@@ -25,11 +25,11 @@ public:
 	typedef Eigen::Vector2d vector_type;
 
 	static position cartesian (double x, double y) {
-		return position (std::complex<double>(x, y));
+		return position (std::complex<double> (x, y));
 	}
 
 	static position polar (double distance, double direction) {
-		return position (std::polar(range, bearing));
+		return position (std::polar (distance, direction));
 	}
 
 	double x () const { return pos.real(); }
