@@ -4,6 +4,7 @@
 #include <boost/random.hpp>
 #include <boost/math/constants/constants.hpp>
 
+#include <Eigen/Core>
 
 struct random_source {
 
@@ -90,12 +91,16 @@ public:
 template <int N, class Derived>
 class multivariate_normal_dense_base : public multivariate_normal_base<N, Derived> {
 
+	typedef multivariate_normal_base<N, Derived> base_type;
+	typedef typename base_type::vector_type vector_type;
+	typedef typename base_type::matrix_type matrix_type;
+
 	matrix_type m_chol_cov;
 
 protected:
 
 	multivariate_normal_dense_base (const vector_type& mean, const matrix_type& cov)
-	: multivariate_normal_base(mean), m_chol_cov(cov.llt().matrixL()) { }
+	: base_type(mean), m_chol_cov(cov.llt().matrixL()) { }
 
 public:
 
@@ -103,11 +108,11 @@ public:
 	matrix_type& chol_cov () { return m_chol_cov; }
 
 	void chol_cov_multiply (vector_type& v) const {
-		v = m_chol_cov.triangularView<Eigen::Lower>() * v;
+		v = m_chol_cov.template triangularView<Eigen::Lower>() * v;
 	}
 
 	void chol_cov_solve (vector_type& v) const {
-		m_chol_cov.triangularView<Eigen::Lower>().solveInPlace(v);
+		m_chol_cov.template triangularView<Eigen::Lower>().solveInPlace(v);
 	}
 
 	double chol_cov_det () const {
@@ -122,9 +127,16 @@ public:
 
 
 template <int N>
-struct multivariate_normal_dist : public multivariate_normal_base<N, multivariate_normal_dist> {
+struct multivariate_normal_dist : public multivariate_normal_dense_base<N, multivariate_normal_dist<N> > {
 
-	static vector_type subtract (const vector_type& a, const vector_type& b) const { return a - b; }
+	typedef multivariate_normal_dense_base<N, multivariate_normal_dist> base_type;
+	typedef typename base_type::vector_type vector_type;
+	typedef typename base_type::matrix_type matrix_type;
+
+	multivariate_normal_dist (const vector_type& mean, const matrix_type& cov)
+	: base_type(mean, cov) { }
+
+	static vector_type subtract (const vector_type& a, const vector_type& b) { return a - b; }
 
 };
 
@@ -132,24 +144,28 @@ struct multivariate_normal_dist : public multivariate_normal_base<N, multivariat
 template <int N, class Derived>
 class independent_normal_base : public multivariate_normal_base<N, Derived> {
 
+	typedef multivariate_normal_base<N, Derived> base_type;
+	typedef typename base_type::vector_type vector_type;
+	typedef typename base_type::matrix_type matrix_type;
+
 	vector_type m_stddev;
 
 protected:
 
 	independent_normal_base (const vector_type& mean, const vector_type& std_dev)
-	: multivariate_normal_base(mean), m_stddev(std_dev) { }
+	: base_type(mean), m_stddev(std_dev) { }
 
 public:
 
-	matrix_type chol_cov () const { return m_std_dev.asDiagonal(); }
+	matrix_type chol_cov () const { return m_stddev.asDiagonal(); }
 
-	void chol_cov_multiply (vector_type& v) const { v *= m_std_dev.array(); }
+	void chol_cov_multiply (vector_type& v) const { v *= m_stddev.array(); }
 
-	void chol_cov_solve (vector_type& v) const { v /= m_std_dev.array(); }
+	void chol_cov_solve (vector_type& v) const { v /= m_stddev.array(); }
 
-	double chol_cov_det () const { return m_std_dev.array().product(); }
+	double chol_cov_det () const { return m_stddev.array().product(); }
 
-	double chol_cov_log_det () const { return m_std_dev.array().log().sum(); }
+	double chol_cov_log_det () const { return m_stddev.array().log().sum(); }
 
 	const vector_type& chol_cov_diag () const { return m_stddev; }
 	vector_type& chol_cov_diag () { return m_stddev; }
