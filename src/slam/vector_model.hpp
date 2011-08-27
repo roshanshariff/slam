@@ -8,6 +8,8 @@
 #ifndef VECTOR_MODEL_HPP_
 #define VECTOR_MODEL_HPP_
 
+#include <functional>
+
 #include "utility/random.hpp"
 
 
@@ -39,6 +41,20 @@ public:
 	double likelihood (const result_type& x) const { return vector_model().likelihood(to_vector(x)); }
 
 	double log_likelihood (const result_type& x) const { return vector_model().log_likelihood(to_vector(x)); }
+
+	struct builder : public std::unary_function<result_type, vector_model_adapter<vector_model_type> > {
+
+		typedef typename vector_model_type::builder vector_builder_type;
+
+		const vector_builder_type vector_builder;
+
+		builder (const vector_builder_type& vector_builder_) : vector_builder(vector_builder_) { }
+
+		vector_model_adapter<vector_model_type> operator() (const result_type& x) {
+			return vector_model_adapter<vector_model_type> (vector_builder (to_vector (x)));
+		}
+
+	};
 
 };
 
