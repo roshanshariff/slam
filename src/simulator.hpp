@@ -4,120 +4,59 @@
 #include <map>
 #include <tr1/functional>
 
+#include <boost/bind.hpp>
+#include <boost/program_options.hpp>
+
 #include "slam/slam_data.hpp"
 #include "slam/mcmc_slam.hpp"
 #include "utility/random.hpp"
 #include "utility/bitree.hpp"
 
 
-template <class StateModelBuilder, class ObservationModelBuilder>
-class simulator {
+template <class Controller, class Sensor>
+struct simulator {
 
-public:
+	typedef Controller controller_type;
+	typedef typename controller_type::model_type control_model_type;
+	typedef typename control_model_type::result_type state_type;
 
-  typedef typename StateModelBuilder::result_type state_model_type;
-  typedef typename ObservationModelBuilder::result_type observation_model_type;
+	typedef Sensor sensor_type;
+	typedef typename sensor_type::model_type observation_model_type;
+	typedef typename observation_model_type::result_type observation_type;
 
-  typedef typename state_model_type::result_type state_type;
-  typedef typename observation_model_type::result_type observation_type;
-  typedef std::tr1::function<bool (observation_type)> observation_predicate_type;
+	typedef slam_data<control_model_type, observation_model_type> slam_data_type;
 
-  typedef typename StateModelBuilder::second_argument_type control_type;
-  typedef std::tr1::function<control_type (double, bitree<state_type>)> controller_type;
+	controller_type& controller;
+	sensor_type& sensor;
 
-  typedef slam_data<state_model_type, observation_model_type> slam_data_type;
-  typedef std::map<typename slam_data_type::featureid_t, observation_type> map_type;
+	slam_data_type data;
 
-private:
+	bitree<state_type> state;
 
-  const map_type& landmarks;
-  controller_type controller;
-  state_type initial_state;
+	simulator (controller_type& controller_, sensor_type& sensor_)
+	: controller(controller_), sensor(sensor_) { }
 
-  StateModelBuilder state_model_builder;
-  ObservationModelBuilder observation_model_builder;
-  observation_predicate_type observation_predicate;
+	void operator() (random_source&);
 
-  slam_data_type data;
-  mcmc_slam<slam_data_type> mcmc;
-
-  bitree<state_type> state, expected_state;
-
-  double simulation_time;
-  unsigned long num_steps;
-  unsigned long num_observations;
-
-  void add_observations (random_source&, const state_type& state);
-
-public:
-
-  simulator (const map_type& _landmarks,
-	     const controller_type& _controller,
-	     const state_type& _initial_state,
-	     const StateModelBuilder& _state_model_builder,
-	     const ObservationModelBuilder& _observation_model_builder,
-	     const observation_predicate_type& _observation_predicate,
-	     unsigned int mcmc_steps, double state_dim, double obs_dim)
-    : landmarks(_landmarks),
-      controller(_controller),
-      initial_state(_initial_state),
-      state_model_builder(_state_model_builder),
-      observation_model_builder(_observation_model_builder),
-      observation_predicate(_observation_predicate),
-      mcmc (data, mcmc_steps, state_dim, obs_dim),
-      simulation_time(0.0), num_steps(0), num_observations(0)
-  { }
-
-  void operator() (random_source&, double dt);
-
-  const map_type& get_landmarks () const { return landmarks; }
-  const state_type& get_initial_state () const { return initial_state; }
-  const bitree<state_type>& get_state () const { return state; }
-  const bitree<state_type>& get_expected_state () const { return expected_state; }
-  const bitree<state_type>& get_estimated_state () const { return mcmc.get_action_estimates(); }
-  map_type get_feature_estimates () const { return mcmc.get_feature_estimates (initial_state); }
-
-  double get_simulation_time () const { return simulation_time; }
-  unsigned long get_num_steps () const { return num_steps; }
-  unsigned long get_num_observations () const { return num_observations; }
-  double get_observations_per_step () const { return (double)num_observations/num_steps; }
-
+	state_type current_state () const { return controller.initial_state() + state.accumulate(); }
 };
 
 
-template <class StateModelBuilder, class ObservationModelBuilder>
-void simulator<StateModelBuilder, ObservationModelBuilder>
-::operator() (random_source& random, double dt) {
+template <class Controller, class Sensor>
+void simulator<Controller, Sensor>::operator() (random_source& random) {
 
-  add_observations (random, get_initial_state() + get_state().accumulate());
-  mcmc.update(random);
-  ++num_steps;
-  simulation_time += dt;
+	sensor.sense(current_state(), boost::bind(&slam_data_type::add_observation, &data, _1, _2), random);
 
-  control_type control = controller (dt, get_state() /* get_estimated_state() */);
-  state_model_type state_change_model = state_model_builder (dt, control);
+	while (!controller.finished()) {
 
-  state.push_back (state_change_model (random));
-  expected_state.push_back (state_change_model.mean());
-  data.add_action (state_change_model);
-}
+		control_model_type control = controller.control(current_state());
+		state.push_back(control(random));
+		data.add_control(control);
 
+		sensor.sense(current_state(), boost::bind(&slam_data_type::add_observation, &data, _1, _2), random);
 
-template <class StateModelBuilder, class ObservationModelBuilder>
-void simulator<StateModelBuilder, ObservationModelBuilder>
-::add_observations (random_source& random, const state_type& state) {
-
-  typename map_type::const_iterator i = landmarks.begin();
-  for (; i != landmarks.end(); ++i) {
-
-    const observation_type& feature = i->second;
-    observation_type observation = observation_model_builder(-state+feature)(random);
-
-    if (observation_predicate (observation)) {
-      data.add_observation (i->first, observation_model_builder(observation));
-      ++num_observations;
-    }
-  }
+		data.timestep();
+	}
 }
 
 
