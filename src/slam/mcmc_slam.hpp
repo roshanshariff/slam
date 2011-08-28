@@ -48,17 +48,11 @@ class mcmc_slam {
 		const observation_data_type& observations;
 		observation_type estimate;
 		timestep_t parent_timestep;
-		feature_estimate (const observation_data_type& obs) : observations(obs) { }
+		feature_estimate (const observation_data_type& obs, const observation_type& est, timestep_t t)
+		: observations(obs), estimate(est), parent_timestep(t) { }
 	};
 
 	typedef std::map<featureid_t, feature_estimate> feature_estimates_type;
-
-	/** MCMC Constants. mcmc_steps is the number of iterations per update. The action and observation
-      dimensions are a measure of the number of independent parameters represented by each type of
-      edge. */
-	const int mcmc_steps;
-
-	random_source& random;
 
 	/** The slam_data object stores a history of all recorded observations. This class registers as a
       listener to slam_data using the scoped_connection objects, which will automatically be
@@ -67,6 +61,13 @@ class mcmc_slam {
 	const boost::signals2::scoped_connection m_control_conn;
 	const boost::signals2::scoped_connection m_obs_conn;
 	const boost::signals2::scoped_connection m_timestep_conn;
+
+	random_source& random;
+
+	/** MCMC Constants. mcmc_steps is the number of iterations per update. The action and observation
+      dimensions are a measure of the number of independent parameters represented by each type of
+      edge. */
+	const int mcmc_steps;
 
 	/** The current action edge labels and the corresponding edge weights. */
 	bitree<control_type> state_estimates;
@@ -113,12 +114,12 @@ private:
     update, and action_importance and observation_importance are the number of independent
     parameters represented by each action and observation edge respectively. */
 template <class SlamData>
-mcmc_slam<SlamData>::mcmc_slam (const slam_data_type& data_, random_source& random, int num_steps)
-: mcmc_steps(num_steps), data(data_),
-  m_control_conn(data.connect_control_listener(boost::bind(&add_control, this, _1, _2))),
-  m_obs_conn(data.connect_observation_listener(boost::bind(&add_observation, this, _1, _2, _3))),
-  m_timestep_conn(data.connect_timestep_listener(boost::bind(&update, this)))
-  { }
+mcmc_slam<SlamData>::mcmc_slam (const slam_data_type& data_, random_source& random_, int mcmc_steps_)
+: data(data_),
+  m_control_conn(data.connect_control_listener(boost::bind(&mcmc_slam::add_control, this, _1, _2))),
+  m_obs_conn(data.connect_observation_listener(boost::bind(&mcmc_slam::add_observation, this, _1, _2, _3))),
+  m_timestep_conn(data.connect_timestep_listener(boost::bind(&mcmc_slam::update, this))),
+  random(random_), mcmc_steps(mcmc_steps_) { }
 
 
 /** Called by slam_data whenever a new control is added. */
@@ -141,16 +142,15 @@ void mcmc_slam<SlamData>::add_observation (
 ) {
 	// Try to insert a new feature_estimate storing a reference to that feature's observations.
 	std::pair<typename feature_estimates_type::iterator, bool> result = feature_estimates.insert (
-			std::make_pair (feature_id, feature_estimate (data.observations(feature_id)))
+			std::make_pair (feature_id, feature_estimate (
+					data.observations(feature_id), obs.mean(), timestep
+			))
 	);
 
 	// If insertion succeeds (i.e. feature has not been previously observed) initialise the estimate.
 	if (result.second) {
 
 		feature_estimate& feature = result.first->second;
-		feature.parent_timestep = timestep; // Set parent of the action to be the first time it was seen
-
-		feature.estimate = obs.mean(); // Use the mean of the distribution as the initial estimate
 
 		// feature_weights must be large enough to hold this feature's weight.
 		if (feature_weights.size() <= feature_id) feature_weights.resize(feature_id+1);
@@ -261,7 +261,7 @@ double mcmc_slam<SlamData>::state_change (const timestep_t timestep) const {
 
 		typename observation_data_type::const_iterator j, end; // the range of observations to consider
 
-		if (feature.parent_action <= timestep) {
+		if (feature.parent_timestep <= timestep) {
 			// The feature edge lies in T1 since its parent action is before the modified action edge.
 			// The observations to consider are all those in T2, i.e. after the modified action.
 			j = feature.observations.upper_bound(timestep);
@@ -318,18 +318,18 @@ void mcmc_slam<SlamData>::update_feature (const featureid_t feature_id) {
 	// Find the associated distribution corresponding to the observation from the parent action of
 	// this feature.
 	const observation_model_type& distribution
-	= feature.observations.find(feature.parent_action)->second;
+	= feature.observations.find(feature.parent_timestep)->second;
 
 	// Compute a new estimate of this feature's position as a random sample from the associated distribution,
 	// and compute a new edge weight accordingly.
 	const observation_type new_estimate = distribution(random);
-	const double new_feature_weight = observation_edge_weight(distribution, new_estimate);
+	const double new_feature_weight = edge_weight(distribution, new_estimate);
 
 	// These variables will store the new and old estimates of the feature's position, computed relative to
 	// some action. Initially, they are relative to the parent action of the feature.
 	observation_type new_observation = new_estimate;
 	observation_type old_observation = feature.estimate;
-	timestep_t observation_base = feature.parent_action;
+	timestep_t observation_base = feature.parent_timestep;
 
 	double acceptance_probability = 0.0; // log of the acceptance probability.
 
@@ -338,7 +338,7 @@ void mcmc_slam<SlamData>::update_feature (const featureid_t feature_id) {
 	for (; i != feature.observations.end(); ++i) {
 
 		// Ignore the observation edge that is in the spanning tree of the inference graph.
-		if (i->first == feature.parent_action) continue;
+		if (i->first == feature.parent_timestep) continue;
 
 		// Each observation is relative to a different action. Computes the state change between the old
 		// base of observation (which is initially the parent action) and the current base of the
