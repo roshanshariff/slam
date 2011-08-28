@@ -23,6 +23,8 @@ struct velocity_model : public independent_normal_base<3, velocity_model> {
 
 	typedef pose associated_type;
 
+	velocity_model () { }
+
 	velocity_model (const vector_type& mean, const vector_type& stddev) : base_type(mean, stddev) { }
 
 	static vector_type subtract (const vector_type& a, const vector_type& b) { return a - b; }

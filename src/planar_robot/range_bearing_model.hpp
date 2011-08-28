@@ -20,6 +20,8 @@ struct range_bearing_model : public independent_normal_base<2, range_bearing_mod
 
 	typedef position associated_type;
 
+	range_bearing_model () { }
+
 	range_bearing_model (const vector_type& mean, const vector_type& stddev) : base_type(mean, stddev) { }
 
 	static vector_type subtract (const vector_type& a, const vector_type& b) {
