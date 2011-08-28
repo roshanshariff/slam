@@ -13,88 +13,98 @@
     It is also responsible for notifying listeners when new state changes and observations are added.
     ActionModel and ObservationModel are the types of distributions over state changes and
     observations, respectively. */
-template <class ActionModel, class ObservationModel>
+template <class ControlModel, class ObservationModel>
 class slam_data {
 
 public:
 
-  /** Use the native machine unsigned integral type to identify features and observations. This is 64
+	/** Use the native machine unsigned integral type to identify features and observations. This is 64
       bits on amd64 machines and 32 bits on i386 machines. */
-  typedef size_t featureid_t;
-  typedef size_t actionid_t;
+	typedef size_t timestep_t;
+	typedef size_t featureid_t;
 
-  /** The types of distributions over state changes and observations, respectively. */
-  typedef ActionModel action_model_type;
-  typedef ObservationModel observation_model_type;
+	/** The types of distributions over state changes and observations, respectively. */
+	typedef ControlModel control_model_type;
+	typedef ObservationModel observation_model_type;
 
-  /** Actions are stored as a vector of the corresponding distributions. */
-  typedef std::vector<action_model_type> action_data_type;
-
-  /** Feature observations are stored as an arraymap from the time of an observation to the observation's
+	/** Feature observations are stored as an arraymap from the time of an observation to the observation's
       distribution. Since observations are expected to be added in chronological order, this is much
       more efficient then using a tree-based map. */
-  typedef arraymap<actionid_t, observation_model_type> feature_data_type;
+	typedef arraymap<timestep_t, observation_model_type> observation_data_type;
 
-  /** Features are stored as a map from the feature_id to the feature's observation data. */
-  typedef std::map<featureid_t, feature_data_type> observation_data_type;
+	/** Features are stored as a map from the feature_id to the feature's observation data. */
+	typedef std::map<featureid_t, observation_data_type> feature_data_type;
 
-  /** Action signal handlers are passed the action id just added, whereas observation signal handlers
+	/** Action signal handlers are passed the action id just added, whereas observation signal handlers
       are passed the feature id being observed and the time of the observation. */
-  typedef boost::signals2::signal<void (actionid_t)> action_signal_type;
-  typedef boost::signals2::signal<void (featureid_t, actionid_t)> observation_signal_type;
+	typedef boost::signals2::signal<void (timestep_t, control_model_type)> control_signal_type;
+	typedef boost::signals2::signal<void (timestep_t, featureid_t, observation_model_type)> observation_signal_type;
+	typedef boost::signals2::signal<void (timestep_t)> timestep_signal_type;
 
-  /** Listeners for action and observation signals. */
-  typedef typename action_signal_type::slot_type action_listener_type;
-  typedef typename observation_signal_type::slot_type observation_listener_type;
+	/** Listeners for action and observation signals. */
+	typedef typename control_signal_type::slot_type control_listener_type;
+	typedef typename observation_signal_type::slot_type observation_listener_type;
+	typedef typename timestep_signal_type::slot_type timestep_listener_type;
 
 private:
 
-  action_data_type _actions;
-  observation_data_type _observations;
-  mutable action_signal_type _action_signal;
-  mutable observation_signal_type _observation_signal;
+	/** Actions are stored as a vector of the corresponding distributions. */
+	std::vector<control_model_type> m_controls;
+
+	feature_data_type m_observations;
+
+	mutable control_signal_type m_control_signal;
+	mutable observation_signal_type m_observation_signal;
+	mutable timestep_signal_type m_timestep_signal;
 
 public:
 
-  const action_data_type& actions () const { return _actions; }
-  const observation_data_type& observations () const { return _observations; }
+	timestep_t current_timestep () const { return m_controls.size(); }
 
-  /** Retrieve the state change specified by the given id. */
-  const action_model_type& action (actionid_t id) const {
-    assert (id < actions().size());
-    return actions()[id];
-  }
+	/** Retrieve the state change specified by the given id. */
+	const control_model_type& control (timestep_t timestep) const {
+		assert (timestep < current_timestep());
+		return m_controls[timestep];
+	}
 
-  /** Retrieve the observations of the feature specified by the given id. */
-  const feature_data_type& observation (featureid_t id) const {
-    typename observation_data_type::const_iterator i = observations().find(id);
-    assert (i != observations().end());
-    return i->second;
-  }
+	/** Retrieve the observations of the feature specified by the given id. */
+	const observation_data_type& observations (featureid_t feature) const {
+		typename feature_data_type::const_iterator i = m_observations.find(feature);
+		assert (i != m_observations.end());
+		return i->second;
+	}
 
-  /** Add a new state change to the end of the list. */
-  actionid_t add_action (const action_model_type& action) {
-    actionid_t action_id = actions().size();
-    _actions.push_back (action);
-    _action_signal (action_id); // Trigger the signal to notify listeners of the addition.
-    return action_id;
-  }
+	/** Add a new state change to the end of the list. */
+	void add_control (const control_model_type& control) {
+		timestep_t timestep = current_timestep();
+		m_controls.push_back (control);
+		m_control_signal (timestep, control);
+	}
 
-  /** Add a new observation of the specified feature, taken at the current time. */
-  void add_observation (const featureid_t feature_id, const observation_model_type& obs) {
-    _observations[feature_id][actions().size()] = obs;
-    _observation_signal(feature_id, actions().size()); // Trigger the signal to notify listeners.
-  }
+	/** Add a new observation of the specified feature, taken at the current time. */
+	void add_observation (const featureid_t feature, const observation_model_type& obs) {
+		timestep_t timestep = current_timestep();
+		m_observations[feature][timestep] = obs;
+		m_observation_signal (timestep, feature, obs);
+	}
 
-  /** Connect a listener to receive notifications of new state changes. */
-  boost::signals2::connection connect_action_listener (const action_listener_type& l) const {
-    return _action_signal.connect(l);
-  }
+	void timestep () const {
+		m_timestep_signal (current_timestep());
+	}
 
-  /** Connect a listener to receive notifications of new observations. */
-  boost::signals2::connection connect_observation_listener (const observation_listener_type& l) const {
-    return _observation_signal.connect(l);
-  }
+	/** Connect a listener to receive notifications of new state changes. */
+	boost::signals2::connection connect_control_listener (const control_listener_type& l) const {
+		return m_control_signal.connect(l);
+	}
+
+	/** Connect a listener to receive notifications of new observations. */
+	boost::signals2::connection connect_observation_listener (const observation_listener_type& l) const {
+		return m_observation_signal.connect(l);
+	}
+
+	boost::signals2::connection connect_timestep_listener (const timestep_listener_type& l) const {
+		return m_timestep_signal.connect(l);
+	}
 
 };  
 
