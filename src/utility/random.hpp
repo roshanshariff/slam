@@ -39,12 +39,14 @@ private:
 
 protected:
 
+	multivariate_normal_base () { }
+
 	multivariate_normal_base (const vector_type& v) : m_mean(v) { }
 
 public:
 
 	const Derived& derived() const { return static_cast<const Derived&>(*this); }
-	Derived& derived() const { return static_cast<Derived&>(*this); }
+	Derived& derived() { return static_cast<Derived&>(*this); }
 
 	const vector_type& mean () const { return m_mean; }
 	vector_type& mean () { return m_mean; }
@@ -69,18 +71,18 @@ public:
 		return result;
 	}
 
-	double likelihood_exponent (vector_type x) {
+	double likelihood_exponent (vector_type x) const {
 		x = subtract(x, mean());
 		chol_cov_solve(x);
 		return -0.5 * x.squaredNorm();
 	}
 
-	double likelihood (const vector_type& x) {
+	double likelihood (const vector_type& x) const {
 		const double root_two_pi = boost::math::constants::root_two_pi<double>();
 		return std::exp(likelihood_exponent(x)) * std::pow(root_two_pi, -vector_dim) / chol_cov_det();
 	}
 
-	double log_likelihood (const vector_type& x) {
+	double log_likelihood (const vector_type& x) const {
 		const double log_root_two_pi = 0.5 * std::log(2*boost::math::constants::pi<double>());
 		return likelihood_exponent(x) - vector_dim*log_root_two_pi - chol_cov_log_det();
 	}
@@ -98,6 +100,8 @@ class multivariate_normal_dense_base : public multivariate_normal_base<N, Derive
 	matrix_type m_chol_cov;
 
 protected:
+
+	multivariate_normal_dense_base () { }
 
 	multivariate_normal_dense_base (const vector_type& mean, const matrix_type& cov)
 	: base_type(mean), m_chol_cov(cov.llt().matrixL()) { }
@@ -133,6 +137,8 @@ struct multivariate_normal_dist : public multivariate_normal_dense_base<N, multi
 	typedef typename base_type::vector_type vector_type;
 	typedef typename base_type::matrix_type matrix_type;
 
+	multivariate_normal_dist () { }
+
 	multivariate_normal_dist (const vector_type& mean, const matrix_type& cov)
 	: base_type(mean, cov) { }
 
@@ -142,15 +148,19 @@ struct multivariate_normal_dist : public multivariate_normal_dense_base<N, multi
 
 
 template <int N, class Derived>
-class independent_normal_base : public multivariate_normal_base<N, Derived> {
+struct independent_normal_base : public multivariate_normal_base<N, Derived> {
 
 	typedef multivariate_normal_base<N, Derived> base_type;
 	typedef typename base_type::vector_type vector_type;
 	typedef typename base_type::matrix_type matrix_type;
 
+private:
+
 	vector_type m_stddev;
 
 protected:
+
+	independent_normal_base () { }
 
 	independent_normal_base (const vector_type& mean, const vector_type& std_dev)
 	: base_type(mean), m_stddev(std_dev) { }
@@ -159,11 +169,11 @@ public:
 
 	matrix_type chol_cov () const { return m_stddev.asDiagonal(); }
 
-	void chol_cov_multiply (vector_type& v) const { v *= m_stddev.array(); }
+	void chol_cov_multiply (vector_type& v) const { v.array() *= m_stddev.array(); }
 
-	void chol_cov_solve (vector_type& v) const { v /= m_stddev.array(); }
+	void chol_cov_solve (vector_type& v) const { v.array() /= m_stddev.array(); }
 
-	double chol_cov_det () const { return m_stddev.array().product(); }
+	double chol_cov_det () const { return m_stddev.array().prod(); }
 
 	double chol_cov_log_det () const { return m_stddev.array().log().sum(); }
 
