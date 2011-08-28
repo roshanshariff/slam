@@ -26,6 +26,8 @@ public:
 
 	static const int vector_dim = vector_model_type::vector_dim;
 
+	vector_model_adapter () { }
+
 	vector_model_adapter (const vector_model_type& m) : model(m) { }
 
 	static result_type from_vector (const vector_type& v) { return vector_model_type::from_vector(v); }
@@ -50,7 +52,7 @@ public:
 
 		builder (const vector_builder_type& vector_builder_) : vector_builder(vector_builder_) { }
 
-		vector_model_adapter<vector_model_type> operator() (const result_type& x) {
+		vector_model_adapter<vector_model_type> operator() (const result_type& x) const {
 			return vector_model_adapter<vector_model_type> (vector_builder (to_vector (x)));
 		}
 
