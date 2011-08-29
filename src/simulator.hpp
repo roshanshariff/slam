@@ -1,11 +1,7 @@
 #ifndef _SIMULATOR_HPP
 #define _SIMULATOR_HPP
 
-#include <map>
-#include <tr1/functional>
-
 #include <boost/bind.hpp>
-#include <boost/program_options.hpp>
 
 #include "slam/slam_data.hpp"
 #include "slam/mcmc_slam.hpp"
@@ -28,22 +24,23 @@ struct simulator {
 
 	controller_type& controller;
 	sensor_type& sensor;
+	random_source& random;
 
 	slam_data_type data;
 
 	bitree<state_type> state;
 
-	simulator (controller_type& controller_, sensor_type& sensor_)
-	: controller(controller_), sensor(sensor_) { }
+	simulator (controller_type& controller_, sensor_type& sensor_, random_source& random_)
+	: controller(controller_), sensor(sensor_), random(random_) { }
 
-	void operator() (random_source&);
+	void operator() ();
 
 	state_type current_state () const { return controller.initial_state() + state.accumulate(); }
 };
 
 
 template <class Controller, class Sensor>
-void simulator<Controller, Sensor>::operator() (random_source& random) {
+void simulator<Controller, Sensor>::operator() () {
 
 	sensor.sense(current_state(), boost::bind(&slam_data_type::add_observation, &data, _1, _2), random);
 
