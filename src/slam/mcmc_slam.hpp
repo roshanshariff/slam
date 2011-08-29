@@ -8,6 +8,7 @@
 
 #include <boost/bind.hpp>
 #include <boost/signals2.hpp>
+#include <boost/program_options.hpp>
 
 #include "slam/slam_data.hpp"
 #include "utility/random.hpp"
@@ -27,9 +28,6 @@ class mcmc_slam {
 	typedef typename slam_data_type::timestep_t timestep_t;
 	typedef typename slam_data_type::featureid_t featureid_t;
 
-	/** Convenient redefinitions of typedefs in slam_data_type. Please look there for details. */
-	typedef typename slam_data_type::observation_data_type observation_data_type;
-
 	/** The type of probability distributions for action and observation edges, respectively. */
 	typedef typename slam_data_type::control_model_type control_model_type;
 	typedef typename slam_data_type::observation_model_type  observation_model_type;
@@ -45,10 +43,11 @@ class mcmc_slam {
       of this feature from slam_data, an estimate for this feature, and the time step relative
       to which the estimate is computed. */
 	struct feature_estimate {
-		const observation_data_type& observations;
+		const typename slam_data_type::observation_data_type& observations;
 		observation_type estimate;
 		timestep_t parent_timestep;
-		feature_estimate (const observation_data_type& obs, const observation_type& est, timestep_t t)
+		feature_estimate (const typename slam_data_type::observation_data_type& obs,
+				const observation_type& est, timestep_t t)
 		: observations(obs), estimate(est), parent_timestep(t) { }
 	};
 
@@ -58,16 +57,18 @@ class mcmc_slam {
       listener to slam_data using the scoped_connection objects, which will automatically be
       disconnected when this class is destroyed. */
 	const slam_data_type& data;
+	random_source& random;
+
 	const boost::signals2::scoped_connection m_control_conn;
 	const boost::signals2::scoped_connection m_obs_conn;
 	const boost::signals2::scoped_connection m_timestep_conn;
 
-	random_source& random;
-
 	/** MCMC Constants. mcmc_steps is the number of iterations per update. The action and observation
       dimensions are a measure of the number of independent parameters represented by each type of
       edge. */
-	const int mcmc_steps;
+	unsigned int mcmc_steps;
+	double control_edge_importance;
+	double observation_edge_importance;
 
 	/** The current action edge labels and the corresponding edge weights. */
 	bitree<control_type> state_estimates;
@@ -79,11 +80,18 @@ class mcmc_slam {
 
 public:
 
-	mcmc_slam (const slam_data_type&, random_source&, int num_steps);
+	static boost::program_options::options_description program_options ();
+	void parse_options (const boost::program_options::variables_map&);
+
+	mcmc_slam (const slam_data_type& data_, random_source& random_)
+	: data(data_), random(random_),
+	  m_control_conn(data.connect_control_listener(boost::bind(&mcmc_slam::add_control, this, _1, _2))),
+	  m_obs_conn(data.connect_observation_listener(boost::bind(&mcmc_slam::add_observation, this, _1, _2, _3))),
+	  m_timestep_conn(data.connect_timestep_listener(boost::bind(&mcmc_slam::update, this))),
+	  mcmc_steps(1), control_edge_importance(1.0), observation_edge_importance(1.0) { }
 
 	void add_control (timestep_t, const control_model_type&);
 	void add_observation (timestep_t, featureid_t, const observation_model_type&);
-
 	void update ();
 
 	const bitree<control_type>& get_state_estimates () const { return state_estimates; }
@@ -93,33 +101,23 @@ private:
 
 	void update_trajectory (timestep_t);
 	double state_change (timestep_t) const;
-
 	void update_feature (featureid_t);
+
 
 	/** Calculates the edge weight given the probability distribution and label. Uses the formula
       p_e(x) = k * J_e(x)^(-1/k) where p_e is the edge weight, x is the edge label, and J_e is
       the probability density of the label by its own distribution. k is a parameter expressing
       the number of independent dimensions in the probability distribution. */
-	template <class Model>
-	static double edge_weight (const Model& model, const typename Model::result_type& label) {
-		const double importance = Model::vector_dim;
-		return importance * std::pow (model.likelihood(label), -1.0/importance);
+
+	double edge_weight (const control_model_type& model, const control_type& label) {
+		return control_edge_importance * std::pow (model.likelihood(label), -1.0/control_edge_importance);
+	}
+
+	double edge_weight (const observation_model_type& model, const observation_type& label) {
+		return observation_edge_importance * std::pow (model.likelihood(label), -1.0/observation_edge_importance);
 	}
 
 };
-
-
-/** Constructs an mcmc_slam object storing a reference to a random_source and a slam_data. Registers
-    this class as a listener for slam data events. num_steps is the number of MCMC iterations per
-    update, and action_importance and observation_importance are the number of independent
-    parameters represented by each action and observation edge respectively. */
-template <class SlamData>
-mcmc_slam<SlamData>::mcmc_slam (const slam_data_type& data_, random_source& random_, int mcmc_steps_)
-: data(data_),
-  m_control_conn(data.connect_control_listener(boost::bind(&mcmc_slam::add_control, this, _1, _2))),
-  m_obs_conn(data.connect_observation_listener(boost::bind(&mcmc_slam::add_observation, this, _1, _2, _3))),
-  m_timestep_conn(data.connect_timestep_listener(boost::bind(&mcmc_slam::update, this))),
-  random(random_), mcmc_steps(mcmc_steps_) { }
 
 
 /** Called by slam_data whenever a new control is added. */
@@ -259,7 +257,7 @@ double mcmc_slam<SlamData>::state_change (const timestep_t timestep) const {
 
 		const feature_estimate& feature = i->second;
 
-		typename observation_data_type::const_iterator j, end; // the range of observations to consider
+		typename slam_data_type::observation_data_type::const_iterator j, end; // the range of observations to consider
 
 		if (feature.parent_timestep <= timestep) {
 			// The feature edge lies in T1 since its parent action is before the modified action edge.
@@ -334,7 +332,7 @@ void mcmc_slam<SlamData>::update_feature (const featureid_t feature_id) {
 	double acceptance_probability = 0.0; // log of the acceptance probability.
 
 	// Iterate over all observations of this feature.
-	typename observation_data_type::const_iterator i = feature.observations.begin();
+	typename slam_data_type::observation_data_type::const_iterator i = feature.observations.begin();
 	for (; i != feature.observations.end(); ++i) {
 
 		// Ignore the observation edge that is in the spanning tree of the inference graph.
@@ -389,5 +387,25 @@ mcmc_slam<SlamData>::get_feature_estimates (const control_type& initial_state) c
 	return estimates;
 }
 
+
+template <class SlamData>
+boost::program_options::options_description mcmc_slam<SlamData>::program_options () {
+	namespace po = boost::program_options;
+	po::options_description options ("MCMC-SLAM Parameters");
+	options.add_options()
+		("mcmc-steps", po::value<unsigned int>()->default_value(1), "MCMC iterations per simulation step")
+		("control-edge-importance", po::value<double>()->default_value(control_model_type::vector_dim), "degrees of freedom for control edges")
+		("observation-edge-importance", po::value<double>()->default_value(observation_model_type::vector_dim), "degrees of freedom for observation edges");
+	return options;
+}
+
+
+template <class SlamData>
+void mcmc_slam<SlamData>::parse_options (const boost::program_options::variables_map& options) {
+	if (options.count("mcmc-steps")) mcmc_steps = options["mcmc-steps"].as<unsigned int>();
+	if (options.count("control-edge-importance")) control_edge_importance = options["control-edge-importance"].as<double>();
+	if (options.count("observation-edge-importance")) observation_edge_importance = options["observation-edge-importance"].as<double>();
+
+}
 
 #endif //_SLAM_MCMC_SLAM_HPP
