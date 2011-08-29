@@ -25,28 +25,22 @@ po::options_description waypoint_controller::program_options () {
 	po::options_description robot_options ("Robot Parameters");
 	robot_options.add_options()
 	("time-delta", po::value<double>()->default_value(0.25),
-		"time delta per update")
+		"time delta per update, in seconds")
 	("robot-speed", po::value<double>()->default_value(3.0),
-		"speed of the robot, in m/s")
-	("robot-steering-max", po::value<double>()->default_value(30.0*RAD_PER_DEG),
-		"maximum steering angle, in rad")
-	("robot-steering-rate", po::value<double>()->default_value(20.0*RAD_PER_DEG),
-		"maximum change in steering, in rad/s");
+		"speed of the robot, in meter/second")
+	("robot-steering-max", po::value<double>()->default_value(30.0),
+		"maximum steering angle, in degrees")
+	("robot-steering-rate", po::value<double>()->default_value(20.0),
+		"maximum change in steering, in degree/second");
 
-	po::options_description velmodel_options ("Velocity Motion Model");
+	po::options_description velmodel_options ("Velocity Motion Model Parameters");
 	velmodel_options.add_options()
-	("velmodel-alpha1", po::value<double>()->default_value(0.1),
-		"alpha1 parameter in velocity control model")
-	("velmodel-alpha2", po::value<double>()->default_value(1.0),
-		"alpha1 parameter in velocity control model")
-	("velmodel-alpha3", po::value<double>()->default_value(1.0*RAD_PER_DEG),
-		"alpha1 parameter in velocity control model")
-	("velmodel-alpha4", po::value<double>()->default_value(0.05*RAD_PER_DEG),
-		"alpha1 parameter in velocity control model")
-	("velmodel-alpha5", po::value<double>()->default_value(0.1*RAD_PER_DEG),
-		"alpha1 parameter in velocity control model")
-	("velmodel-alpha6", po::value<double>()->default_value(0.005*RAD_PER_DEG),
-		"alpha1 parameter in velocity control model");
+	("velmodel-alpha1", po::value<double>()->default_value(0.1))
+	("velmodel-alpha2", po::value<double>()->default_value(1.0))
+	("velmodel-alpha3", po::value<double>()->default_value(1.0*RAD_PER_DEG))
+	("velmodel-alpha4", po::value<double>()->default_value(0.05*RAD_PER_DEG))
+	("velmodel-alpha5", po::value<double>()->default_value(0.1*RAD_PER_DEG))
+	("velmodel-alpha6", po::value<double>()->default_value(0.005*RAD_PER_DEG));
 
 	po::options_description waypoint_options ("Waypoints");
 	waypoint_options.add_options()
@@ -65,18 +59,21 @@ po::options_description waypoint_controller::program_options () {
 
 waypoint_controller waypoint_controller::parse_options (const po::variables_map& options) {
 
+	const double RAD_PER_DEG = boost::math::constants::pi<double>() / 180;
+
 	std::vector<position> waypoints;
-	{
+	if (options.count("waypoint-file")) {
 		double x, y;
 		std::ifstream waypoint_file (options["waypoint-file"].as<std::string>().c_str());
 		while (waypoint_file >> x >> y) waypoints.push_back (position::cartesian (x, y));
 	}
-	assert (!waypoints.empty());
+
+	const double dt = options["time-delta"].as<double>();
 
 	return waypoint_controller (
-		options["robot-speed"].as<double>(),
-		options["robot-steering-max"].as<double>(),
-		options["robot-steering-rate"].as<double>(),
+		options["robot-speed"].as<double>() * dt,
+		options["robot-steering-max"].as<double>() * RAD_PER_DEG,
+		options["robot-steering-rate"].as<double>() * dt * RAD_PER_DEG,
 		waypoints,
 		options["waypoint-proximity"].as<double>(),
 		options["waypoint-repetitions"].as<double>(),
