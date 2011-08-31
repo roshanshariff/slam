@@ -6,6 +6,7 @@
  */
 
 #include <string>
+#include <iostream>
 #include <fstream>
 #include <cstdlib>
 #include <cassert>
@@ -47,7 +48,7 @@ po::options_description waypoint_controller::program_options () {
 	("waypoint-file", po::value<std::string>(),
 		"filename of waypoints file")
 	("waypoint-proximity", po::value<double>()->default_value(1.0),
-		"distance at which waypoint is considered reached, in m");
+		"distance at which waypoint is considered reached, in m")
 	("waypoint-repetitions", po::value<double>()->default_value(1.0),
 		"number of times to traverse waypoints");
 
@@ -95,6 +96,9 @@ waypoint_controller::model_type waypoint_controller::control (const pose& state)
 	if (!waypoints.empty()) {
 
 		position to_waypoint = -state + waypoints[current_waypoint % waypoints.size()];
+
+		std::cout << "Seeking waypoint " << current_waypoint+1 << " of " << waypoints.size()
+			<< " (distance is " << to_waypoint.distance() << " m)" << std::endl;
 
 		double steering_change = to_waypoint.direction() - current_steering;
 		if (std::abs(steering_change) > steering_rate) {
