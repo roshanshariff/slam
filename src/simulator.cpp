@@ -77,8 +77,8 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
 
 	po::options_description general_options ("General Options");
 	general_options.add_options()
-		("output-prefix,o", po::value<std::string>()->default_value("./output", "prefix for simulation output files")
-		("verbose,v", "produce detailed simulation logs")
+		("output-prefix,o", po::value<std::string>()->default_value("./output"), "prefix for simulation output files")
+        ("verbose,v", "produce detailed simulation logs")
 		("seed", po::value<unsigned int>(), "seed for simulation random number generator")
 		("mcmc-seed", po::value<unsigned int>(), "seed for MCMC-SLAM random number generator");
 
