@@ -3,5 +3,6 @@
 *.dSYM
 *.o
 build/
+output/
 Debug/
 Release/
