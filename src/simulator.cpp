@@ -49,17 +49,11 @@ int main (int argc, char* argv[]) {
 	mcmc_slam_type mcmc (sim.data, mcmc_random);
 	mcmc.parse_options(options);
 
-	boost::filesystem::path output_directory = "./output";
-	if (options.count("output-prefix")) output_directory = options["output-prefix"].as<std::string>();
+	boost::filesystem::path output_dir (options["output-prefix"].as<std::string>());
 
-	boost::filesystem::path mcmc_incremental_output = output_directory / "mcmc_slam" / "incremental";
-	print_incremental_info<slam_data_type, mcmc_slam_type> incremental_info_printer (
-			sim.data, mcmc, controller.initial_state(), mcmc_incremental_output
-	);
-	if (options.count("verbose")) {
-		boost::filesystem::create_directories (mcmc_incremental_output);
-		incremental_info_printer.connect();
-	}
+	print_incremental_info<slam_data_type, mcmc_slam_type> incremental_info_printer
+			(sim.data, mcmc, controller.initial_state(), output_dir/"mcmc_slam"/"incremental");
+	if (options.count("verbose")) incremental_info_printer.connect();
 
 	sim();
 
@@ -83,7 +77,7 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
 
 	po::options_description general_options ("General Options");
 	general_options.add_options()
-		("output-prefix,o", po::value<std::string>(), "prefix for simulation output files")
+		("output-prefix,o", po::value<std::string>()->default_value("./output", "prefix for simulation output files")
 		("verbose,v", "produce detailed simulation logs")
 		("seed", po::value<unsigned int>(), "seed for simulation random number generator")
 		("mcmc-seed", po::value<unsigned int>(), "seed for MCMC-SLAM random number generator");

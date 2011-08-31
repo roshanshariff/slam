@@ -56,8 +56,6 @@ void simulator<Controller, Sensor>::operator() () {
 		state.push_back(control(random));
 		data.add_control(control);
 
-		std::cout << "Control is " << control_model_type::to_vector(state.back()) << std::endl;
-
 		sensor.sense(current_state(), boost::bind(&slam_data_type::add_observation, &data, _1, _2), random);
 
 		data.timestep();
@@ -148,6 +146,8 @@ public:
 	: data(data_), slam(slam_), initial_state(initial_state_), path(path_) { }
 
 	void print (typename SlamData::timestep_t timestep) const {
+
+		boost::filesystem::create_directories (path);
 
 		std::string trajectory_filename = "trajectory." + boost::lexical_cast<std::string>(timestep) + ".txt";
 		print_trajectory<SlamImpl> ((path/trajectory_filename).c_str(), slam, initial_state);
