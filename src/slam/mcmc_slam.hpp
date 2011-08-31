@@ -22,6 +22,8 @@
 template <class SlamData>
 class mcmc_slam {
 
+public:
+
 	typedef SlamData slam_data_type;
 
 	/** The types of action and feature identifiers, respectively. Usually same as size_t. */
@@ -38,6 +40,8 @@ class mcmc_slam {
       seen from the given pose. */
 	typedef typename control_model_type::result_type control_type;
 	typedef typename observation_model_type::result_type observation_type;
+
+private:
 
 	/** All the information about each feature for MCMC SLAM. Stores a reference to the observations
       of this feature from slam_data, an estimate for this feature, and the time step relative
@@ -94,8 +98,10 @@ public:
 	void add_observation (timestep_t, featureid_t, const observation_model_type&);
 	void update ();
 
-	const bitree<control_type>& get_state_estimates () const { return state_estimates; }
-	std::map<featureid_t, observation_type> get_feature_estimates (const control_type& initial_state) const;
+	const bitree<control_type>& trajectory_estimate () const { return state_estimates; }
+
+	template <class FeatureEstimateFunctor>
+	void foreach_feature_estimate (FeatureEstimateFunctor) const;
 
 private:
 
@@ -110,11 +116,11 @@ private:
       the number of independent dimensions in the probability distribution. */
 
 	double edge_weight (const control_model_type& model, const control_type& label) {
-		return control_edge_importance * std::pow (model.likelihood(label), -1.0/control_edge_importance);
+		return control_edge_importance * std::exp(-model.log_likelihood(label)/control_edge_importance);
 	}
 
 	double edge_weight (const observation_model_type& model, const observation_type& label) {
-		return observation_edge_importance * std::pow (model.likelihood(label), -1.0/observation_edge_importance);
+		return observation_edge_importance * std::exp(-model.log_likelihood(label)/observation_edge_importance);
 	}
 
 };
@@ -371,20 +377,14 @@ void mcmc_slam<SlamData>::update_feature (const featureid_t feature_id) {
 
 
 /** Returns current estimates of the positions of all observed features. */
-template <class SlamData>
-std::map<typename SlamData::featureid_t, typename SlamData::observation_model_type::result_type>
-mcmc_slam<SlamData>::get_feature_estimates (const control_type& initial_state) const {
-	std::map<featureid_t, observation_type> estimates;
+template <class SlamData> template <class FeatureEstimateFunctor>
+void mcmc_slam<SlamData>::foreach_feature_estimate (FeatureEstimateFunctor f) const {
 	typename feature_estimates_type::const_iterator i = feature_estimates.begin();
 	for (; i != feature_estimates.end(); ++i) { // iterate through each feature
 		featureid_t feature_id = i->first;
 		const feature_estimate& feature = i->second;
-		// Rebase the estimate to be relative to action 0.
-		estimates.insert (std::make_pair (feature_id,
-				initial_state + state_estimates.accumulate(feature.parent_timestep) + feature.estimate
-		));
+		f (feature_id, state_estimates.accumulate(feature.parent_timestep) + feature.estimate);
 	}
-	return estimates;
 }
 
 
