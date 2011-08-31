@@ -1,11 +1,13 @@
 #include <vector>
 #include <iostream>
+#include <string>
 #include <fstream>
 #include <cstdlib>
 #include <cstdio>
 #include <tr1/random>
 
 #include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
 
 #include "simulator.hpp"
 #include "planar_robot/waypoint_controller.hpp"
@@ -46,6 +48,18 @@ int main (int argc, char* argv[]) {
 
 	mcmc_slam_type mcmc (sim.data, mcmc_random);
 	mcmc.parse_options(options);
+
+	boost::filesystem::path output_directory = "./output";
+	if (options.count("output-prefix")) output_directory = options["output-prefix"].as<std::string>();
+
+	boost::filesystem::path mcmc_incremental_output = output_directory / "mcmc_slam" / "incremental";
+	print_incremental_info<slam_data_type, mcmc_slam_type> incremental_info_printer (
+			sim.data, mcmc, controller.initial_state(), mcmc_incremental_output
+	);
+	if (options.count("verbose")) {
+		boost::filesystem::create_directories (mcmc_incremental_output);
+		incremental_info_printer.connect();
+	}
 
 	sim();
 
