@@ -7,7 +7,7 @@ set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/"
 
 set (CMAKE_INCLUDE_CURRENT_DIR true)
 
-find_package (Boost COMPONENTS program_options REQUIRED)
+find_package (Boost COMPONENTS program_options filesystem system REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 target_link_libraries (simulator ${Boost_LIBRARIES})
 
