@@ -69,9 +69,9 @@ public:
 
 	void chol_cov_solve (vector_type& v) const { derived().chol_cov_solve(v); }
 
-	double chol_cov_det () const { derived().chol_cov_det(); }
+	double chol_cov_det () const { return derived().chol_cov_det(); }
 
-	double chol_cov_log_det () const { derived().chol_cov_log_det(); }
+	double chol_cov_log_det () const { return derived().chol_cov_log_det(); }
 
 	static vector_type subtract (const vector_type& a, const vector_type& b) { return Derived::subtract(a, b); }
 
