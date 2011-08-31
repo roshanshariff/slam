@@ -35,7 +35,7 @@ struct velocity_model : public independent_normal_base<3, velocity_model> {
 		}
 		else {
 			double r = 0.5 * dp.distance_squared() / dp.y();
-			double theta = std::atan2 (dp.x(), r - dp.y());
+			double theta = r >= 0 ? std::atan2 (dp.x(), r - dp.y()) : std::atan2 (-dp.x(), dp.y() - r);
 			return vector_type (r*theta, theta, wrap_angle(dp.bearing()-theta));
 		}
 	}
