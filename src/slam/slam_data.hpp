@@ -26,14 +26,15 @@ public:
 	/** The types of distributions over state changes and observations, respectively. */
 	typedef ControlModel control_model_type;
 	typedef ObservationModel observation_model_type;
+    
+    /** The types of controls and observations */
+    typedef typename control_model_type::result_type control_type;
+    typedef typename observation_model_type::result_type observation_type;
 
 	/** Feature observations are stored as an arraymap from the time of an observation to the observation's
       distribution. Since observations are expected to be added in chronological order, this is much
       more efficient then using a tree-based map. */
 	typedef arraymap<timestep_t, observation_model_type> observation_data_type;
-
-	/** Features are stored as a map from the feature_id to the feature's observation data. */
-	typedef std::map<featureid_t, observation_data_type> feature_data_type;
 
 	/** Action signal handlers are passed the action id just added, whereas observation signal handlers
       are passed the feature id being observed and the time of the observation. */
@@ -51,7 +52,7 @@ private:
 	/** Actions are stored as a vector of the corresponding distributions. */
 	std::vector<control_model_type> m_controls;
 
-	feature_data_type m_observations;
+	std::map<featureid_t, observation_data_type> m_observations;
 
 	mutable control_signal_type m_control_signal;
 	mutable observation_signal_type m_observation_signal;
@@ -69,7 +70,7 @@ public:
 
 	/** Retrieve the observations of the feature specified by the given id. */
 	const observation_data_type& observations (featureid_t feature) const {
-		typename feature_data_type::const_iterator i = m_observations.find(feature);
+		typename std::map<featureid_t, observation_data_type>::const_iterator i = m_observations.find(feature);
 		assert (i != m_observations.end());
 		return i->second;
 	}
