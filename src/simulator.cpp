@@ -19,8 +19,15 @@
 template <class Simulator>
 boost::program_options::variables_map parse_options (int argc, char* argv[]);
 
+template <class RandGen>
+random_source make_random_source (RandGen& rng, const char* key,
+                                  const boost::program_options::variables_map& options,
+                                  unsigned int* seed_ptr = 0);
+
 
 int main (int argc, char* argv[]) {
+
+    /* typedefs for common types */
 
 	typedef planar_robot::waypoint_controller controller_type;
 	typedef planar_robot::landmark_sensor sensor_type;
@@ -30,33 +37,57 @@ int main (int argc, char* argv[]) {
 
 	typedef mcmc_slam<slam_data_type> mcmc_slam_type;
 
-	boost::program_options::variables_map options =
-			parse_options<simulator_type> (argc, argv);
+	/* parse program options and set up random number generators */
+    
+    boost::program_options::variables_map options = parse_options<simulator_type> (argc, argv);
 
+	std::tr1::random_device random_generator;
+
+	unsigned int random_seed;
+	random_source random = make_random_source (random_generator, "seed", options, &random_seed);
+    
+    unsigned int sim_seed;
+    random_source sim_random = make_random_source (random.generator, "sim-seed", options, &sim_seed);
+
+    unsigned int mcmc_slam_seed;
+    random_source mcmc_slam_random = make_random_source (random.generator, "mcmc-slam-seed", options, &mcmc_slam_seed);
+    
+    /* set up simulation objects */
+    
 	controller_type controller = controller_type::parse_options (options);
 	sensor_type sensor = sensor_type::parse_options (options);
+	
+    simulator_type sim (controller, sensor, sim_random);
 
-	std::tr1::random_device sys_rand;
+	mcmc_slam_type mcmc_slam = mcmc_slam_type::parse_options (sim.data, mcmc_slam_random, options);
+    mcmc_slam.connect();
+    
+    /* set up simulation logging */
+    
+	boost::filesystem::path output_dir (options["output-dir"].as<std::string>());
+    boost::filesystem::create_directories (output_dir);
 
-	random_source random;
-	const unsigned int random_seed = init_random (random, "sim-seed", options, sys_rand);
-
-	random_source mcmc_random;
-	const unsigned int mcmc_random_seed = init_random (mcmc_random, "mcmc-seed", options, random.generator);
-
-	simulator_type sim (controller, sensor, random);
-
-	mcmc_slam_type mcmc (sim.data, mcmc_random);
-	mcmc.parse_options(options);
-
-	boost::filesystem::path output_dir (options["output-prefix"].as<std::string>());
-
-	print_incremental_info<slam_data_type, mcmc_slam_type> incremental_info_printer
-			(sim.data, mcmc, controller.initial_state(), output_dir/"mcmc_slam"/"incremental");
-	if (options.count("verbose")) incremental_info_printer.connect();
-
+	slam_logger<slam_data_type, mcmc_slam_type> mcmc_slam_logger
+    (output_dir/"log"/"mcmc_slam", sim.data, mcmc_slam, controller.initial_state());
+    
+	if (options.count("log")) {
+        mcmc_slam_logger.connect();
+    }
+    
+    /* run simulation */
+    
 	sim();
+    
+    /* print output */
+    
+    slam_data_type::control_type initial_state = controller.initial_state();
 
+    print_trajectory<slam_data_type> ((output_dir/"trajectory.txt").c_str(), sim, initial_state);
+    print_map<slam_data_type> ((output_dir/"map.txt").c_str(), sim, initial_state);
+
+    print_trajectory<slam_data_type> ((output_dir/"mcmc_slam.trajectory.txt").c_str(), mcmc_slam, initial_state);
+    print_map<slam_data_type> ((output_dir/"mcmc_slam.map.txt").c_str(), mcmc_slam, initial_state);
+    
 	return EXIT_SUCCESS;
 
 }
@@ -70,17 +101,19 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
 	po::options_description command_line_options ("Command Line Options");
 	command_line_options.add_options()
 		("help,h", "usage information")
-		("controller-options", "controller options")
-		("sensor-options", "sensor options")
-		("mcmc-slam-options", "MCMC-SLAM options")
+		("controller-help", "controller options")
+		("sensor-help", "sensor options")
+		("mcmc-slam-help", "MCMC-SLAM options")
 		("config-file,f", po::value<std::vector<std::string> >()->composing(), "configuration files");
 
 	po::options_description general_options ("General Options");
 	general_options.add_options()
-		("output-prefix,o", po::value<std::string>()->default_value("./output"), "prefix for simulation output files")
-        ("verbose,v", "produce detailed simulation logs")
-		("seed", po::value<unsigned int>(), "seed for simulation random number generator")
-		("mcmc-seed", po::value<unsigned int>(), "seed for MCMC-SLAM random number generator");
+		("output-dir,o", po::value<std::string>()->default_value("./output"),
+         "directory for simulation output files")
+        ("log", "produce detailed simulation logs")
+        ("seed", po::value<unsigned int>(), "seed for global random number generator")
+        ("sim-seed", po::value<unsigned int>(), "seed for control and sensor noise")
+		("mcmc-slam-seed", po::value<unsigned int>(), "seed for MCMC-SLAM random number generator");
 
 	po::options_description controller_options = Simulator::controller_type::program_options();
 	po::options_description sensor_options = Simulator::sensor_type::program_options();
@@ -93,27 +126,36 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
 	all_options.add(command_line_options).add(config_options);
 
 	po::variables_map values;
-	po::store (po::parse_command_line (argc, argv, all_options), values);
+	po::store (po::command_line_parser (argc, argv).options(all_options).allow_unregistered().run(), values);
 	po::notify (values);
+    
+    po::options_description help_options;
+    bool help_requested = false;
 
 	if (values.count ("help")) {
-		po::options_description help_options;
 		help_options.add(command_line_options).add(general_options);
-		std::cout << help_options << std::endl;
-		std::exit(EXIT_SUCCESS);
+        help_requested = true;
 	}
-	else if (values.count("controller-options")) {
-		std::cout << controller_options << std::endl;
-		std::exit(EXIT_SUCCESS);
+    
+	if (values.count("controller-help")) {
+		help_options.add(controller_options);
+        help_requested = true;
 	}
-	else if (values.count("sensor-options")) {
-		std::cout << sensor_options << std::endl;
-		std::exit(EXIT_SUCCESS);
+    
+	if (values.count("sensor-help")) {
+		help_options.add(sensor_options);
+        help_requested = true;
 	}
-	else if (values.count("mcmc-slam-options")) {
-		std::cout << mcmc_options << std::endl;
-		std::exit(EXIT_SUCCESS);
+    
+	if (values.count("mcmc-slam-help")) {
+		help_options.add(mcmc_options);
+        help_requested = true;
 	}
+    
+    if (help_requested) {
+        std::cout << help_options << std::endl;
+        std::exit(EXIT_SUCCESS);
+    }
 
 	if (values.count("config-file")) {
 		std::vector<std::string> files = values["config-file"].as<std::vector<std::string> >();
@@ -130,3 +172,20 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
 
 	return values;
 }
+
+
+template <class RandGen>
+random_source make_random_source (RandGen& rng, const char* key,
+                                  const boost::program_options::variables_map& options,
+                                  unsigned int* seed_ptr)
+{
+	unsigned int seed = rng();
+	if (options.count(key)) seed = options[key].as<unsigned int>();
+	if (seed_ptr) *seed_ptr = seed;
+    
+    random_source random;
+	random.generator.seed(seed);
+    return random;
+}
+
+
