@@ -40,12 +40,11 @@ po::options_description landmark_sensor::program_options () {
 landmark_sensor landmark_sensor::parse_options (const po::variables_map& options) {
 
 	std::vector<position> landmarks;
-	{
+	if (options.count("landmark-file")) {
 		double x, y;
 		std::ifstream landmark_file (options["landmark-file"].as<std::string>().c_str());
 		while (landmark_file >> x >> y) landmarks.push_back (position::cartesian (x, y));
 	}
-	assert (!landmarks.empty());
 
 	return landmark_sensor (
 		options["sensor-range-max"].as<double>(),
