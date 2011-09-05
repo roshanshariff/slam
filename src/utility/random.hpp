@@ -3,7 +3,6 @@
 
 #include <boost/random.hpp>
 #include <boost/math/constants/constants.hpp>
-#include <boost/program_options.hpp>
 
 #include <Eigen/Core>
 
@@ -22,17 +21,6 @@ struct random_source {
       normal(uniform, boost::normal_distribution<double>()) { }
 
 };
-
-
-template <class RandomNumberGenerator>
-inline unsigned int init_random (random_source& random, const char* key,
-		const boost::program_options::variables_map& options, RandomNumberGenerator& rng)
-{
-	unsigned int seed = rng();
-	if (options.count(key)) seed = options[key].as<unsigned int>();
-	random.generator.seed(seed);
-	return seed;
-}
 
 
 template <int N, class Derived>
