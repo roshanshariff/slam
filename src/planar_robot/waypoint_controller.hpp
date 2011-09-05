@@ -44,8 +44,13 @@ private:
 
 public:
 
-	pose initial_state () const { return pose::from_position (waypoints.front(), 0.0); }
-	bool finished () const { return current_waypoint >= waypoints.size() * repetitions; }
+	pose initial_state () const {
+        return waypoints.empty() ? pose() : pose::from_position (waypoints.front(), 0.0);
+    }
+    
+	bool finished () const {
+        return current_waypoint >= waypoints.size() * repetitions;
+    }
 
 };
 
