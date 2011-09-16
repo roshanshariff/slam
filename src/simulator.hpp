@@ -141,7 +141,7 @@ void print_trajectory (const char* filename, const SlamImpl& slam,
     std::tr1::shared_ptr<FILE> output = open_file (filename, "w");
     if (output) {
         const bitree<control_type>& trajectory = slam.trajectory();
-        for (size_t i = 0; i < trajectory.size(); ++i) {
+        for (size_t i = 0; i <= trajectory.size(); ++i) {
             typename control_type::vector_type v = (initial_state + trajectory.accumulate(i)).to_vector();
             std::fprintf (output.get(), "%zu", i);
             for (int j = 0; j < v.size(); ++j) std::fprintf (output.get(), "\t%f", v(j));
