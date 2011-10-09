@@ -1,25 +1,43 @@
 #ifndef _UTILITY_RANDOM_HPP
 #define _UTILITY_RANDOM_HPP
 
-#include <boost/random.hpp>
+#include <boost/random/mersenne_twister.hpp>
+#include <boost/random/uniform_01.hpp>
+#include <boost/random/normal_distribution.hpp>
+
 #include <boost/math/constants/constants.hpp>
 
 #include <Eigen/Core>
 
-struct random_source {
+class random_source {
+    
+public:
+    
+    typedef boost::random::mt19937 engine_type;
+    typedef engine_type::result_type result_type;
+    
+private:
+    
+    engine_type engine;
+    boost::random::uniform_01<> uniform_dist;
+    boost::random::normal_distribution<> normal_dist;
 
-  typedef boost::mt19937 engine_type;
-  typedef boost::variate_generator<engine_type&, boost::uniform_01<double> > uniform_type;
-  typedef boost::variate_generator<uniform_type&, boost::normal_distribution<double> > normal_type;
+public:
+            
+    random_source () { }    
+    random_source (result_type seed) : engine(seed) { }
+    
+    result_type operator()() { return engine(); }
+    void seed (result_type seed) { engine.seed(seed); uniform_dist.reset(); normal_dist.reset(); }
+        
+    static result_type min() { return engine_type::min(); }
+    static result_type max() { return engine_type::max(); }
 
-  engine_type generator;
-  uniform_type uniform;
-  normal_type normal;
-
-  random_source ()
-    : generator(), uniform(generator, boost::uniform_01<double>()),
-      normal(uniform, boost::normal_distribution<double>()) { }
-
+    bool operator== (const random_source& r) const { return *this == r; }
+    
+    double uniform () { return uniform_dist(*this); }
+    double normal () { return normal_dist(*this); }
+    
 };
 
 

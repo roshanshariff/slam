@@ -4,7 +4,7 @@
 #include <fstream>
 #include <cstdlib>
 #include <cstdio>
-#include <tr1/random>
+#include <ctime>
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -41,16 +41,17 @@ int main (int argc, char* argv[]) {
     
     boost::program_options::variables_map options = parse_options<simulator_type> (argc, argv);
 
-	std::tr1::random_device random_generator;
+	random_source random_generator;
+    random_generator.seed(std::time(0));
 
 	unsigned int random_seed;
 	random_source random = make_random_source (random_generator, "seed", options, &random_seed);
     
     unsigned int sim_seed;
-    random_source sim_random = make_random_source (random.generator, "sim-seed", options, &sim_seed);
+    random_source sim_random = make_random_source (random, "sim-seed", options, &sim_seed);
 
     unsigned int mcmc_slam_seed;
-    random_source mcmc_slam_random = make_random_source (random.generator, "mcmc-slam-seed", options, &mcmc_slam_seed);
+    random_source mcmc_slam_random = make_random_source (random, "mcmc-slam-seed", options, &mcmc_slam_seed);
     
     /* set up simulation objects */
     
@@ -183,9 +184,7 @@ random_source make_random_source (RandGen& rng, const char* key,
 	if (options.count(key)) seed = options[key].as<unsigned int>();
 	if (seed_ptr) *seed_ptr = seed;
     
-    random_source random;
-	random.generator.seed(seed);
-    return random;
+    return random_source (seed);
 }
 
 
