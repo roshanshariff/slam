@@ -10,6 +10,7 @@
 #define slam_cowtree_hpp
 
 #include <cassert>
+#include <utility>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
@@ -36,6 +37,8 @@ protected:
     cowtree& operator= (const cowtree& o) { node_ptr = o.node_ptr; return *this; }
     void swap (cowtree& o) { node_ptr.swap(o.node_ptr); }
     
+    void clear () { node_ptr.reset(); }
+    
 private:
     
     class node;
@@ -61,8 +64,15 @@ private:
 class cowtree::root : public cowtree {
 public:
     void swap (root& o) { cowtree::swap(o); }
+    void clear () { cowtree::clear(); }
 };
 
+
+inline void swap (cowtree::root& a, cowtree::root& b) { a.swap(b); }
+
+namespace std {
+    template<> void swap (cowtree::root& a, cowtree::root& b) { a.swap(b); }
+}
 
 class cowtree::node {
     
