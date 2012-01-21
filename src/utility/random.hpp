@@ -4,7 +4,6 @@
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_01.hpp>
 #include <boost/random/normal_distribution.hpp>
-
 #include <boost/math/constants/constants.hpp>
 
 #include <Eigen/Core>
@@ -65,7 +64,7 @@ public:
 
 	const Derived& derived() const { return static_cast<const Derived&>(*this); }
 	Derived& derived() { return static_cast<Derived&>(*this); }
-
+    
 	const vector_type& mean () const { return m_mean; }
 	vector_type& mean () { return m_mean; }
 
@@ -89,12 +88,16 @@ public:
 		return result;
 	}
 
-	double likelihood_exponent (vector_type x) const {
+private:
+	
+    double likelihood_exponent (vector_type x) const {
 		x = subtract(x, mean());
 		chol_cov_solve(x);
 		return -0.5 * x.squaredNorm();
 	}
 
+public:
+    
 	double likelihood (const vector_type& x) const {
 		const double root_two_pi = boost::math::constants::root_two_pi<double>();
 		return std::exp(likelihood_exponent(x)) * std::pow(root_two_pi, -vector_dim) / chol_cov_det();
@@ -162,6 +165,26 @@ struct multivariate_normal_dist : public multivariate_normal_dense_base<N, multi
 
 	static vector_type subtract (const vector_type& a, const vector_type& b) { return a - b; }
 
+};
+
+
+template <class Adapted>
+struct multivariate_normal_dense_adapter
+: public multivariate_normal_dense_base<Adapted::vector_dim, multivariate_normal_dense_adapter<Adapted> > {
+    
+	typedef multivariate_normal_dense_base<Adapted::vector_dim, multivariate_normal_dense_adapter> base_type;
+	typedef typename base_type::vector_type vector_type;
+	typedef typename base_type::matrix_type matrix_type;
+    
+	multivariate_normal_dense_adapter () { }
+    
+	multivariate_normal_dense_adapter (const vector_type& mean, const matrix_type& cov)
+	: base_type(mean, cov) { }
+    
+	static vector_type subtract (const vector_type& a, const vector_type& b) {
+        return Adapted::subtract(a, b);
+    }
+    
 };
 
 
