@@ -6,6 +6,8 @@
 #include <cstdio>
 #include <ctime>
 
+#include <boost/make_shared.hpp>
+#include <boost/ref.hpp>
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 
@@ -14,9 +16,8 @@
 #include "planar_robot/landmark_sensor.hpp"
 #include "slam/mcmc_slam.hpp"
 #include "utility/random.hpp"
+#include "utility/options.hpp"
 
-
-template <class Simulator>
 boost::program_options::variables_map parse_options (int argc, char* argv[]);
 
 template <class RandGen>
@@ -24,56 +25,49 @@ random_source make_random_source (RandGen& rng, const char* key,
                                   const boost::program_options::variables_map& options,
                                   unsigned int* seed_ptr = 0);
 
+struct sim_types {
+    
+    typedef planar_robot::waypoint_controller controller_type;
+    typedef planar_robot::landmark_sensor sensor_type;
+    
+    typedef simulator<controller_type, sensor_type> simulator_type;
+    
+    typedef controller_type::model_type control_model_type;
+    typedef sensor_type::model_type observation_model_type;
+    
+    typedef slam_data<control_model_type, observation_model_type> slam_data_type;
+    typedef mcmc_slam<control_model_type, observation_model_type> mcmc_slam_type;
+    
+};
+
 
 int main (int argc, char* argv[]) {
 
-    /* typedefs for common types */
-
-	typedef planar_robot::waypoint_controller controller_type;
-	typedef planar_robot::landmark_sensor sensor_type;
-
-	typedef simulator<controller_type, sensor_type> simulator_type;
-	typedef simulator_type::slam_data_type slam_data_type;
-
-	typedef mcmc_slam<slam_data_type> mcmc_slam_type;
-
-	/* parse program options and set up random number generators */
+	/* parse program options */
     
-    boost::program_options::variables_map options = parse_options<simulator_type> (argc, argv);
+    boost::program_options::variables_map options = parse_options (argc, argv);
 
-	random_source random_generator;
-    random_generator.seed(std::time(0));
-
-	unsigned int random_seed;
-	random_source random = make_random_source (random_generator, "seed", options, &random_seed);
-    
-    unsigned int sim_seed;
-    random_source sim_random = make_random_source (random, "sim-seed", options, &sim_seed);
-
-    unsigned int mcmc_slam_seed;
-    random_source mcmc_slam_random = make_random_source (random, "mcmc-slam-seed", options, &mcmc_slam_seed);
-    
     /* set up simulation objects */
     
-	controller_type controller = controller_type::parse_options (options);
-	sensor_type sensor = sensor_type::parse_options (options);
-	
-    simulator_type sim (controller, sensor, sim_random);
-
-	mcmc_slam_type mcmc_slam = mcmc_slam_type::parse_options (sim.data, mcmc_slam_random, options);
-    mcmc_slam.connect();
+    sim_types::simulator_type sim (options, (unsigned int) std::time(0));
+    
+    boost::shared_ptr<sim_types::mcmc_slam_type> mcmc_slam
+    = boost::make_shared<sim_types::mcmc_slam_type> (boost::ref (options), sim.random());
+    mcmc_slam->connect (sim.data);
     
     /* set up simulation logging */
     
 	boost::filesystem::path output_dir (options["output-dir"].as<std::string>());
     boost::filesystem::create_directories (output_dir);
 
+    /*
 	slam_logger<slam_data_type, mcmc_slam_type> mcmc_slam_logger
     (output_dir/"log"/"mcmc_slam", sim.data, mcmc_slam, controller.initial_state());
-    
-	if (options.count("log")) {
+
+    if (options.count("log")) {
         mcmc_slam_logger.connect();
     }
+    */
     
     /* run simulation */
     
@@ -81,6 +75,7 @@ int main (int argc, char* argv[]) {
     
     /* print output */
     
+    /*
     slam_data_type::control_type initial_state = controller.initial_state();
 
     print_trajectory<slam_data_type> ((output_dir/"trajectory.txt").c_str(), sim, initial_state);
@@ -88,15 +83,14 @@ int main (int argc, char* argv[]) {
 
     print_trajectory<slam_data_type> ((output_dir/"mcmc_slam.trajectory.txt").c_str(), mcmc_slam, initial_state);
     print_map<slam_data_type> ((output_dir/"mcmc_slam.map.txt").c_str(), mcmc_slam, initial_state);
-    
+    */
 	return EXIT_SUCCESS;
 
 }
 
 
-template <class Simulator>
 boost::program_options::variables_map parse_options (int argc, char* argv[]) {
-
+    
 	namespace po = boost::program_options;
 
 	po::options_description command_line_options ("Command Line Options");
@@ -112,13 +106,11 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
 		("output-dir,o", po::value<std::string>()->default_value("./output"),
          "directory for simulation output files")
         ("log", "produce detailed simulation logs")
-        ("seed", po::value<unsigned int>(), "seed for global random number generator")
-        ("sim-seed", po::value<unsigned int>(), "seed for control and sensor noise")
-		("mcmc-slam-seed", po::value<unsigned int>(), "seed for MCMC-SLAM random number generator");
+        ("seed", po::value<unsigned int>(), "seed for global random number generator");
 
-	po::options_description controller_options = Simulator::controller_type::program_options();
-	po::options_description sensor_options = Simulator::sensor_type::program_options();
-	po::options_description mcmc_options = mcmc_slam<typename Simulator::slam_data_type>::program_options();
+	po::options_description controller_options = sim_types::controller_type::program_options();
+	po::options_description sensor_options = sim_types::sensor_type::program_options();
+	po::options_description mcmc_options = sim_types::mcmc_slam_type::program_options();
 
 	po::options_description config_options;
 	config_options.add(general_options).add(controller_options).add(sensor_options).add(mcmc_options);
@@ -173,18 +165,3 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
 
 	return values;
 }
-
-
-template <class RandGen>
-random_source make_random_source (RandGen& rng, const char* key,
-                                  const boost::program_options::variables_map& options,
-                                  unsigned int* seed_ptr)
-{
-	unsigned int seed = rng();
-	if (options.count(key)) seed = options[key].as<unsigned int>();
-	if (seed_ptr) *seed_ptr = seed;
-    
-    return random_source (seed);
-}
-
-

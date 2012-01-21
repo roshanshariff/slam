@@ -54,9 +54,11 @@ struct velocity_model : public independent_normal_base<3, velocity_model> {
 	class builder : public std::unary_function<vector_type, velocity_model> {
 
 		Eigen::Matrix3d mat_stddev;
-		const double dt;
+		double dt;
 
 	public:
+        
+        builder () { }
 
 		builder (double a1, double a2, double a3, double a4, double a5, double a6, double _dt) : dt(_dt) {
 			mat_stddev << a1, a2, 0,

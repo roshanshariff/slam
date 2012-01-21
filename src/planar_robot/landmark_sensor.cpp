@@ -7,8 +7,6 @@
 
 #include <string>
 #include <fstream>
-#include <cstdlib>
-#include <cassert>
 
 #include <boost/math/constants/constants.hpp>
 
@@ -37,32 +35,15 @@ po::options_description landmark_sensor::program_options () {
 }
 
 
-landmark_sensor landmark_sensor::parse_options (const po::variables_map& options) {
-
-	std::vector<position> landmarks;
-	if (options.count("landmark-file")) {
+landmark_sensor::landmark_sensor (const po::variables_map& options)
+: max_range (options["sensor-range-max"].as<double>()),
+hits (0),
+model_builder (range_bearing_model::builder (options["sensor-range-stddev"].as<double>(),
+                                             options["sensor-bearing-stddev"].as<double>()))
+{
+    if (options.count("landmark-file")) {
 		double x, y;
 		std::ifstream landmark_file (options["landmark-file"].as<std::string>().c_str());
 		while (landmark_file >> x >> y) landmarks.push_back (position::cartesian (x, y));
-	}
-
-	return landmark_sensor (
-		options["sensor-range-max"].as<double>(),
-		range_bearing_model::builder (
-			options["sensor-range-stddev"].as<double>(),
-			options["sensor-bearing-stddev"].as<double>()
-		),
-		landmarks
-	);
-}
-
-
-void landmark_sensor::sense (const pose& state, observe_function_type observe, random_source& random) const {
-	for (size_t i = 0; i < landmarks.size(); ++i) {
-		position obs = observation_builder(-state + landmarks[i])(random);
-		if (obs.distance() < max_range) {
-			observe(i, observation_builder(obs));
-			++hits;
-		}
 	}
 }

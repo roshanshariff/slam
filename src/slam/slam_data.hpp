@@ -5,7 +5,11 @@
 #include <map>
 #include <cassert>
 
-#include <boost/signals2.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/enable_shared_from_this.hpp>
+#include <boost/bind.hpp>
+#include <boost/ref.hpp>
+#include <boost/utility.hpp>
 
 #include "utility/arraymap.hpp"
 
@@ -14,7 +18,7 @@
     ActionModel and ObservationModel are the types of distributions over state changes and
     observations, respectively. */
 template <class ControlModel, class ObservationModel>
-class slam_data {
+class slam_data : boost::noncopyable {
 
 public:
 
@@ -23,47 +27,66 @@ public:
 	typedef size_t timestep_t;
 	typedef size_t featureid_t;
 
-	/** The types of distributions over state changes and observations, respectively. */
-	typedef ControlModel control_model_type;
-	typedef ObservationModel observation_model_type;
-    
-    /** The types of controls and observations */
-    typedef typename control_model_type::result_type control_type;
-    typedef typename observation_model_type::result_type observation_type;
-
 	/** Feature observations are stored as an arraymap from the time of an observation to the observation's
-      distribution. Since observations are expected to be added in chronological order, this is much
-      more efficient then using a tree-based map. */
-	typedef arraymap<timestep_t, observation_model_type> observation_data_type;
-
-	/** Action signal handlers are passed the action id just added, whereas observation signal handlers
-      are passed the feature id being observed and the time of the observation. */
-	typedef boost::signals2::signal<void (timestep_t, control_model_type)> control_signal_type;
-	typedef boost::signals2::signal<void (timestep_t, featureid_t, observation_model_type)> observation_signal_type;
-	typedef boost::signals2::signal<void (timestep_t)> timestep_signal_type;
-
-	/** Listeners for action and observation signals. */
-	typedef typename control_signal_type::slot_type control_listener_type;
-	typedef typename observation_signal_type::slot_type observation_listener_type;
-	typedef typename timestep_signal_type::slot_type timestep_listener_type;
-
+     distribution. Since observations are expected to be added in chronological order, this is much
+     more efficient then using a tree-based map. */
+	typedef arraymap<timestep_t, ObservationModel> observation_data_type;
+	
+    class listener : boost::noncopyable, public boost::enable_shared_from_this<listener> {
+        
+        boost::shared_ptr<const slam_data> data_ptr;
+        
+    public:
+        
+        void connect (boost::shared_ptr<const slam_data>);
+        
+        bool is_connected () const { return data_ptr.get() != 0; }
+        
+        const slam_data& data() const { assert (is_connected()); return *data_ptr; }
+        
+        void disconnected () { data_ptr.reset(); }
+        
+        virtual void add_control (timestep_t, const ControlModel&) = 0;
+        
+        virtual void add_observation (timestep_t, featureid_t, const ObservationModel&) = 0;
+        
+        virtual void end_observation (timestep_t) = 0;
+        
+        virtual void end_simulation (timestep_t) = 0;
+        
+        virtual ~listener () { }
+        
+    };
+        
 private:
 
 	/** Actions are stored as a vector of the corresponding distributions. */
-	std::vector<control_model_type> m_controls;
+	std::vector<ControlModel> m_controls;
 
 	std::map<featureid_t, observation_data_type> m_observations;
 
-	mutable control_signal_type m_control_signal;
-	mutable observation_signal_type m_observation_signal;
-	mutable timestep_signal_type m_timestep_signal;
-
+    mutable std::vector<boost::weak_ptr<listener> > m_listeners;
+    
+    template <class Functor>
+    void foreach_listener (const Functor& f) {
+        typename std::vector<boost::weak_ptr<listener> >::iterator iter = m_listeners.begin();
+        while (iter != m_listeners.end()) {
+            if (boost::shared_ptr<listener> l = iter->lock()) {
+                f(l.get());
+                ++iter;
+            }
+            else {
+                iter = m_listeners.erase (iter);
+            }
+        }
+    }
+    
 public:
-
+    
 	timestep_t current_timestep () const { return m_controls.size(); }
 
 	/** Retrieve the state change specified by the given id. */
-	const control_model_type& control (timestep_t timestep) const {
+	const ControlModel& control (timestep_t timestep) const {
 		assert (timestep < current_timestep());
 		return m_controls[timestep];
 	}
@@ -76,37 +99,33 @@ public:
 	}
 
 	/** Add a new state change to the end of the list. */
-	void add_control (const control_model_type& control) {
+	void add_control (const ControlModel& control) {
 		timestep_t timestep = current_timestep();
 		m_controls.push_back (control);
-		m_control_signal (timestep, control);
+        foreach_listener (boost::bind (&listener::add_control, _1, timestep, boost::cref(control)));
 	}
 
 	/** Add a new observation of the specified feature, taken at the current time. */
-	void add_observation (const featureid_t feature, const observation_model_type& obs) {
+	void add_observation (const featureid_t feature, const ObservationModel& obs) {
 		timestep_t timestep = current_timestep();
 		m_observations[feature][timestep] = obs;
-		m_observation_signal (timestep, feature, obs);
+        foreach_listener (boost::bind (&listener::add_observation, _1, timestep, feature, boost::cref(obs)));
 	}
 
-	void timestep () const {
-		m_timestep_signal (current_timestep());
+	void end_observation () {
+        foreach_listener (boost::bind (&listener::end_observation, _1, current_timestep()));
 	}
+    
+    void end_simulation () {
+        foreach_listener (boost::bind (&listener::end_simulation, _1, current_timestep()));
+    }
 
-	/** Connect a listener to receive notifications of new state changes. */
-	boost::signals2::connection connect_control_listener (const control_listener_type& l) const {
-		return m_control_signal.connect(l);
-	}
+};
 
-	/** Connect a listener to receive notifications of new observations. */
-	boost::signals2::connection connect_observation_listener (const observation_listener_type& l) const {
-		return m_observation_signal.connect(l);
-	}
-
-	boost::signals2::connection connect_timestep_listener (const timestep_listener_type& l) const {
-		return m_timestep_signal.connect(l);
-	}
-
-};  
+template <class ControlModel, class ObservationModel>
+void slam_data<ControlModel, ObservationModel>::listener::connect (boost::shared_ptr<const slam_data> data_ptr_) {
+    data_ptr = data_ptr_;
+    data_ptr->m_listeners.push_back (this->shared_from_this());
+}
 
 #endif //_SLAM_SLAM_DATA_HPP

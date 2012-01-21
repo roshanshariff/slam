@@ -3,12 +3,12 @@
 
 #include <string>
 #include <cstdio>
-#include <tr1/memory>
 
+#include <boost/shared_ptr.hpp>
 #include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/signals2.hpp>
+#include <boost/program_options/variables_map.hpp>
 
 #include "slam/slam_data.hpp"
 #include "slam/mcmc_slam.hpp"
@@ -20,30 +20,34 @@
 template <class Controller, class Sensor>
 struct simulator {
 
-	typedef Controller controller_type;
-	typedef typename controller_type::model_type control_model_type;
-
-	typedef Sensor sensor_type;
-	typedef typename sensor_type::model_type observation_model_type;
+	typedef typename Controller::model_type control_model_type;
+	typedef typename Sensor::model_type observation_model_type;
 
 	typedef slam_data<control_model_type, observation_model_type> slam_data_type;
 
+	random_source random;
+    
+    boost::shared_ptr<slam_data_type> data;
+
+private:
+    
     typedef typename slam_data_type::featureid_t featureid_t;
     typedef typename slam_data_type::timestep_t timestep_t;
-    typedef typename slam_data_type::control_type control_type;
-    typedef typename slam_data_type::observation_type observation_type;
-    
-	controller_type& controller;
-	sensor_type& sensor;
-	random_source& random;
 
-	slam_data_type data;
+    typedef typename control_model_type::result_type control_type;
+    typedef typename observation_model_type::result_type observation_type;
+    
+    Controller controller;
+    Sensor sensor;
 
 	bitree<control_type> m_trajectory;
 
-	simulator (controller_type& controller_, sensor_type& sensor_, random_source& random_)
-	: controller(controller_), sensor(sensor_), random(random_) { }
-
+public:
+    
+    simulator (boost::program_options::variables_map& options, unsigned int seed) :
+    random (remember_option (options, "seed", seed)), controller (options), sensor (options),
+    data (boost::make_shared<slam_data_type>()) { }
+    
 	void operator() ();
 
 	control_type current_state () const { return controller.initial_state() + m_trajectory.accumulate(); }
@@ -58,15 +62,15 @@ private:
     template <class FeatureFunctor>
     class for_each_feature_helper {
 
+        const control_type& initial_state;
         FeatureFunctor f;
-        control_type initial_state;
 
     public:
 
-        for_each_feature_helper (const FeatureFunctor& f_, const control_type& initial_state_)
-        : f(f_), initial_state(initial_state_) { }
+        for_each_feature_helper (const control_type& initial_state_, const FeatureFunctor& f_)
+        : initial_state(initial_state_), f(f_) { }
 
-        void operator() (featureid_t feature_id, const observation_type& obs) const {
+        void operator() (featureid_t feature_id, const observation_type& obs) {
             f (feature_id, -initial_state + obs);
         }
 
@@ -78,28 +82,30 @@ private:
 template <class Controller, class Sensor>
 void simulator<Controller, Sensor>::operator() () {
 
-	sensor.sense(current_state(), boost::bind(&slam_data_type::add_observation, &data, _1, _2), random);
-
 	while (!controller.finished()) {
 
-		control_model_type control = controller.control(current_state());
+		sensor.sense (current_state(), random, boost::bind(&slam_data_type::add_observation, data.get(), _1, _2));
+        data->end_observation();
+        
+		control_model_type control = controller.control (current_state());
 		m_trajectory.push_back(control(random));
-		data.add_control(control);
-
-		sensor.sense(current_state(), boost::bind(&slam_data_type::add_observation, &data, _1, _2), random);
-
-		data.timestep();
+		data->add_control (control);
 	}
+
+    sensor.sense (current_state(), random, boost::bind(&slam_data_type::add_observation, data.get(), _1, _2));
+    data->end_observation();
+    
+    data->end_simulation();
 }
 
 
 template <class Controller, class Sensor>
 template <class FeatureFunctor>
 void simulator<Controller, Sensor>::for_each_feature (FeatureFunctor f) const {
-    sensor.for_each_feature (for_each_feature_helper<FeatureFunctor> (f, controller.initial_state()));
+    sensor->for_each_feature (for_each_feature_helper<FeatureFunctor> (controller.initial_state(), f));
 }
 
-
+/*
 template <class SlamData, class SlamImpl>
 class print_map_helper {
 
@@ -107,12 +113,12 @@ class print_map_helper {
 	typedef typename SlamData::observation_type observation_type;
 	typedef typename SlamData::featureid_t featureid_t;
 
-    std::tr1::shared_ptr<FILE> output;
+    boost::shared_ptr<FILE> output;
 	control_type initial_state;
 
 public:
     
-    print_map_helper (std::tr1::shared_ptr<FILE> output_, const control_type& initial_state_)
+    print_map_helper (boost::shared_ptr<FILE> output_, const control_type& initial_state_)
     : output(output_), initial_state(initial_state_) { }
 
 	void operator() (featureid_t feature_id, observation_type obs) const {
@@ -138,7 +144,7 @@ void print_trajectory (const char* filename, const SlamImpl& slam,
                        const typename SlamData::control_type& initial_state)
 {
     typedef typename SlamData::control_type control_type;
-    std::tr1::shared_ptr<FILE> output = open_file (filename, "w");
+    boost::shared_ptr<FILE> output = open_file (filename, "w");
     if (output) {
         const bitree<control_type>& trajectory = slam.trajectory();
         for (size_t i = 0; i <= trajectory.size(); ++i) {
@@ -188,5 +194,7 @@ public:
     }
 
 };
+
+ */
 
 #endif //_SIMULATOR_HPP

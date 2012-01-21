@@ -6,7 +6,6 @@
  */
 
 #include <string>
-#include <iostream>
 #include <fstream>
 #include <cstdlib>
 #include <cassert>
@@ -58,36 +57,35 @@ po::options_description waypoint_controller::program_options () {
 }
 
 
-waypoint_controller waypoint_controller::parse_options (const po::variables_map& options) {
+waypoint_controller::waypoint_controller (const po::variables_map& options) {
 
 	const double RAD_PER_DEG = boost::math::constants::pi<double>() / 180;
 
-	std::vector<position> waypoints;
+	const double dt = options["time-delta"].as<double>();
+
+    model_builder
+    = velocity_model::builder (options["velmodel-alpha1"].as<double>(),
+                               options["velmodel-alpha2"].as<double>(),
+                               options["velmodel-alpha3"].as<double>(),
+                               options["velmodel-alpha4"].as<double>(),
+                               options["velmodel-alpha5"].as<double>(),
+                               options["velmodel-alpha6"].as<double>(),
+                               options["time-delta"].as<double>());
+
 	if (options.count("waypoint-file")) {
 		double x, y;
 		std::ifstream waypoint_file (options["waypoint-file"].as<std::string>().c_str());
 		while (waypoint_file >> x >> y) waypoints.push_back (position::cartesian (x, y));
 	}
-
-	const double dt = options["time-delta"].as<double>();
-
-	return waypoint_controller (
-		options["robot-speed"].as<double>() * dt,
-		options["robot-steering-max"].as<double>() * RAD_PER_DEG,
-		options["robot-steering-rate"].as<double>() * dt * RAD_PER_DEG,
-		waypoints,
-		options["waypoint-proximity"].as<double>(),
-		options["waypoint-repetitions"].as<double>(),
-		velocity_model::builder (
-			options["velmodel-alpha1"].as<double>(),
-			options["velmodel-alpha2"].as<double>(),
-			options["velmodel-alpha3"].as<double>(),
-			options["velmodel-alpha4"].as<double>(),
-			options["velmodel-alpha5"].as<double>(),
-			options["velmodel-alpha6"].as<double>(),
-			options["time-delta"].as<double>()
-		)
-	);
+    
+	speed = options["robot-speed"].as<double>() * dt;
+	steering_max = options["robot-steering-max"].as<double>() * RAD_PER_DEG;
+    steering_rate = options["robot-steering-rate"].as<double>() * dt * RAD_PER_DEG;
+    proximity = options["waypoint-proximity"].as<double>();
+    repetitions = options["waypoint-repetitions"].as<double>();
+    
+    current_steering = 0;
+    current_waypoint = 0;
 }
 
 
