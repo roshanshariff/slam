@@ -32,6 +32,7 @@ public:
 
 	static result_type from_vector (const vector_type& v) { return vector_model_type::from_vector(v); }
 	static vector_type to_vector (const result_type& x) { return vector_model_type::to_vector(x); }
+    static vector_type subtract (const vector_type& a, const vector_type& b) { return vector_model_type::subtract(a,b); }
 
 	const vector_model_type& vector_model () const { return model; }
 	vector_model_type& vector_model () { return model; }
@@ -44,16 +45,18 @@ public:
 
 	double log_likelihood (const result_type& x) const { return vector_model().log_likelihood(to_vector(x)); }
 
-	struct builder : public std::unary_function<result_type, vector_model_adapter<vector_model_type> > {
+	struct builder : public std::unary_function<result_type, vector_model_adapter> {
 
 		typedef typename vector_model_type::builder vector_builder_type;
 
-		const vector_builder_type vector_builder;
+		vector_builder_type vector_builder;
+        
+        builder () { }
 
 		builder (const vector_builder_type& vector_builder_) : vector_builder(vector_builder_) { }
 
-		vector_model_adapter<vector_model_type> operator() (const result_type& x) const {
-			return vector_model_adapter<vector_model_type> (vector_builder (to_vector (x)));
+		vector_model_adapter operator() (const result_type& x) const {
+			return vector_model_adapter (vector_builder (to_vector (x)));
 		}
 
 	};
