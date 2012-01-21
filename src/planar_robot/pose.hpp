@@ -6,7 +6,7 @@
 #include <Eigen/Core>
 
 #include "planar_robot/position.hpp"
-
+#include "utility/geometry.hpp"
 
 namespace planar_robot {
 
@@ -53,6 +53,10 @@ public:
 	vector_type to_vector () const { return vector_type(x(), y(), bearing()); }
 
 	static pose from_vector (const vector_type& v) { return cartesian (v(0), v(1), v(2)); }
+    
+    static vector_type subtract (const vector_type& a, const vector_type& b) {
+        return vector_type (a(0)-b(0), a(1)-b(1), wrap_angle(a(2)-b(2)));
+    }
 
 	pose& operator+= (const pose& p) {
 		translation += rotation * p.translation;

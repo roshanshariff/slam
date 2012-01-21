@@ -42,6 +42,8 @@ public:
 	vector_type to_vector () const { return vector_type (x(), y()); }
 
 	static position from_vector (const vector_type& v) { return cartesian (v(0), v(1)); }
+    
+    static vector_type subtract (const vector_type& a, const vector_type& b) { return a - b; }
 
 	friend class pose;
 	friend position operator+ (const pose&, const position&);
