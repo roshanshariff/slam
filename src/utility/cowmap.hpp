@@ -47,9 +47,17 @@ public:
     
     void clear () { return root().clear(); }
     
+    mapped_type get (const key_type& key) const {
+        return find_subtree(key).value<value_type>.second;
+    }
+    
     bool insert (const value_type& entry) {
         cowtree::editor editor (root());
         return insert (entry, editor);
+    }
+    
+    bool insert (const key_type& key, const mapped_type& value) {
+        return insert (value_type (key, value));
     }
 
     void swap (cowmap& other) { data.swap (other.data); }
