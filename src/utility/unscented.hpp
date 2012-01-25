@@ -45,49 +45,43 @@ public:
  * cross-covariance between the state and its transformation by f.
  */
 template <int N, class StateDist, int M, class ResultDist, class TransformFunc>
-void unscented_transform (const TransformFunc& f,
+void unscented_transform (const unscented_params<N>& params,
         const multivariate_normal_base<N, StateDist>& state,
         multivariate_normal_dense_base<M, ResultDist>& result,
-        const unscented_params<N>& params,
+        const Eigen::Matrix<double, M, M>& noise_chol_cov,
+        TransformFunc f,
         Eigen::Matrix<double, N, M>* cross_cov = 0
 ) {
     
-    const typename ResultDist::vector_type base = f(state.mean());
+    const typename ResultDist::vector_type base = f (state.mean());
+    Eigen::Matrix<double, M, 2*N+M> sigmapts;
 
     const typename StateDist::matrix_type& state_chol_cov = state.derived().chol_cov();
-    Eigen::Matrix<double, M, 2*N> sigmapts;
     for (int i = 0; i < N; ++i) {
-        const vector_type state_innov = params.eta() * state_chol_cov.col(i);
+        const typename StateDist::vector_type state_innov = params.eta() * state_chol_cov.col(i);
         sigmapts.col(i) = ResultDist::subtract (base, f(state.mean() - state_innov));
         sigmapts.col(N+i) = ResultDist::subtract (base, f(state.mean() + state_innov));
     }
 
-    const typename ResultDist::vector_type base_innov = params.weight_rest() * sigmapts.rowwise().sum();
+    const typename ResultDist::vector_type base_innov 
+        = params.weight_rest() * sigmapts.leftCols<2*N>().rowwise().sum();
+
     for (int i = 0; i < 2*N; ++i) sigmapts.col(i) = ResultDist::subtract (base_innov, sigmapts.col(i));
 
     result.mean() = ResultDist::subtract (base, base_innov);
-
+    
+    sigmapts.leftCols<2*N>() *= std::sqrt (params.weight_rest());
+    sigmapts.rightCols<2*N>() = noise_chol_cov;
+    
     result.chol_cov() = sigmapts.transpose().householderQr().matrixQR()
-            .topLeftCorner<M,M>().triangularView<Eigen::Upper>().transpose();
-    result.chol_cov() *= std::sqrt(params.weight_rest());
+        .topLeftCorner<M,M>().triangularView<Eigen::Upper>().transpose();
 
-    cholesky_update (result.sqrt_cov(), base_innov, params.weight_first());
+    cholesky_update (result.chol_cov(), base_innov, params.weight_first());
 
     if (cross_cov) cross_cov->noalias() = params.weight_rest() * params.eta() * state_chol_cov
             * (sigmapts.rightCols<N>().transpose() - sigmapts.leftCols<N>().transpose());
 }
 
-
-/* Modifies the state to take into account a transformation by f; i.e. the prediction step of
- * the Kalman filter.
- */
-template <int N, class StateDist, class PredictFunc>
-void unscented_predict (const PredictFunc& f,
-        multivariate_normal_dense_base<N, StateDist>& state,
-        const unscented_params<N>& params)
-{
-    unscented_transform (f, state, state, params);
-}
 
 
 /* Modifies the state to take into account measurements under h.
@@ -96,31 +90,29 @@ void unscented_predict (const PredictFunc& f,
  * observation parameter).
  */
 template <int N, class StateDist, int M, class ObsDist, class ObsFunc>
-void unscented_update (const ObsFunc& h,
+void unscented_update (const unscented_params<N>& params,
         multivariate_normal_dense_base<N, StateDist>& state,
         const multivariate_normal_base<M, ObsDist>& obs,
-        const unscented_params<N>& params
+        ObsFunc h
 ) {
 
     multivariate_normal_dense_adapter<ObsDist> predicted;
     Eigen::Matrix<double, N, M> cross_cov;
 
-    unscented_transform (h, state, predicted, params, &cross_cov)
+    unscented_transform (params, state, predicted, obs.derived().chol_cov(), h, &cross_cov);
 
-    const typename ObsDist::matrix_type& obs_chol_cov = observation.derived().chol_cov();
-    for (int i = 0; i < M; ++i) cholesky_update (predicted.sqrt_cov(), obs_chol_cov.col(i));
-
-    Eigen::Matrix<double, N, M> kalman_gain =
-            predicted.chol_cov().triangularView<Eigen::Lower>().transpose().jacobiSvd().solve(
-                    predicted.chol_cov().triangularView<Eigen::Lower>().jacobiSvd().solve(
-                            cross_cov.transpose()
-                    )
-            ).transpose();
+    Eigen::Matrix<double, N, M> kalman_gain
+        = predicted.chol_cov().triangularView<Eigen::Lower>().transpose().jacobiSvd().solve(
+            predicted.chol_cov().triangularView<Eigen::Lower>().jacobiSvd().solve(
+                cross_cov.transpose()
+            )
+        ).transpose();
 
     state.mean().noalias() += kalman_gain * ObsDist::subtract(observation.mean(), predicted.mean());
 
     kalman_gain.noalias() *= predicted.chol_cov();
-    for (int i = 0; i < M; ++i) cholesky_downdate(state.chol_cov(), kalman_gain.col(i));
+    
+    for (int i = 0; i < M; ++i) cholesky_downdate (state.chol_cov(), kalman_gain.col(i));
 }
 
 #endif /* UNSCENTED_HPP_ */
