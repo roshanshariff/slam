@@ -6,6 +6,7 @@
 #include <cassert>
 #include <cmath>
 
+#include <boost/shared_ptr.hpp>
 #include <boost/program_options.hpp>
 
 #include "slam/slam_data.hpp"
@@ -75,7 +76,10 @@ public:
 	virtual void end_observation (timestep_t);
     virtual void end_simulation (timestep_t);
 
-	const bitree<control_type>& trajectory () const { return state_estimates; }
+    boost::shared_ptr<const bitree<control_type> > trajectory_estimate () const {
+        return boost::shared_ptr<const bitree<control_type> > (this->shared_from_this(), &state_estimates);
+    }
+    
 	template <class FeatureFunctor> void for_each_feature (FeatureFunctor) const;
 
 private:
