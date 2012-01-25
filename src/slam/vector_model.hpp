@@ -51,8 +51,6 @@ public:
 
 		vector_builder_type vector_builder;
         
-        builder () { }
-
 		builder (const vector_builder_type& vector_builder_) : vector_builder(vector_builder_) { }
 
 		vector_model_adapter operator() (const result_type& x) const {
