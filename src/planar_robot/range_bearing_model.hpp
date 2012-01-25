@@ -42,8 +42,6 @@ struct range_bearing_model : public independent_normal_base<2, range_bearing_mod
 
 	public:
         
-        builder () { }
-
 		builder (double range_stddev, double bearing_stddev) : stddev(range_stddev, bearing_stddev) { }
 
 		range_bearing_model operator() (const vector_type& observation) const {

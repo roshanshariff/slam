@@ -44,8 +44,6 @@ struct odometry_model : public independent_normal_base<3, odometry_model> {
 
 	public:
         
-        builder () { }
-
 		builder (double a1, double a2, double a3, double a4) {
 			mat_stddev << a3, a4, a4,
 					      a2, a1,  0,

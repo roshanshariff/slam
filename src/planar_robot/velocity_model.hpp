@@ -58,8 +58,6 @@ struct velocity_model : public independent_normal_base<3, velocity_model> {
 
 	public:
         
-        builder () { }
-
 		builder (double a1, double a2, double a3, double a4, double a5, double a6, double _dt) : dt(_dt) {
 			mat_stddev << a1, a2, 0,
 					      a3, a4, 0,
