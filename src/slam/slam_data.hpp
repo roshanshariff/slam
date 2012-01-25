@@ -44,15 +44,15 @@ public:
         
         const slam_data& data() const { assert (is_connected()); return *data_ptr; }
         
-        void disconnected () { data_ptr.reset(); }
+        void disconnect () { data_ptr.reset(); }
         
-        virtual void add_control (timestep_t, const ControlModel&) = 0;
+        virtual void add_control (timestep_t, const ControlModel&) { }
         
-        virtual void add_observation (timestep_t, featureid_t, const ObservationModel&) = 0;
+        virtual void add_observation (timestep_t, featureid_t, const ObservationModel&) { }
         
-        virtual void end_observation (timestep_t) = 0;
+        virtual void end_observation (timestep_t) { }
         
-        virtual void end_simulation (timestep_t) = 0;
+        virtual void end_simulation (timestep_t) { }
         
         virtual ~listener () { }
         
