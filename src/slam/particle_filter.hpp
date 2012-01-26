@@ -46,6 +46,9 @@ public:
     template <class Updater>
     void update ();
     
+    const T& operator[] (size_t index) const { return particles[index].data; }
+    T& operator[] (size_t index) { return particles[index].data; }
+    
     const T& max_weight_particle () const {
         return std::max_element (particles.begin(), particles.end())->data;
     }
