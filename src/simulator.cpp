@@ -38,6 +38,7 @@ struct sim_types {
     
     typedef slam_data<control_model_type, observation_model_type> slam_data_type;
     typedef mcmc_slam<control_model_type, observation_model_type> mcmc_slam_type;
+    typedef fastslam<control_model_type, observation_model_type> fastslam_type;
     
 };
 
@@ -53,8 +54,12 @@ int main (int argc, char* argv[]) {
     sim_types::simulator_type sim (options, (unsigned int) std::time(0));
     
     boost::shared_ptr<sim_types::mcmc_slam_type> mcmc_slam
-    = boost::make_shared<sim_types::mcmc_slam_type> (boost::ref (options), sim.random());
+    = boost::make_shared<sim_types::mcmc_slam_type> (boost::ref(options), sim.random());
     mcmc_slam->connect (sim.data);
+    
+    boost::shared_ptr<sim_types::fastslam_type> fastslam
+    = boost::make_shared<sim_types::fastslam_type> (boost::ref(options), sim.random());
+    fastslam->connect (sim.data);
     
     /* set up simulation logging */
     
@@ -100,6 +105,7 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
 		("controller-help", "controller options")
 		("sensor-help", "sensor options")
 		("mcmc-slam-help", "MCMC-SLAM options")
+        ("fastslam-help", "FastSLAM 2.0 options")
 		("config-file,f", po::value<std::vector<std::string> >()->composing(), "configuration files");
 
 	po::options_description general_options ("General Options");
@@ -111,10 +117,13 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
 
 	po::options_description controller_options = sim_types::controller_type::program_options();
 	po::options_description sensor_options = sim_types::sensor_type::program_options();
-	po::options_description mcmc_options = sim_types::mcmc_slam_type::program_options();
+	po::options_description mcmc_slam_options = sim_types::mcmc_slam_type::program_options();
+    po::options_description fastslam_options = sim_types::fastslam_type::program_options();
 
 	po::options_description config_options;
-	config_options.add(general_options).add(controller_options).add(sensor_options).add(mcmc_options);
+	config_options
+    .add(general_options).add(controller_options).add(sensor_options)
+    .add(mcmc_slam_options).add(fastslam_options);
 
 	po::options_description all_options;
 	all_options.add(command_line_options).add(config_options);
@@ -142,7 +151,12 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
 	}
     
 	if (values.count("mcmc-slam-help")) {
-		help_options.add(mcmc_options);
+		help_options.add(mcmc_slam_options);
+        help_requested = true;
+	}
+    
+	if (values.count("fastslam-help")) {
+		help_options.add(fastslam_options);
         help_requested = true;
 	}
     
