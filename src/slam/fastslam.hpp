@@ -299,10 +299,10 @@ template <class ControlModel, class ObservationModel>
 boost::program_options::options_description fastslam<ControlModel, ObservationModel>
 ::program_options () {
 	namespace po = boost::program_options;
-	po::options_description options ("MCMC-SLAM Parameters");
+	po::options_description options ("FastSLAM 2.0 Parameters");
 	options.add_options()
     ("num-particles", po::value<size_t>()->default_value(10), "Number of particles in the particle filter")
-    ("resample-threshold", po::value<double>()->default_value(0.6), "Ratio of effective particles before resampling")
+    ("resample-threshold", po::value<double>()->default_value(0.5), "Minimum ratio of effective particles")
     ("particle-trajectory", "Keep per-particle trajectory information")
     ("ukf-alpha", po::value<double>()->default_value(0.002), "The alpha parameter for the scaled UKF")
     ("ukf-beta", po::value<double>()->default_value(2), "The beta parameter for the scaled UKF")
