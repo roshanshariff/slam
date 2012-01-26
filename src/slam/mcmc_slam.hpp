@@ -57,15 +57,15 @@ class mcmc_slam : public slam_data<ControlModel, ObservationModel>::listener {
 
 	};
 
+    /** Our very own pseudo-random number generator. */
+	mutable random_source random;
+    
 	/** MCMC Constants. mcmc_steps is the number of iterations per update. The action and observation
      dimensions are a measure of the number of independent parameters represented by each type of
      edge. */
 	unsigned int mcmc_steps;
 	double control_edge_importance;
 	double observation_edge_importance;
-    
-    /** Our very own pseudo-random number generator. */
-	random_source random;
     
 	/** The current action edge labels and the corresponding edge weights. */
 	bitree<control_type> state_estimates;
@@ -353,7 +353,8 @@ void mcmc_slam<ControlModel, ObservationModel>
 /** Returns current estimates of the positions of all observed features. */
 template <class ControlModel, class ObservationModel>
 template <class FeatureFunctor>
-void mcmc_slam<ControlModel, ObservationModel>::for_each_feature (FeatureFunctor f) const {
+void mcmc_slam<ControlModel, ObservationModel>
+::for_each_feature (FeatureFunctor f) const {
 	for (size_t i = 0; i < feature_estimates.size(); ++i) { // iterate through each feature
         const feature_estimate& feature = feature_estimates[i];
 		f (feature.feature_id(), state_estimates.accumulate(feature.parent_timestep) + feature.estimate);
@@ -362,23 +363,25 @@ void mcmc_slam<ControlModel, ObservationModel>::for_each_feature (FeatureFunctor
 
 
 template <class ControlModel, class ObservationModel>
-boost::program_options::options_description mcmc_slam<ControlModel, ObservationModel>::program_options () {
+boost::program_options::options_description mcmc_slam<ControlModel, ObservationModel>
+::program_options () {
 	namespace po = boost::program_options;
 	po::options_description options ("MCMC-SLAM Parameters");
 	options.add_options()
-		("mcmc-steps", po::value<unsigned int>()->default_value(1), "MCMC iterations per simulation step")
-		("control-edge-importance", po::value<double>()->default_value(ControlModel::vector_dim), "degrees of freedom for control edges")
-		("observation-edge-importance", po::value<double>()->default_value(ObservationModel::vector_dim), "degrees of freedom for observation edges")
-        ("mcmc-slam-seed", po::value<unsigned int>(), "MCMC-SLAM random seed");
+    ("mcmc-steps", po::value<unsigned int>()->default_value(1), "MCMC iterations per simulation step")
+    ("control-edge-importance", po::value<double>()->default_value(ControlModel::vector_dim), "degrees of freedom for control edges")
+    ("observation-edge-importance", po::value<double>()->default_value(ObservationModel::vector_dim), "degrees of freedom for observation edges")
+    ("mcmc-slam-seed", po::value<unsigned int>(), "MCMC-SLAM random seed");
 	return options;
 }
 
 
 template <class ControlModel, class ObservationModel>
-mcmc_slam<ControlModel, ObservationModel>::mcmc_slam (boost::program_options::variables_map& options, unsigned int seed)
-: mcmc_steps                (options["mcmc-steps"].as<unsigned int>()),
+mcmc_slam<ControlModel, ObservationModel>
+::mcmc_slam (boost::program_options::variables_map& options, unsigned int seed)
+: random                    (remember_option (options, "mcmc-slam-seed", seed)),
+mcmc_steps                  (options["mcmc-steps"].as<unsigned int>()),
 control_edge_importance     (options["control-edge-importance"].as<double>()),
-observation_edge_importance (options["observation-edge-importance"].as<double>()),
-random                      (remember_option (options, "mcmc-slam-seed", seed)) { }
+observation_edge_importance (options["observation-edge-importance"].as<double>()) { }
 
 #endif //_SLAM_MCMC_SLAM_HPP
