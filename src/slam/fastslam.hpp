@@ -61,39 +61,12 @@ class fastslam : public slam_data<ControlModel, ObservationModel>::listener {
     typedef vector_model_adapter <multivariate_normal_adapter<feature_type> > feature_dist;
 
     
-    /** Functors */
+    /** Nested types */
     
-    struct state_predictor {
-        const state_type& state;
-        state_predictor (const state_type& state) : state(state) { }
-        state_vector_type operator() (const control_vector_type& control) const {
-            return (state + ControlModel::from_vector (control)).to_vector();
-        }
-    };
-    
-    struct state_feature_observer {
-        observation_vector_type operator() (const Eigen::Matrix<double, state_dim+feature_dim, 1>& vec) const {
-            state_type state = state_type::from_vector (vec.template head<state_dim>());
-            feature_type feature = feature_type::from_vector (vec.template tail<feature_dim>());
-            return ObservationModel::to_vector (-state + feature);
-        }
-    };
-    
-    struct feature_observer {
-        const state_type& state;
-        feature_observer (const state_type& state) : state(state) { }
-        observation_vector_type operator() (const feature_vector_type& feature) const {
-            return ObservationModel::to_vector (-state + feature_type::from_vector (feature));
-        }
-    };
-    
-    struct feature_initializer {
-        const state_type& state;
-        feature_initializer (const state_type& state) : state(state) { }
-        feature_vector_type operator() (const observation_vector_type& obs) const {
-            return (state + ObservationModel::from_vector(obs)).to_vector();
-        }
-    };
+    struct state_predictor;
+    struct state_feature_observer;
+    struct feature_observer;
+    struct feature_initializer;
     
     struct particle_type {
         struct trajectory_type {
@@ -117,7 +90,7 @@ class fastslam : public slam_data<ControlModel, ObservationModel>::listener {
     size_t num_particles;
     double resample_threshold;
 
-    bool keep_particle_trajectory;
+    const bool keep_particle_trajectory;
     bitree<state_type> trajectory;
 
     const struct unscented_params_holder {
@@ -146,6 +119,50 @@ public:
     virtual void add_observation (timestep_t, featureid_t, const ObservationModel&, bool new_feature);
     virtual void end_observation (timestep_t);
     
+};
+
+
+template <class ControlModel, class ObservationModel>
+struct fastslam<ControlModel, ObservationModel>
+::state_predictor {
+    const state_type& state;
+    state_predictor (const state_type& state) : state(state) { }
+    state_vector_type operator() (const control_vector_type& control) const {
+        return (state + ControlModel::from_vector (control)).to_vector();
+    }
+};
+
+
+template <class ControlModel, class ObservationModel>
+struct fastslam<ControlModel, ObservationModel>
+::state_feature_observer {
+    observation_vector_type operator() (const Eigen::Matrix<double, state_dim+feature_dim, 1>& vec) const {
+        state_type state = state_type::from_vector (vec.template head<state_dim>());
+        feature_type feature = feature_type::from_vector (vec.template tail<feature_dim>());
+        return ObservationModel::to_vector (-state + feature);
+    }
+};
+
+
+template <class ControlModel, class ObservationModel>
+struct fastslam<ControlModel, ObservationModel>
+::feature_observer {
+    const state_type& state;
+    feature_observer (const state_type& state) : state(state) { }
+    observation_vector_type operator() (const feature_vector_type& feature) const {
+        return ObservationModel::to_vector (-state + feature_type::from_vector (feature));
+    }
+};
+
+
+template <class ControlModel, class ObservationModel>
+struct fastslam<ControlModel, ObservationModel>
+::feature_initializer {
+    const state_type& state;
+    feature_initializer (const state_type& state) : state(state) { }
+    feature_vector_type operator() (const observation_vector_type& obs) const {
+        return (state + ObservationModel::from_vector(obs)).to_vector();
+    }
 };
 
 
