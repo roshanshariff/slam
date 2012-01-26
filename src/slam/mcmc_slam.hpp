@@ -1,11 +1,11 @@
 #ifndef _SLAM_MCMC_SLAM_HPP
 #define _SLAM_MCMC_SLAM_HPP
 
-#include <map>
-#include <utility>
 #include <cassert>
 #include <cmath>
 
+#include <boost/container/vector.hpp>
+#include <boost/container/flat_map.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/program_options.hpp>
 
@@ -38,21 +38,31 @@ class mcmc_slam : public slam_data<ControlModel, ObservationModel>::listener {
 	/** All the information about each feature for MCMC SLAM. Stores a reference to the observations
       of this feature from slam_data, an estimate for this feature, and the time step relative
       to which the estimate is computed. */
-	struct feature_estimate {
-		const typename slam_data_type::observation_data_type& observations;
+	class feature_estimate {
+
+		typename slam_data_type::feature_iterator feature_iter;
+        
+    public:
+
+        timestep_t parent_timestep;
 		observation_type estimate;
-		timestep_t parent_timestep;
-		feature_estimate (const typename slam_data_type::observation_data_type& obs,
-				const observation_type& est, timestep_t t)
-		: observations(obs), estimate(est), parent_timestep(t) { }
+
+		feature_data (timestep_t timestep, const observation_type& est,
+                      typename slam_data_type::feature_iterator iter)
+		: parent_timestep(timestep), estimate(est), feature_iter(iter) { }
+        
+        featureid_t feature_id () const { return feature_iter->first; }
+        
+        const typename slam_data_type::feature_data_type& data () const { return feature_iter->second; }
+
 	};
 
 	/** MCMC Constants. mcmc_steps is the number of iterations per update. The action and observation
      dimensions are a measure of the number of independent parameters represented by each type of
      edge. */
-	const unsigned int mcmc_steps;
-	const double control_edge_importance;
-	const double observation_edge_importance;
+	unsigned int mcmc_steps;
+	double control_edge_importance;
+	double observation_edge_importance;
     
     /** Our very own pseudo-random number generator. */
 	random_source random;
@@ -62,7 +72,7 @@ class mcmc_slam : public slam_data<ControlModel, ObservationModel>::listener {
 	bitree<double> state_weights;
 
 	/** The current feature edge labels and the corresponding edge weights. */
-    std::map<featureid_t, feature_estimate> feature_estimates;
+    boost::container::vector<feature_estimate> feature_estimates;
 	bitree<double> feature_weights;
 
 public:
@@ -72,9 +82,8 @@ public:
 	static boost::program_options::options_description program_options ();
 
 	virtual void add_control (timestep_t, const ControlModel&);
-	virtual void add_observation (timestep_t, featureid_t, const ObservationModel&);
+	virtual void add_observation (timestep_t, featureid_t, const ObservationModel&, bool new_feature);
 	virtual void end_observation (timestep_t);
-    virtual void end_simulation (timestep_t);
 
     boost::shared_ptr<const bitree<control_type> > trajectory_estimate () const {
         return boost::shared_ptr<const bitree<control_type> > (this->shared_from_this(), &state_estimates);
@@ -87,7 +96,7 @@ private:
     void update ();
 	void update_trajectory (timestep_t);
 	double state_change (timestep_t) const;
-	void update_feature (featureid_t);
+	void update_feature (size_t);
 
 	/** Calculates the edge weight given the probability distribution and label. Uses the formula
       p_e(x) = k * J_e(x)^(-1/k) where p_e is the edge weight, x is the edge label, and J_e is
@@ -126,30 +135,13 @@ void mcmc_slam<ControlModel, ObservationModel>
 /** Called by slam_data whenever a new observation is added. */
 template <class ControlModel, class ObservationModel>
 void mcmc_slam<ControlModel, ObservationModel>
-::add_observation (timestep_t timestep, featureid_t feature_id, const ObservationModel& obs) {
-    
-    // Use the mean of the distribution as the initial estimate
-    observation_type initial_estimate = obs.mean();
-    
-	// Try to insert a new feature_estimate storing a reference to that feature's observations.
-	std::pair<typename std::map<featureid_t, feature_estimate>::iterator, bool> result
-    = feature_estimates.insert (
-			std::make_pair (feature_id, feature_estimate (
-					this->data().observations(feature_id), initial_estimate, timestep
-			))
-	);
-
-	// If insertion succeeds (i.e. feature has not been previously observed) initialise the estimate.
-	if (result.second) {
-
-		feature_estimate& feature = result.first->second;
-
-		// feature_weights must be large enough to hold this feature's weight.
-		if (feature_weights.size() <= feature_id) feature_weights.resize(feature_id+1);
-
-		// Compute the feature's edge weight using the distribution and the initial estimate.
-		feature_weights[feature_id] = edge_weight (obs, feature.estimate);
-	}
+::add_observation (timestep_t timestep, featureid_t feature_id, const ObservationModel& obs, bool new_feature) {
+    assert (feature_estimates.size() == feature_weights.size());
+    if (new_feature) {
+        observation_type initial_estimate = obs.mean();
+        feature_estimates.emplace_back (timestep, initial_estimate, this->data().feature_find(feature_id));
+        feature_weights.push_back (edge_weight (obs, initial_estimate));
+    }
 }
 
 
@@ -159,12 +151,6 @@ void mcmc_slam<ControlModel, ObservationModel>
 ::end_observation (timestep_t) {
     for (int i = 0; i < mcmc_steps; ++i) update();
 }
-
-
-// Nothing special to do when simulation ends
-template <class ControlModel, class ObservationModel>
-void mcmc_slam<ControlModel, ObservationModel>
-::end_simulation (timestep_t) { }
 
 
 // Performs the MCMC SLAM update step
@@ -188,13 +174,11 @@ void mcmc_slam<ControlModel, ObservationModel>
     
     if (state_range < state_weight) {
         // Identify the time step in whose interval the randomly selected number lies.
-        timestep_t timestep = state_weights.binary_search (state_range);
-        update_trajectory (timestep);
+        update_trajectory (state_weights.binary_search (state_range));
     }
     else if (feature_weight > 0) {
         // Identify the feature in whose interval the randomly selected number lies.
-        featureid_t feature = feature_weights.binary_search (feature_range);
-        update_feature (feature);
+        update_feature (feature_weights.binary_search (feature_range));
     }
 }
 
@@ -249,28 +233,27 @@ void mcmc_slam<ControlModel, ObservationModel>
 template <class ControlModel, class ObservationModel>
 double mcmc_slam<ControlModel, ObservationModel>
 ::state_change (const timestep_t timestep) const {
-
+    
 	double result = 0.0; // Initialise log probability to zero.
 
-	typename std::map<featureid_t, feature_estimate>::const_iterator i = feature_estimates.begin();
+    for (size_t i = 0; i < feature_estimates.size(); ++i) { // iterate over all observed features.
 
-	for (; i != feature_estimates.end(); ++i) { // iterate over all observed features.
+		const feature_estimate& feature = feature_estimates[i];
 
-		const feature_estimate& feature = i->second;
-
-		typename slam_data_type::observation_data_type::const_iterator j, end; // the range of observations to consider
+        // the range of observations to consider
+		typename slam_data_type::feature_data_type::const_iterator j, end;
 
 		if (feature.parent_timestep <= timestep) {
 			// The feature edge lies in T1 since its parent action is before the modified action edge.
 			// The observations to consider are all those in T2, i.e. after the modified action.
-			j = feature.observations.upper_bound(timestep);
-			end = feature.observations.end();
+			j = feature.data().upper_bound(timestep);
+			end = feature.data().end();
 		}
 		else {
 			// The feature edge lies in T2 since its parent action is after the modified action edge.
 			// The features to consider are all those in T1, i.e. before the modified action.
-			j = feature.observations.begin();
-			end = feature.observations.upper_bound(timestep);
+			j = feature.data().begin();
+			end = feature.data().upper_bound(timestep);
 		}
 
 		// The position of the feature, stored as an observation relative to the observation_base.
@@ -278,8 +261,7 @@ double mcmc_slam<ControlModel, ObservationModel>
 		observation_type observation = feature.estimate;
 		timestep_t observation_base = feature.parent_timestep;
 
-		// Loop over all observations of this feature.
-		for (; j != end; ++j) {
+		for (; j != end; ++j) { // iterate over observations of this feature.
 
 			// Each observation is relative to a different action. Computes the state change between the old
 			// base of observation (which is initially the parent action) and the current base of the
@@ -308,17 +290,13 @@ double mcmc_slam<ControlModel, ObservationModel>
     of the feature whose estimate is being modified. */
 template <class ControlModel, class ObservationModel>
 void mcmc_slam<ControlModel, ObservationModel>
-::update_feature (const featureid_t feature_id) {
-
-	// Retrieve the feature estimate to be updated.
-	typename std::map<featureid_t, feature_estimate>::iterator feature_iter = feature_estimates.find (feature_id);
-	assert (feature_iter != feature_estimates.end());
-	feature_estimate& feature = feature_iter->second;
+::update_feature (size_t feature_index) {
+    
+	feature_estimate& feature = feature_estimates[feature_index];
 
 	// Find the associated distribution corresponding to the observation from the parent action of
 	// this feature.
-	const ObservationModel& distribution
-	= feature.observations.find(feature.parent_timestep)->second;
+	const ObservationModel& distribution = feature.data().at(feature.parent_timestep);
 
 	// Compute a new estimate of this feature's position as a random sample from the associated distribution,
 	// and compute a new edge weight accordingly.
@@ -334,8 +312,8 @@ void mcmc_slam<ControlModel, ObservationModel>
 	double acceptance_probability = 0.0; // log of the acceptance probability.
 
 	// Iterate over all observations of this feature.
-	typename slam_data_type::observation_data_type::const_iterator i = feature.observations.begin();
-	for (; i != feature.observations.end(); ++i) {
+	typename slam_data_type::feature_data_type::const_iterator i = feature.data().begin();
+	for (; i != feature.data().end(); ++i) {
 
 		// Ignore the observation edge that is in the spanning tree of the inference graph.
 		if (i->first == feature.parent_timestep) continue;
@@ -343,7 +321,7 @@ void mcmc_slam<ControlModel, ObservationModel>
 		// Each observation is relative to a different action. Computes the state change between the old
 		// base of observation (which is initially the parent action) and the current base of the
 		// observation.
-		const control_type action_difference  = state_estimates.accumulate (observation_base, i->first);
+		const control_type state_change = state_estimates.accumulate (observation_base, i->first);
 		observation_base = i->first;
 
 		// Retrieve the distribution associated with this observation edge.
@@ -351,23 +329,23 @@ void mcmc_slam<ControlModel, ObservationModel>
 
 		// Update the new observation by rebasing it relative to the current action and multiply the
 		// corresponding probability to the running total (i.e. add the log probability).
-		new_observation = -action_difference + new_observation;
+		new_observation = -state_change + new_observation;
 		acceptance_probability += distribution.log_likelihood(new_observation);
 
 		// Update the old observation by rebasing it relative to the current action and divide the
 		// corresponding probability from the running total (i.e. subtract the log probability).
-		old_observation = -action_difference + old_observation;
+		old_observation = -state_change + old_observation;
 		acceptance_probability -= distribution.log_likelihood(old_observation);
 	}
 
 	// Compute the acceptance probability as the ratio of probabilities of the new and the old estimates,
 	// multiplied by the ratio between the new and the old edge weights.
-	acceptance_probability = std::exp(acceptance_probability) * new_feature_weight / feature_weights[feature_id];
+	acceptance_probability = std::exp(acceptance_probability) * new_feature_weight / feature_weights[feature_index];
 
 	// If the change was accepted, replace the old estimate and edge weight by the new ones.
 	if (random.uniform() < acceptance_probability) {
 		feature.estimate = new_estimate;
-		feature_weights[feature_id] = new_feature_weight;
+		feature_weights[feature_index] = new_feature_weight;
 	}
 }
 
@@ -376,11 +354,9 @@ void mcmc_slam<ControlModel, ObservationModel>
 template <class ControlModel, class ObservationModel>
 template <class FeatureFunctor>
 void mcmc_slam<ControlModel, ObservationModel>::for_each_feature (FeatureFunctor f) const {
-	typename std::map<featureid_t, feature_estimate>::const_iterator i = feature_estimates.begin();
-	for (; i != feature_estimates.end(); ++i) { // iterate through each feature
-		featureid_t feature_id = i->first;
-		const feature_estimate& feature = i->second;
-		f (feature_id, state_estimates.accumulate(feature.parent_timestep) + feature.estimate);
+	for (size_t i = 0; i < feature_estimates.size(); ++i) { // iterate through each feature
+        const feature_estimate& feature = feature_estimates[i];
+		f (feature.feature_id(), state_estimates.accumulate(feature.parent_timestep) + feature.estimate);
 	}
 }
 
