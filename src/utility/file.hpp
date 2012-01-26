@@ -9,15 +9,12 @@
 #ifndef slam_file_hpp
 #define slam_file_hpp
 
-#include <boost/shared_ptr.hpp>
 #include <cstdio>
 
-inline boost::shared_ptr<FILE> open_file (const char* filename, const char* mode) {
-    return boost::shared_ptr<FILE> (std::fopen (filename, mode), &std::fclose);
-}
+#include <boost/shared_ptr.hpp>
 
-inline boost::shared_ptr<FILE> open_process (const char* command, const char* mode) {
-    return boost::shared_ptr<FILE> (std::popen (filename, mode), &std::pclose);
-}
+boost::shared_ptr<FILE> open_file (const char* filename, const char* mode);
+
+boost::shared_ptr<FILE> open_process (const char* command, const char* mode);
 
 #endif
