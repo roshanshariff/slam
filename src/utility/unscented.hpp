@@ -96,7 +96,7 @@ void unscented_update (const unscented_params<N>& params,
         ObsFunc h
 ) {
 
-    multivariate_normal_dense_adapter<ObsDist> predicted;
+    multivariate_normal_adapter<ObsDist> predicted;
     Eigen::Matrix<double, N, M> cross_cov;
 
     unscented_transform (params, state, predicted, obs.derived().chol_cov(), h, &cross_cov);

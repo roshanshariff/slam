@@ -169,20 +169,29 @@ struct multivariate_normal_dist : public multivariate_normal_dense_base<N, multi
 
 
 template <class Adapted>
-struct multivariate_normal_dense_adapter
-: public multivariate_normal_dense_base<Adapted::vector_dim, multivariate_normal_dense_adapter<Adapted> > {
+struct multivariate_normal_adapter
+: public multivariate_normal_dense_base<Adapted::vector_dim, multivariate_normal_adapter<Adapted> > {
     
-	typedef multivariate_normal_dense_base<Adapted::vector_dim, multivariate_normal_dense_adapter> base_type;
+	typedef multivariate_normal_dense_base<Adapted::vector_dim, multivariate_normal_adapter> base_type;
 	typedef typename base_type::vector_type vector_type;
 	typedef typename base_type::matrix_type matrix_type;
     
-	multivariate_normal_dense_adapter () { }
+    typedef Adapted associated_type;
     
-	multivariate_normal_dense_adapter (const vector_type& mean, const matrix_type& cov)
-	: base_type(mean, cov) { }
+	multivariate_normal_adapter () { }
+    
+	multivariate_normal_adapter (const vector_type& mean, const matrix_type& cov) : base_type(mean, cov) { }
     
 	static vector_type subtract (const vector_type& a, const vector_type& b) {
-        return Adapted::subtract(a, b);
+        return associated_type::subtract (a, b);
+    }
+    
+    static vector_type to_vector (const associated_type& value) {
+        return value.to_vector();
+    }
+    
+    static associated_type from_vector (const vector_type& v) {
+        return associated_type::from_vector (v);
     }
     
 };
