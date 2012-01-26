@@ -1,17 +1,17 @@
 #ifndef _SLAM_SLAM_DATA_HPP
 #define _SLAM_SLAM_DATA_HPP
 
-#include <vector>
-#include <map>
 #include <cassert>
+#include <utility>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/container/map.hpp>
+#include <boost/container/flat_map.hpp>
 #include <boost/bind.hpp>
 #include <boost/ref.hpp>
 #include <boost/utility.hpp>
-
-#include "utility/arraymap.hpp"
 
 /** This class stores a record of all state changes and observations, as probability distributions.
     It is also responsible for notifying listeners when new state changes and observations are added.
@@ -30,7 +30,8 @@ public:
 	/** Feature observations are stored as an arraymap from the time of an observation to the observation's
      distribution. Since observations are expected to be added in chronological order, this is much
      more efficient then using a tree-based map. */
-	typedef arraymap<timestep_t, ObservationModel> observation_data_type;
+	typedef boost::container::flat_map<timestep_t, ObservationModel> feature_data_type;
+    typedef boost::container::map<featureid_t, feature_data_type>::const_iterator feature_iterator;
 	
     class listener : boost::noncopyable, public boost::enable_shared_from_this<listener> {
         
@@ -42,13 +43,13 @@ public:
         
         bool is_connected () const { return data_ptr.get() != 0; }
         
-        const slam_data& data() const { assert (is_connected()); return *data_ptr; }
+        const slam_data& data() const { assert(is_connected()); return *data_ptr; }
         
         void disconnect () { data_ptr.reset(); }
         
         virtual void add_control (timestep_t, const ControlModel&) { }
         
-        virtual void add_observation (timestep_t, featureid_t, const ObservationModel&) { }
+        virtual void add_observation (timestep_t, featureid_t, const ObservationModel&, bool new_feature) { }
         
         virtual void end_observation (timestep_t) { }
         
@@ -60,57 +61,46 @@ public:
         
 private:
 
-	/** Actions are stored as a vector of the corresponding distributions. */
-	std::vector<ControlModel> m_controls;
-
-	std::map<featureid_t, observation_data_type> m_observations;
-
-    mutable std::vector<boost::weak_ptr<listener> > m_listeners;
+	boost::container::vector<ControlModel> m_controls;
+    boost::container::map<featureid_t, feature_data_type> m_features;
+    mutable boost::container::vector<boost::weak_ptr<listener> > m_listeners;
     
-    template <class Functor>
-    void foreach_listener (const Functor& f) {
-        typename std::vector<boost::weak_ptr<listener> >::iterator iter = m_listeners.begin();
-        while (iter != m_listeners.end()) {
-            if (boost::shared_ptr<listener> l = iter->lock()) {
-                f(l.get());
-                ++iter;
-            }
-            else {
-                iter = m_listeners.erase (iter);
-            }
-        }
-    }
+    template <class Functor> void foreach_listener (Functor);
     
 public:
     
-	timestep_t current_timestep () const { return m_controls.size(); }
+	timestep_t current_timestep () const {
+        return m_controls.size();
+    }
 
-	/** Retrieve the state change specified by the given id. */
+	/** Retrieve controls. */
+
 	const ControlModel& control (timestep_t timestep) const {
-		assert (timestep < current_timestep());
-		return m_controls[timestep];
-	}
+        return m_controls.at(timestep);
+    }
+    
+    /** Retrieve observations. */
+    
+    feature_iterator feature_begin () const { return m_features.begin(); }
+    feature_iterator feature_end () const { return m_features.begin(); }
+    
+    feature_iterator find_feature (featureid_t feature_id) const {
+        return m_features.find (feature_id);
+    }
 
-	/** Retrieve the observations of the feature specified by the given id. */
-	const observation_data_type& observations (featureid_t feature) const {
-		typename std::map<featureid_t, observation_data_type>::const_iterator i = m_observations.find(feature);
-		assert (i != m_observations.end());
-		return i->second;
-	}
+    const feature_data_type& feature_data (featureid_t feature_id) const {
+        return m_features.at(feature_id);
+    }
+    
+    const ObservationModel& feature_observation (featureid_t feature_id, timestep_t, timestep) const {
+        return m_features.at(feature_id).at(timestep);
+    }
+    
+	/** Add new data */
+    
+	void add_control (const ControlModel&);
 
-	/** Add a new state change to the end of the list. */
-	void add_control (const ControlModel& control) {
-		timestep_t timestep = current_timestep();
-		m_controls.push_back (control);
-        foreach_listener (boost::bind (&listener::add_control, _1, timestep, boost::cref(control)));
-	}
-
-	/** Add a new observation of the specified feature, taken at the current time. */
-	void add_observation (const featureid_t feature, const ObservationModel& obs) {
-		timestep_t timestep = current_timestep();
-		m_observations[feature][timestep] = obs;
-        foreach_listener (boost::bind (&listener::add_observation, _1, timestep, feature, boost::cref(obs)));
-	}
+	void add_observation (featureid_t, const ObservationModel&);
 
 	void end_observation () {
         foreach_listener (boost::bind (&listener::end_observation, _1, current_timestep()));
@@ -123,9 +113,47 @@ public:
 };
 
 template <class ControlModel, class ObservationModel>
-void slam_data<ControlModel, ObservationModel>::listener::connect (boost::shared_ptr<const slam_data> data_ptr_) {
-    data_ptr = data_ptr_;
+void slam_data<ControlModel, ObservationModel>
+::listener::connect (boost::shared_ptr<const slam_data> data_ptr) {
+    this->data_ptr = data_ptr;
     data_ptr->m_listeners.push_back (this->shared_from_this());
 }
+
+template <class ControlModel, class ObservationModel>
+template <class Functor>
+void slam_data<ControlModel, ObservationModel>
+::foreach_listener (Functor f) {
+    boost::container::vector<boost::weak_ptr<listener> >::iterator iter = m_listeners.begin();
+    while (iter != m_listeners.end()) {
+        if (boost::shared_ptr<listener> l = iter->lock()) {
+            f (l.get());
+            ++iter;
+        }
+        else {
+            iter = m_listeners.erase (iter);
+        }
+    }
+}
+
+template <class ControlModel, class ObservationModel>
+void slam_data<ControlModel, ObservationModel>
+::add_control (const ControlModel& control) {
+    timestep_t timestep = current_timestep();
+    m_controls.emplace_back (control);
+    foreach_listener (boost::bind (&listener::add_control, _1, timestep, boost::cref(control)));
+}
+
+template <class ControlModel, class ObservationModel>
+void slam_data<ControlModel, ObservationModel>
+::add_observation (const featureid_t feature_id, const ObservationModel& obs) {
+    typedef boost::container::map<featureid_t, feature_data_type>::iterator feature_iterator;
+    typedef boost::container::flat_map<timestep_t, ObservationModel>::iterator obs_iterator;
+    std::pair<feature_iterator, bool> feature_ins = m_observations.emplace (feature_id);
+    std::pair<obs_iterator, bool> obs_ins = feature_ins.first->second.emplace (current_timestep(), obs);
+    if (obs_ins.second) foreach_listener
+        (boost::bind (&listener::add_observation, _1,
+                      current_timestep(), feature_id, boost::cref(obs), feature_ins.second));
+}
+
 
 #endif //_SLAM_SLAM_DATA_HPP
