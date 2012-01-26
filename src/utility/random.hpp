@@ -112,20 +112,22 @@ public:
 
 
 template <int N, class Derived>
-class multivariate_normal_dense_base : public multivariate_normal_base<N, Derived> {
+struct multivariate_normal_dense_base : public multivariate_normal_base<N, Derived> {
 
 	typedef multivariate_normal_base<N, Derived> base_type;
 	typedef typename base_type::vector_type vector_type;
 	typedef typename base_type::matrix_type matrix_type;
 
+private:
+    
 	matrix_type m_chol_cov;
 
 protected:
 
 	multivariate_normal_dense_base () { }
 
-	multivariate_normal_dense_base (const vector_type& mean, const matrix_type& cov)
-	: base_type(mean), m_chol_cov(cov.llt().matrixL()) { }
+	multivariate_normal_dense_base (const vector_type& mean, const matrix_type& chol_cov)
+	: base_type(mean), m_chol_cov(chol_cov) { }
 
 public:
 
@@ -160,8 +162,8 @@ struct multivariate_normal_dist : public multivariate_normal_dense_base<N, multi
 
 	multivariate_normal_dist () { }
 
-	multivariate_normal_dist (const vector_type& mean, const matrix_type& cov)
-	: base_type(mean, cov) { }
+	multivariate_normal_dist (const vector_type& mean, const matrix_type& chol_cov)
+	: base_type(mean, chol_cov) { }
 
 	static vector_type subtract (const vector_type& a, const vector_type& b) { return a - b; }
 
@@ -180,7 +182,7 @@ struct multivariate_normal_adapter
     
 	multivariate_normal_adapter () { }
     
-	multivariate_normal_adapter (const vector_type& mean, const matrix_type& cov) : base_type(mean, cov) { }
+	multivariate_normal_adapter (const vector_type& mean, const matrix_type& chol_cov) : base_type(mean, chol_cov) { }
     
 	static vector_type subtract (const vector_type& a, const vector_type& b) {
         return associated_type::subtract (a, b);

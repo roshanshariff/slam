@@ -33,8 +33,8 @@ public:
     
     class value_compare : public std::binary_function<value_type, value_type, bool> {
         key_compare comp;
-        value_compare (const key_compare& comp) : comp(comp) { }
     public:
+        value_compare (const key_compare& comp) : comp(comp) { }
         bool operator() (const value_type& a, const value_type& b) const {
             return comp (a.first, b.first);
         }
@@ -48,7 +48,7 @@ public:
     void clear () { return root().clear(); }
     
     mapped_type get (const key_type& key) const {
-        return find_subtree(key).template value<value_type>.second;
+        return find_subtree(key).template value<value_type>().second;
     }
     
     bool insert (const value_type& entry) {

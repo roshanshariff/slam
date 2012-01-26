@@ -60,18 +60,18 @@ void particle_filter<Particle>::resample (random_source& random, size_t new_size
     assert (!particles.empty());
     assert (weight_sum > 0);
 
-    std::vector<particle> new_particles;
+    boost::container::vector<particle> new_particles;
     new_particles.reserve (new_size);
     
     const double U = random.uniform();
     
     size_t i = 0;
-    double t = particles.front().first;
+    double t = particles.front().weight;
     for (size_t j = 0; j < new_size; ++j) {
         while (t * new_size <= (j+U)*weight_sum && i < particles.size() - 1) {
-            t += particles[++i].first;
+            t += particles[++i].weight;
         }
-        new_particles.emplace_back (particles[i].second);
+        new_particles.emplace_back (particles[i].data);
     }
     
     particles.swap (new_particles);

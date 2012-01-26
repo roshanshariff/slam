@@ -78,8 +78,8 @@ void cholesky_downdate (Eigen::Matrix<double, N, N>& L, Eigen::Matrix<double, N,
 
 template <int N>
 void cholesky_update (Eigen::Matrix<double, N, N>& L, const Eigen::Matrix<double, N, 1>& v, double k) {
-	if (k > 0) cholesky_update(L, std::sqrt(k)*v);
-	else if (k < 0) cholesky_downdate(L, std::sqrt(-k)*v);
+	if (k > 0) cholesky_update<N> (L, std::sqrt(k)*v);
+	else if (k < 0) cholesky_downdate<N> (L, std::sqrt(-k)*v);
 }
 
 
