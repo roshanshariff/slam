@@ -47,7 +47,7 @@ class mcmc_slam : public slam_data<ControlModel, ObservationModel>::listener {
         timestep_t parent_timestep;
 		observation_type estimate;
 
-		feature_data (timestep_t timestep, const observation_type& est,
+		feature_estimate (timestep_t timestep, const observation_type& est,
                       typename slam_data_type::feature_iterator iter)
 		: parent_timestep(timestep), estimate(est), feature_iter(iter) { }
         
@@ -139,7 +139,7 @@ void mcmc_slam<ControlModel, ObservationModel>
     assert (feature_estimates.size() == feature_weights.size());
     if (new_feature) {
         observation_type initial_estimate = obs.mean();
-        feature_estimates.emplace_back (timestep, initial_estimate, this->data().feature_find(feature_id));
+        feature_estimates.emplace_back (timestep, initial_estimate, this->data().find_feature (feature_id));
         feature_weights.push_back (edge_weight (obs, initial_estimate));
     }
 }

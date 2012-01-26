@@ -13,7 +13,7 @@
 
 #include <Eigen/Eigen>
 
-#include "utility/multivariate.hpp"
+#include "utility/random.hpp"
 #include "utility/cholesky.hpp"
 
 /* See "The unscented particle filter", van de Merwe, Doucet, de Freitas, et al, (2001) for details
@@ -64,22 +64,22 @@ void unscented_transform (const unscented_params<N>& params,
     }
 
     const typename ResultDist::vector_type base_innov 
-        = params.weight_rest() * sigmapts.leftCols<2*N>().rowwise().sum();
+        = params.weight_rest() * sigmapts.template leftCols<2*N>().rowwise().sum();
 
     for (int i = 0; i < 2*N; ++i) sigmapts.col(i) = ResultDist::subtract (base_innov, sigmapts.col(i));
 
     result.mean() = ResultDist::subtract (base, base_innov);
     
-    sigmapts.leftCols<2*N>() *= std::sqrt (params.weight_rest());
-    sigmapts.rightCols<2*N>() = noise_chol_cov;
+    sigmapts.template leftCols<2*N>() *= std::sqrt (params.weight_rest());
+    sigmapts.template rightCols<2*N>() = noise_chol_cov;
     
     result.chol_cov() = sigmapts.transpose().householderQr().matrixQR()
-        .topLeftCorner<M,M>().triangularView<Eigen::Upper>().transpose();
+        .template topLeftCorner<M,M>().template triangularView<Eigen::Upper>().transpose();
 
     cholesky_update (result.chol_cov(), base_innov, params.weight_first());
 
     if (cross_cov) cross_cov->noalias() = params.weight_rest() * params.eta() * state_chol_cov
-            * (sigmapts.rightCols<N>().transpose() - sigmapts.leftCols<N>().transpose());
+            * (sigmapts.template rightCols<N>() - sigmapts.template leftCols<N>()).transpose();
 }
 
 
@@ -102,13 +102,13 @@ void unscented_update (const unscented_params<N>& params,
     unscented_transform (params, state, predicted, obs.derived().chol_cov(), h, &cross_cov);
 
     Eigen::Matrix<double, N, M> kalman_gain
-        = predicted.chol_cov().triangularView<Eigen::Lower>().transpose().jacobiSvd().solve(
-            predicted.chol_cov().triangularView<Eigen::Lower>().jacobiSvd().solve(
+        = predicted.chol_cov().template triangularView<Eigen::Lower>().transpose().jacobiSvd().solve(
+            predicted.chol_cov().template triangularView<Eigen::Lower>().jacobiSvd().solve(
                 cross_cov.transpose()
             )
         ).transpose();
 
-    state.mean().noalias() += kalman_gain * ObsDist::subtract(observation.mean(), predicted.mean());
+    state.mean().noalias() += kalman_gain * ObsDist::subtract(obs.mean(), predicted.mean());
 
     kalman_gain.noalias() *= predicted.chol_cov();
     

@@ -26,7 +26,7 @@ class particle_filter {
         particle () : weight(1.0) { }
         particle (const T& data) : weight(1.0), data(data) { }
         bool operator< (const particle& p) const { return weight < p.weight; }
-    }
+    };
     
     boost::container::vector<particle> particles;
 
@@ -43,8 +43,7 @@ public:
     void resample (random_source& random, size_t new_size);
     void resample (random_source& random) { resample (random, size()); }
     
-    template <class Updater>
-    void update ();
+    template <class Updater> void update (Updater);
     
     const T& operator[] (size_t index) const { return particles[index].data; }
     T& operator[] (size_t index) { return particles[index].data; }

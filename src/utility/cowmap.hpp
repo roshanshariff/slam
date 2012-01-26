@@ -48,7 +48,7 @@ public:
     void clear () { return root().clear(); }
     
     mapped_type get (const key_type& key) const {
-        return find_subtree(key).value<value_type>.second;
+        return find_subtree(key).template value<value_type>.second;
     }
     
     bool insert (const value_type& entry) {
@@ -79,7 +79,7 @@ private:
 
 
 template <class K, class V, class Compare>
-const cowtree& find_subtree (const key_type& key) const {
+const cowtree& cowmap<K, V, Compare>::find_subtree (const key_type& key) const {
     const cowtree* subtree = &root();
     while (!subtree->empty()) {
         if (key_comp()(key, subtree->value<value_type>().first)) subtree = &subtree->left();
@@ -91,13 +91,13 @@ const cowtree& find_subtree (const key_type& key) const {
 
 
 template <class K, class V, class Compare>
-bool insert (const value_type& entry, cowtree::editor& editor) {
+bool cowmap<K, V, Compare>::insert (const value_type& entry, cowtree::editor& editor) {
     if (editor.subtree().empty()) {
         editor.insert<value_type>(entry);
         return true;
     }
     else {
-        value_type& node_value = editor.subtree().value<value_type>();
+        value_type& node_value = editor.template value<value_type>();
         if (value_comp()(entry, node_value)) {
             cowtree::editor::left left_editor (editor);
             return insert (entry, left_editor);

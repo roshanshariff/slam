@@ -57,20 +57,19 @@ po::options_description waypoint_controller::program_options () {
 }
 
 
-waypoint_controller::waypoint_controller (const po::variables_map& options) {
+waypoint_controller::waypoint_controller (const po::variables_map& options)
+: model_builder (velocity_model::builder (options["velmodel-alpha1"].as<double>(),
+                                          options["velmodel-alpha2"].as<double>(),
+                                          options["velmodel-alpha3"].as<double>(),
+                                          options["velmodel-alpha4"].as<double>(),
+                                          options["velmodel-alpha5"].as<double>(),
+                                          options["velmodel-alpha6"].as<double>(),
+                                          options["time-delta"].as<double>()))
+{
 
 	const double RAD_PER_DEG = boost::math::constants::pi<double>() / 180;
 
 	const double dt = options["time-delta"].as<double>();
-
-    model_builder
-    = velocity_model::builder (options["velmodel-alpha1"].as<double>(),
-                               options["velmodel-alpha2"].as<double>(),
-                               options["velmodel-alpha3"].as<double>(),
-                               options["velmodel-alpha4"].as<double>(),
-                               options["velmodel-alpha5"].as<double>(),
-                               options["velmodel-alpha6"].as<double>(),
-                               options["time-delta"].as<double>());
 
 	if (options.count("waypoint-file")) {
 		double x, y;

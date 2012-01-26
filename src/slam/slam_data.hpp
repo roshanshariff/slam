@@ -1,13 +1,13 @@
 #ifndef _SLAM_SLAM_DATA_HPP
 #define _SLAM_SLAM_DATA_HPP
 
+#include <vector>
+#include <map>
 #include <cassert>
 #include <utility>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/container/map.hpp>
 #include <boost/container/flat_map.hpp>
 #include <boost/bind.hpp>
 #include <boost/ref.hpp>
@@ -27,12 +27,6 @@ public:
 	typedef size_t timestep_t;
 	typedef size_t featureid_t;
 
-	/** Feature observations are stored as an arraymap from the time of an observation to the observation's
-     distribution. Since observations are expected to be added in chronological order, this is much
-     more efficient then using a tree-based map. */
-	typedef boost::container::flat_map<timestep_t, ObservationModel> feature_data_type;
-    typedef boost::container::map<featureid_t, feature_data_type>::const_iterator feature_iterator;
-	
     class listener : boost::noncopyable, public boost::enable_shared_from_this<listener> {
         
         boost::shared_ptr<const slam_data> data_ptr;
@@ -59,15 +53,22 @@ public:
         
     };
         
-private:
+	typedef boost::container::flat_map<timestep_t, ObservationModel> feature_data_type;
 
-	boost::container::vector<ControlModel> m_controls;
-    boost::container::map<featureid_t, feature_data_type> m_features;
-    mutable boost::container::vector<boost::weak_ptr<listener> > m_listeners;
+private:
+    
+    typedef std::map<featureid_t, feature_data_type> feature_map_type;
+
+	std::vector<ControlModel> m_controls;
+    feature_map_type m_features;
+
+    mutable std::vector<boost::weak_ptr<listener> > m_listeners;
     
     template <class Functor> void foreach_listener (Functor);
     
 public:
+    
+    typedef typename feature_map_type::const_iterator feature_iterator;
     
 	timestep_t current_timestep () const {
         return m_controls.size();
@@ -81,8 +82,8 @@ public:
     
     /** Retrieve observations. */
     
-    feature_iterator feature_begin () const { return m_features.begin(); }
-    feature_iterator feature_end () const { return m_features.begin(); }
+    feature_iterator features_begin () const { return m_features.begin(); }
+    feature_iterator features_end () const { return m_features.begin(); }
     
     feature_iterator find_feature (featureid_t feature_id) const {
         return m_features.find (feature_id);
@@ -92,7 +93,7 @@ public:
         return m_features.at(feature_id);
     }
     
-    const ObservationModel& feature_observation (featureid_t feature_id, timestep_t, timestep) const {
+    const ObservationModel& feature_observation (featureid_t feature_id, timestep_t timestep) const {
         return m_features.at(feature_id).at(timestep);
     }
     
@@ -123,7 +124,7 @@ template <class ControlModel, class ObservationModel>
 template <class Functor>
 void slam_data<ControlModel, ObservationModel>
 ::foreach_listener (Functor f) {
-    boost::container::vector<boost::weak_ptr<listener> >::iterator iter = m_listeners.begin();
+    typename std::vector<boost::weak_ptr<listener> >::iterator iter = m_listeners.begin();
     while (iter != m_listeners.end()) {
         if (boost::shared_ptr<listener> l = iter->lock()) {
             f (l.get());
@@ -139,20 +140,25 @@ template <class ControlModel, class ObservationModel>
 void slam_data<ControlModel, ObservationModel>
 ::add_control (const ControlModel& control) {
     timestep_t timestep = current_timestep();
-    m_controls.emplace_back (control);
+    m_controls.push_back (control);
     foreach_listener (boost::bind (&listener::add_control, _1, timestep, boost::cref(control)));
 }
 
 template <class ControlModel, class ObservationModel>
 void slam_data<ControlModel, ObservationModel>
 ::add_observation (const featureid_t feature_id, const ObservationModel& obs) {
-    typedef boost::container::map<featureid_t, feature_data_type>::iterator feature_iterator;
-    typedef boost::container::flat_map<timestep_t, ObservationModel>::iterator obs_iterator;
-    std::pair<feature_iterator, bool> feature_ins = m_observations.emplace (feature_id);
-    std::pair<obs_iterator, bool> obs_ins = feature_ins.first->second.emplace (current_timestep(), obs);
-    if (obs_ins.second) foreach_listener
-        (boost::bind (&listener::add_observation, _1,
-                      current_timestep(), feature_id, boost::cref(obs), feature_ins.second));
+
+    std::pair<typename feature_map_type::iterator, bool> feature_ins
+    = m_features.insert (std::make_pair (feature_id, feature_data_type()));
+
+    std::pair<typename feature_data_type::iterator, bool> obs_ins
+    = feature_ins.first->second.insert (std::make_pair (current_timestep(), obs));
+    
+    if (!obs_ins.second) return;
+    
+    foreach_listener
+    (boost::bind (&listener::add_observation, _1,
+                  current_timestep(), feature_id, boost::cref(obs), feature_ins.second));
 }
 
 

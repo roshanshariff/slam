@@ -71,7 +71,7 @@ public:
 inline void swap (cowtree::root& a, cowtree::root& b) { a.swap(b); }
 
 namespace std {
-    template<> void swap (cowtree::root& a, cowtree::root& b) { a.swap(b); }
+    template<> void swap (cowtree::root& a, cowtree::root& b);
 }
 
 class cowtree::node {
@@ -147,8 +147,6 @@ class cowtree::editor : boost::noncopyable {
     editor* const parent_ptr;
     cowtree* subtree_ptr;
     
-    cowtree& subtree () { assert(subtree_ptr != 0); return *subtree_ptr; }
-    
     void rotate ();
     
     editor (editor& parent, cowtree& subtree);
@@ -158,14 +156,11 @@ public:
     editor (root& tree);
     
     bool is_root () const { return parent_ptr == 0; }    
-    bool is_left_child () const { return !is_root() && &subtree() == &parent().subtree().left(); }
+    bool is_left_child () const { return !is_root() && subtree_ptr == &parent_ptr->subtree_ptr->left(); }
 
-    editor& parent () { assert(!is_root()); return *parent_ptr; }
-    const editor& parent () const { assert(!is_root()); return *parent_ptr; }
-
-    const cowtree& subtree () const { assert(subtree_ptr != 0); return *subtree_ptr; }
+    const cowtree& subtree () const { return *subtree_ptr; }
     
-    template <class T> T& value () { return subtree().value<T>(); }    
+    template <class T> T& value () { return subtree_ptr->template value<T>(); }    
     template <class T> void insert (const T& value);
     
     ~editor ();
@@ -180,7 +175,7 @@ class cowtree::editor::left : public cowtree::editor {
     left (const left&);
     left& operator= (const left&);
 public:
-    left (editor& parent) : editor(parent, parent.subtree().left()) { }
+    left (editor& parent) : editor(parent, parent.subtree_ptr->left()) { }
 };
 
 
@@ -188,13 +183,13 @@ class cowtree::editor::right : public cowtree::editor {
     right (const right&);
     right& operator= (const right&);
 public:
-    right (editor& parent) : editor(parent, parent.subtree().right()) { }
+    right (editor& parent) : editor(parent, parent.subtree_ptr->right()) { }
 };
 
 
 template <class T> void cowtree::editor::insert (const T& value) {
-    assert(subtree().empty());
-    subtree().node_ptr = cowtree::make_node(value);
+    assert(subtree_ptr->empty());
+    subtree_ptr->node_ptr = cowtree::make_node(value);
 }
 
 

@@ -15,6 +15,7 @@
 #include "planar_robot/waypoint_controller.hpp"
 #include "planar_robot/landmark_sensor.hpp"
 #include "slam/mcmc_slam.hpp"
+#include "slam/fastslam.hpp"
 #include "utility/random.hpp"
 #include "utility/options.hpp"
 

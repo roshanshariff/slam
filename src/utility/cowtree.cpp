@@ -10,47 +10,53 @@
 
 #include "utility/cowtree.hpp"
 
+template<> void std::swap (cowtree::root& a, cowtree::root& b) {
+    a.swap(b);
+}
 
 cowtree::editor::editor (editor& parent, cowtree& subtree)
 : parent_ptr(&parent), subtree_ptr(&subtree)
 {
-    subtree.make_unique();
+    assert (subtree_ptr != 0);
+    subtree_ptr->make_unique();
 }
 
 
 cowtree::editor::editor (root& tree)
 : parent_ptr(0), subtree_ptr(&tree)
 {
-    subtree().make_unique();
-    assert (subtree().is_black());
+    assert (subtree_ptr != 0);
+    subtree_ptr->make_unique();
+    assert (subtree_ptr->is_black());
 }
 
 
 void cowtree::editor::rotate () {
     if (is_left_child()) {
-        parent().subtree().swap(subtree().right());
-        parent().subtree().swap(subtree());
-        subtree_ptr = &parent().subtree().right();
+        parent_ptr->subtree_ptr->swap(subtree_ptr->right());
+        parent_ptr->subtree_ptr->swap(*subtree_ptr);
+        subtree_ptr = &parent_ptr->subtree_ptr->right();
     }
     else {
-        parent().subtree().swap(subtree().left());
-        parent().subtree().swap(subtree());
-        subtree_ptr = &parent().subtree().left();
+        parent_ptr->subtree_ptr->swap(subtree_ptr->left());
+        parent_ptr->subtree_ptr->swap(*subtree_ptr);
+        subtree_ptr = &parent_ptr->subtree_ptr->left();
     }
+    assert (subtree_ptr != 0);
 }
 
 
 cowtree::editor::~editor () {
-    if (!subtree().is_black()) {
+    if (!subtree_ptr->is_black()) {
         if (is_root()) {
-            subtree().set_black(true);
+            subtree_ptr->set_black(true);
         }
-        else if (!parent().subtree().is_black()) {
-            if (is_left_child() != parent().is_left_child()) {
+        else if (!parent_ptr->subtree_ptr->is_black()) {
+            if (is_left_child() != parent_ptr->is_left_child()) {
                 rotate();
             }
-            subtree().set_black(true);
-            parent().rotate();
+            subtree_ptr->set_black(true);
+            parent_ptr->rotate();
         }
     }
 }
