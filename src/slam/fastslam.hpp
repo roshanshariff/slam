@@ -9,15 +9,17 @@
 #ifndef slam_fastslam_hpp
 #define slam_fastslam_hpp
 
+#include <cmath>
+
 #include <boost/container/vector.hpp>
 #include <boost/program_options.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
-#include <boost/dynamic_bitset.hpp>
 #include <boost/bind.hpp>
 
 #include <Eigen/Eigen>
 
+#include "slam/vector_model.hpp"
 #include "utility/random.hpp"
 #include "utility/cowmap.hpp"
 #include "utility/bitree.hpp"
@@ -52,42 +54,14 @@ class fastslam : public slam_data<ControlModel, ObservationModel>::listener {
     /** Vector representation of observations. */
     static const int observation_dim = observation_model::vector_dim;
     typedef typename observation_model::vector_type observation_vector_type;
-    
-    
-    struct state_dist : public multivariate_normal_dense_base<state_dim, state_dist> {
-        
-        typedef multivariate_normal_dense_base<state_dim, state_dist> base_type;
-        typedef typename base_type::vector_type vector_type;
-        typedef typename base_type::matrix_type matrix_type;
-        
-        state_dist () { }
-        
-        state_dist (const vector_type& mean, const matrix_type& cov) : base_type(mean, cov) { }
-        
-        static vector_type subtract (const vector_type& a, const vector_type& b) {
-            return state_type::subtract (a, b);
-        }
-        
-    };
-    
 
-    struct feature_dist : public multivariate_normal_dense_base<feature_dim, feature_dist> {
+    /** Distributions over states and features respectively. */
+    typedef vector_model_adapter <multivariate_normal_adapter<state_type> > state_dist;
+    typedef vector_model_adapter <multivariate_normal_adapter<feature_type> > feature_dist;
 
-        typedef multivariate_normal_dense_base<feature_dim, feature_dist> base_type;
-        typedef typename base_type::vector_type vector_type;
-        typedef typename base_type::matrix_type matrix_type;
-        
-        feature_dist () { }
-        
-        feature_dist (const vector_type& mean, const matrix_type& cov) : base_type(mean, cov) { }
-        
-        static vector_type subtract (const vector_type& a, const vector_type& b) {
-            return feature_type::subtract (a, b);
-        }
-        
-    };
     
-
+    /** Functors */
+    
     struct state_predictor {
         const state_type& state;
         state_predictor (const state_type& state) : state(state) { }
@@ -127,11 +101,12 @@ class fastslam : public slam_data<ControlModel, ObservationModel>::listener {
         } trajectory;
         cowmap<featureid_t, feature_dist> features;
     };
+    
+    /** Data members */
 
     mutable random_source random;
     timestep_t current_timestep;
     ControlModel current_control;
-    boost::dynamic_bitset feature_observed;
     boost::container::vector<std::pair<featureid_t, ObservationModel> > seen_features, new_features;
     
     particle_filter<particle_type> particles;
@@ -141,15 +116,16 @@ class fastslam : public slam_data<ControlModel, ObservationModel>::listener {
     bool keep_particle_trajectory;
     bitree<state_type> trajectory;
 
+    double alpha, beta, kappa;
     unscented_params<control_dim> ukf_control_params;
     unscented_params<observation_dim> ukf_obs_params;
-    unscented_params<state_dim+feature_dim> ukf_state_feature_params;
     unscented_params<feature_dim> ukf_feature_params;
+    unscented_params<state_dim+feature_dim> ukf_state_feature_params;
     
 public:
     
     virtual void add_control (timestep_t, const ControlModel&);
-    virtual void add_observation (timestep_t, featureid_t, const ObservationModel&);
+    virtual void add_observation (timestep_t, featureid_t, const ObservationModel&, bool new_feature);
     virtual void end_observation (timestep_t);
     
 };
@@ -164,11 +140,9 @@ void fastslam<ControlModel, ObservationModel>
 
 template <class ControlModel, class ObservationModel>
 void fastslam<ControlModel, ObservationModel>
-::add_observation (timestep_t timestep, featureid_t feature_id, const ObservationModel& obs) {
+::add_observation (timestep_t timestep, featureid_t feature_id, const ObservationModel& obs, bool new_feature) {
     assert (timestep == current_timestep);
-    if (feature_observed.size() <= feature_id) feature_observed.resize (feature_id+1);
-    if (feature_observed[feature_id]) seen_features.emplace_back (feature_id, obs);
-    else new_features.emplace_back (feature_id, obs);
+    (new_feature ? new_features : seen_features).emplace_back (feature_id, obs);
 }
 
 template <class ControlModel, class ObservationModel>
@@ -177,47 +151,73 @@ void fastslam<ControlModel, ObservationModel>
     
     assert (timestep == current_timestep);
 
-    if (timestep > 0) particles.update (boost::bind (&fastslam::update_particle, this, _1));
-    particles.update (boost::bind (&fastslam::initialize_features, this, _1));
-
-    for (size_t i = 0; i < new_features.size(); ++i) {
-        feature_observed[new_features[i].first] = true;
-    }
+    // Update particle state
     
+    if (timestep > 0) {
+        if (particles.effective_size() < num_particles*resample_threshold) {
+            particles.resample (random, num_particles);
+        }
+        particles.update (boost::bind (&fastslam::particle_state_update, this, _1));
+    }
+
     if (!keep_particle_trajectory) {
         trajectory.push_back (-trajectory.accumulate() + particles.max_weight_particle().trajectory.state).
     }
     
-    if (particles.effective_size() < num_particles*resample_threshold) {
-        particles.resample (random, num_particles);
-    }
+    // Update particle features
 
+    for (size_t i = 0; i < seen_features.size(); ++i) {
+
+        const featureid_t feature_id = seen_features[i].first;
+        const ObservationModel& obs = seen_features[i].second;
+
+        for (size_t j = 0; j < particles.size(); ++j) {
+            
+            particle_type& particle = particles[j];
+            
+            feature_dist feature = particle.features.get (feature_id);
+            unscented_update (ukf_feature_params, feature.vector_model(), obs.vector_model(),
+                              feature_observer (particle.trajectory.state));
+            particle.features.insert (feature_id, feature);
+        }
+    }
     seen_features.clear();
+    
+    // Initialize new features
+    
+    for (size_t i = 0; i < new_features.size(); ++i) {
+        
+        const featureid_t feature_id = new_features[i].first;
+        const ObservationModel& obs = new_features[i].second;
+        
+        for (size_t j = 0; j < particles.size(); ++j) {
+            
+            particle_type& particle = particles[j];
+            
+            feature_dist feature;
+            unscented_transform (ukf_obs_params, obs.vector_model(), feature.vector_model(),
+                                 feature_dist::matrix_type::Zero(),
+                                 feature_initializer (particle.trajectory.state));
+            particle.features.insert (feature_id, feature);
+        }
+    }
     new_features.clear();
 }
 
 template <class ControlModel, class ObservationModel>
-double fastslam<ControlModel, ObservationModel>::update_particle (particle_type& particle) const {
+double fastslam<ControlModel, ObservationModel>
+::particle_state_update (particle_type& particle) const {
     
-    state_dist state;
+    state_dist state, state_proposal;
 
-    unscented_transform (ukf_control_params, current_control.vector_model(), state,
+    unscented_transform (ukf_control_params, current_control.vector_model(), state.vector_model(),
                          state_dist::matrix_type::Zero(), state_predictor (particle.trajectory.state));
     
-    { // Calculate importance weights and proposal distribution
+    { // Calculate proposal distribution
         
-        multivariate_normal_dist<state_dim+feature_dim> state_feature_joint, state_proposal;
-
-        state_feature_joint.chol_cov().setZero();
-        state_proposal.chol_cov().setZero();
-        
-        state_feature_joint.mean().head<state_dim>() = state.mean();
-        state_proposal.mean().head<state_dim>() = state.mean();
-        
-        state_feature_joint.chol_cov().topLeftCorner<state_dim, state_dim> = state.chol_cov();
-        state_proposal.chol_cov().topLeftCorner<state_dim, state_dim> = state.chol_cov();
-        
-        double log_weight = 0;
+        multivariate_normal_dist<state_dim+feature_dim> state_feature_joint;
+        state_feature_joint.mean().head<state_dim>() = state.vector_model().mean();
+        state_feature_joint.chol_cov().topLeftCorner<state_dim, state_dim> = state.vector_model().chol_cov();
         
         for (size_t i = 0; i < seen_features.size(); ++i) {
             
@@ -225,57 +225,50 @@ double fastslam<ControlModel, ObservationModel>::update_particle (particle_type&
             const ObservationModel& obs = seen_features[i].second;
             
             state_feature_joint.mean().tail<feature_dim>() = feature.mean();
-            state_proposal.mean().tail<feature_dim>() = feature.mean();
-
             state_feature_joint.chol_cov().bottomRightCorner<feature_dim, feature_dim>() = feature.chol_cov();
-            state_proposal.chol_cov().bottomRightCorner<feature_dim, feature_dim>() = feature.chol_cov();
 
-            // Importance weight
-            
-            multivariate_normal_dense_adapter<typename ObservationModel::vector_model::type> predicted_obs;
-            unscented_transform (ukf_state_feature_params, state_feature_joint, predicted_obs,
-                                 obs.vector_model().derived().chol_cov(), state_feature_observer());
-            
-            log_weight += predicted_obs.log_likelihood (obs.vector_model().mean());
-            
-            // State proposal
-            
-            unscented_update (ukf_state_feature_params, state_proposal, obs.vector_model(),
+            state_feature_joint.chol_cov().topRightCorner<state_dim, feature_dim>().setZero();
+            state_feature_joint.chol_cov().bottomLeftCorner<feature_dim, state_dim>().setZero();
+
+            unscented_update (ukf_state_feature_params, state_feature_joint, obs.vector_model(),
                               state_feature_observer());
-            
-            state_proposal.chol_cov().topRightCorner<state_dim, feature_dim>().setZero();
-            state_proposal.chol_cov().bottomLeftCorner<feature_dim, state_dim>().setZero();
         }
         
-        state.mean() = state_proposal.mean().head<state_dim>();
-        state.chol_cov() = state_proposal.chol_cov().topLeftCorner<state_dim, state_dim>();
+        state_proposal.vector_model().mean() = state_feature_joint.mean().head<state_dim>();
+        state_proposal.vector_model().chol_cov() = state_feature_joint.chol_cov().topLeftCorner<state_dim, state_dim>();
     }
     
     if (keep_particle_trajectory) {
-        particle.trajectory.previous = boost::make_shared<particle_t> (particle.trajectory);
-    }
-    particle.trajectory.state = state_type::from_vector (state (random));
-    
-    // Update feature estimates
-    
-    for (size_t i = 0; i < seen_features.size(); ++i) {
-        feature_dist feature = particle.features.get (seen_features[i].first);
-        unscented_update (ukf_feature_params, feature, seen_features[i].second.vector_model(),
-                          feature_observer (particle.trajectory.state));
-        particle.features.insert (seen_features[i].first, feature);
+        particle.trajectory.previous = boost::make_shared<particle_type::trajectory_type> (particle.trajectory);
     }
     
+    particle.trajectory.state = state_proposal (random);
+    
+    return std::exp (particle_log_likelihood (particle)
+                     + state.log_likelihood (particle.trajectory.state)
+                     - state_proposal.log_likelihood (particle.trajectory.state));
 }
 
 template <class ControlModel, class ObservationModel>
-double fastslam<ControlModel, ObservationModel>::initialize_features (particle_type& particle) const {
-    for (size_t i = 0; i < new_features.size(); ++i) {
-        feature_dist feature;
-        unscented_transform (ukf_obs_params, new_features[i].second.vector_model(), feature,
-                             feature_dist::matrix_type::Zero(), feature_initializer (particle.trajectory.state));
-        particle.features.insert (new_features[i].first, feature);
+double fastslam<ControlModel, ObservationModel>
+::particle_log_likelihood (const particle_type& particle) const {
+
+    double log_likelihood = 0;
+
+    for (size_t i = 0; i < seen_features.size(); ++i) {
+
+        const feature_dist& feature = particle.features.get (seen_features[i].first);
+        const ObservationModel& obs = seen_features[i].second;
+        
+        multivariate_normal_adapter<typename ObservationModel::vector_model_type> predicted_obs;
+        unscented_transform (ukf_feature_params, feature.vector_model(), predicted_obs,
+                             obs.vector_model().derived().chol_cov(),
+                             feature_observer (particle.trajectory.state));
+        
+        log_likelihood += predicted_obs.log_likelihood (obs.vector_model().mean());
     }
-    return 1.0;
+    
+    return log_likelihood;
 }
 
 
