@@ -3,6 +3,8 @@
 
 #include <cassert>
 #include <cmath>
+#include <utility>
+#include <algorithm>
 
 #include <boost/container/vector.hpp>
 #include <boost/container/flat_map.hpp>
@@ -10,9 +12,11 @@
 #include <boost/program_options.hpp>
 
 #include "slam/slam_data.hpp"
+#include "slam/slam_estimator.hpp"
 #include "utility/random.hpp"
 #include "utility/bitree.hpp"
 #include "utility/options.hpp"
+#include "utility/utility.hpp"
 
 /** This class implements the MCMC SLAM algorithm. To use it, construct an instance passing in
     a reference to a slam_data object and a random generator. This class will register to listen
@@ -20,7 +24,9 @@
     iterations on the data available so far. */
 
 template <class ControlModel, class ObservationModel>
-class mcmc_slam : public slam_data<ControlModel, ObservationModel>::listener {
+class mcmc_slam :
+public slam_data<ControlModel, ObservationModel>::listener,
+public slam_estimator<ControlModel, ObservationModel> {
 
 	typedef slam_data<ControlModel, ObservationModel> slam_data_type;
 
@@ -56,7 +62,10 @@ class mcmc_slam : public slam_data<ControlModel, ObservationModel>::listener {
         const typename slam_data_type::feature_data_type& data () const { return feature_iter->second; }
 
 	};
-
+    
+    typedef bitree<control_type> trajectory_type;
+    typedef boost::container::flat_map<featureid_t, observation_type> map_estimate_type;
+    
     /** Our very own pseudo-random number generator. */
 	mutable random_source random;
     
@@ -68,7 +77,7 @@ class mcmc_slam : public slam_data<ControlModel, ObservationModel>::listener {
 	double observation_edge_importance;
     
 	/** The current action edge labels and the corresponding edge weights. */
-	bitree<control_type> state_estimates;
+	trajectory_type state_estimates;
 	bitree<double> state_weights;
 
 	/** The current feature edge labels and the corresponding edge weights. */
@@ -81,16 +90,22 @@ public:
     
 	static boost::program_options::options_description program_options ();
 
+    // Overridden virtual member functions of slam_data::listener
+    
 	virtual void add_control (timestep_t, const ControlModel&);
 	virtual void add_observation (timestep_t, featureid_t, const ObservationModel&, bool new_feature);
 	virtual void end_observation (timestep_t);
+    
+    // Overridden virtual member functions of slam_estimator
+    
+    virtual control_type state_estimate () const { return state_estimates.accumulate(); }
 
-    boost::shared_ptr<const bitree<control_type> > trajectory_estimate () const {
-        return boost::shared_ptr<const bitree<control_type> > (this->shared_from_this(), &state_estimates);
+    virtual boost::shared_ptr<const trajectory_type> trajectory_estimate () const {
+        return boost::shared_ptr<const trajectory_type> (this->shared_from_this(), &state_estimates);
     }
     
-	template <class FeatureFunctor> void for_each_feature (FeatureFunctor) const;
-
+    virtual boost::shared_ptr<const map_estimate_type> map_estimate () const;
+    
 private:
     
     void update ();
@@ -352,13 +367,21 @@ void mcmc_slam<ControlModel, ObservationModel>
 
 /** Returns current estimates of the positions of all observed features. */
 template <class ControlModel, class ObservationModel>
-template <class FeatureFunctor>
-void mcmc_slam<ControlModel, ObservationModel>
-::for_each_feature (FeatureFunctor f) const {
+boost::shared_ptr<const typename mcmc_slam<ControlModel, ObservationModel>::map_estimate_type>
+mcmc_slam<ControlModel, ObservationModel>::map_estimate () const {
+    
+    boost::container::vector<typename map_estimate_type::value_type> estimates;
+    estimates.reserve (feature_estimates.size());
+    
 	for (size_t i = 0; i < feature_estimates.size(); ++i) { // iterate through each feature
-        const feature_estimate& feature = feature_estimates[i];
-		f (feature.feature_id(), state_estimates.accumulate(feature.parent_timestep) + feature.estimate);
+        const feature_estimate& f = feature_estimates[i];
+		estimates.emplace_back (f.feature_id(), state_estimates.accumulate(f.parent_timestep)+f.estimate);
 	}
+    
+    std::sort (estimates.begin(), estimates.end(), pair_compare_first<featureid_t>());
+    
+    return boost::make_shared<const map_estimate_type> (boost::container::ordered_unique_range,
+                                                        estimates.begin(), estimates.end());
 }
 
 
@@ -383,5 +406,6 @@ mcmc_slam<ControlModel, ObservationModel>
 mcmc_steps                  (options["mcmc-steps"].as<unsigned int>()),
 control_edge_importance     (options["control-edge-importance"].as<double>()),
 observation_edge_importance (options["observation-edge-importance"].as<double>()) { }
+
 
 #endif //_SLAM_MCMC_SLAM_HPP
