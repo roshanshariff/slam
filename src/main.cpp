@@ -11,7 +11,7 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 
-#include "simulator.hpp"
+#include "simulator/simulator.hpp"
 #include "planar_robot/waypoint_controller.hpp"
 #include "planar_robot/landmark_sensor.hpp"
 #include "slam/mcmc_slam.hpp"
