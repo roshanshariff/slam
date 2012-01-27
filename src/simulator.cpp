@@ -17,14 +17,8 @@
 #include "slam/mcmc_slam.hpp"
 #include "slam/fastslam.hpp"
 #include "utility/random.hpp"
-#include "utility/options.hpp"
+#include "utility/utility.hpp"
 
-boost::program_options::variables_map parse_options (int argc, char* argv[]);
-
-template <class RandGen>
-random_source make_random_source (RandGen& rng, const char* key,
-                                  const boost::program_options::variables_map& options,
-                                  unsigned int* seed_ptr = 0);
 
 struct sim_types {
     
@@ -33,14 +27,16 @@ struct sim_types {
     
     typedef simulator<controller_type, sensor_type> simulator_type;
     
-    typedef controller_type::model_type control_model_type;
-    typedef sensor_type::model_type observation_model_type;
+    typedef simulator_type::control_model_type control_model_type;
+    typedef simulator_type::observation_model_type observation_model_type;
     
-    typedef slam_data<control_model_type, observation_model_type> slam_data_type;
     typedef mcmc_slam<control_model_type, observation_model_type> mcmc_slam_type;
     typedef fastslam<control_model_type, observation_model_type> fastslam_type;
     
 };
+
+
+boost::program_options::variables_map parse_options (int argc, char* argv[]);
 
 
 int main (int argc, char* argv[]) {
@@ -51,45 +47,26 @@ int main (int argc, char* argv[]) {
 
     /* set up simulation objects */
     
-    sim_types::simulator_type sim (options, (unsigned int) std::time(0));
+    random_source random (remember_option(options, "seed", (unsigned int)std::time(0)));
+    
+    boost::shared_ptr<sim_types::simulator_type> sim
+    = boost::make_shared<sim_types::simulator_type> (boost::ref(options), random());
     
     boost::shared_ptr<sim_types::mcmc_slam_type> mcmc_slam
-    = boost::make_shared<sim_types::mcmc_slam_type> (boost::ref(options), sim.random());
-    mcmc_slam->connect (sim.data);
+    = boost::make_shared<sim_types::mcmc_slam_type> (boost::ref(options), random());
+    mcmc_slam->connect (sim->get_slam_data());
     
     boost::shared_ptr<sim_types::fastslam_type> fastslam
-    = boost::make_shared<sim_types::fastslam_type> (boost::ref(options), sim.random());
-    fastslam->connect (sim.data);
+    = boost::make_shared<sim_types::fastslam_type> (boost::ref(options), random());
+    fastslam->connect (sim->get_slam_data());
     
     /* set up simulation logging */
     
 	boost::filesystem::path output_dir (options["output-dir"].as<std::string>());
     boost::filesystem::create_directories (output_dir);
 
-    /*
-	slam_logger<slam_data_type, mcmc_slam_type> mcmc_slam_logger
-    (output_dir/"log"/"mcmc_slam", sim.data, mcmc_slam, controller.initial_state());
-
-    if (options.count("log")) {
-        mcmc_slam_logger.connect();
-    }
-    */
+	(*sim)();
     
-    /* run simulation */
-    
-	sim();
-    
-    /* print output */
-    
-    /*
-    slam_data_type::control_type initial_state = controller.initial_state();
-
-    print_trajectory<slam_data_type> ((output_dir/"trajectory.txt").c_str(), sim, initial_state);
-    print_map<slam_data_type> ((output_dir/"map.txt").c_str(), sim, initial_state);
-
-    print_trajectory<slam_data_type> ((output_dir/"mcmc_slam.trajectory.txt").c_str(), mcmc_slam, initial_state);
-    print_map<slam_data_type> ((output_dir/"mcmc_slam.map.txt").c_str(), mcmc_slam, initial_state);
-    */
 	return EXIT_SUCCESS;
 
 }
@@ -101,20 +78,22 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
 
 	po::options_description command_line_options ("Command Line Options");
 	command_line_options.add_options()
-		("help,h", "usage information")
-		("controller-help", "controller options")
-		("sensor-help", "sensor options")
-		("mcmc-slam-help", "MCMC-SLAM options")
-        ("fastslam-help", "FastSLAM 2.0 options")
-		("config-file,f", po::value<std::vector<std::string> >()->composing(), "configuration files");
+    ("help,h", "usage information")
+    ("simulator-help", "simulator options")
+    ("controller-help", "controller options")
+    ("sensor-help", "sensor options")
+    ("mcmc-slam-help", "MCMC-SLAM options")
+    ("fastslam-help", "FastSLAM 2.0 options")
+    ("config-file,f", po::value<std::vector<std::string> >()->composing(), "configuration files");
 
 	po::options_description general_options ("General Options");
 	general_options.add_options()
-		("output-dir,o", po::value<std::string>()->default_value("./output"),
-         "directory for simulation output files")
-        ("log", "produce detailed simulation logs")
-        ("seed", po::value<unsigned int>(), "seed for global random number generator");
+    ("output-dir,o", po::value<std::string>()->default_value("./output"),
+     "directory for simulation output files")
+    ("log", "produce detailed simulation logs")
+    ("seed", po::value<unsigned int>(), "seed for global random number generator");
 
+    po::options_description simulator_options = sim_types::simulator_type::program_options();
 	po::options_description controller_options = sim_types::controller_type::program_options();
 	po::options_description sensor_options = sim_types::sensor_type::program_options();
 	po::options_description mcmc_slam_options = sim_types::mcmc_slam_type::program_options();
@@ -122,7 +101,7 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
 
 	po::options_description config_options;
 	config_options
-    .add(general_options).add(controller_options).add(sensor_options)
+    .add(general_options).add(simulator_options).add(controller_options).add(sensor_options)
     .add(mcmc_slam_options).add(fastslam_options);
 
 	po::options_description all_options;
@@ -139,6 +118,11 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
 		help_options.add(command_line_options).add(general_options);
         help_requested = true;
 	}
+    
+    if (values.count("simulator-help")) {
+        help_options.add(simulator_options);
+        help_requested = true;
+    }
     
 	if (values.count("controller-help")) {
 		help_options.add(controller_options);
