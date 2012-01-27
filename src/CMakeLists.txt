@@ -3,7 +3,7 @@ cmake_minimum_required (VERSION 2.8)
 project (slam CXX)
 add_executable (simulator
     simulator.cpp planar_robot/waypoint_controller.cpp planar_robot/landmark_sensor.cpp
-    utility/file.cpp utility/cowtree.cpp)
+    utility/utility.cpp utility/cowtree.cpp)
 
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 

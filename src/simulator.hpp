@@ -14,7 +14,6 @@
 #include "slam/mcmc_slam.hpp"
 #include "utility/random.hpp"
 #include "utility/bitree.hpp"
-#include "utility/file.hpp"
 
 
 template <class Controller, class Sensor>
