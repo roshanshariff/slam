@@ -47,8 +47,6 @@ public:
         
         virtual void end_observation (timestep_t) { }
         
-        virtual void end_simulation (timestep_t) { }
-        
         virtual ~listener () { }
         
     };
@@ -107,10 +105,6 @@ public:
         foreach_listener (boost::bind (&listener::end_observation, _1, current_timestep()));
 	}
     
-    void end_simulation () {
-        foreach_listener (boost::bind (&listener::end_simulation, _1, current_timestep()));
-    }
-
 };
 
 template <class ControlModel, class ObservationModel>

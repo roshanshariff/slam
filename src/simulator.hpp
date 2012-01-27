@@ -81,20 +81,18 @@ private:
 template <class Controller, class Sensor>
 void simulator<Controller, Sensor>::operator() () {
 
+    sensor.sense (current_state(), random, boost::bind(&slam_data_type::add_observation, data.get(), _1, _2));
+    data->end_observation();
+
 	while (!controller.finished()) {
 
-		sensor.sense (current_state(), random, boost::bind(&slam_data_type::add_observation, data.get(), _1, _2));
-        data->end_observation();
-        
 		control_model_type control = controller.control (current_state());
 		m_trajectory.push_back(control(random));
 		data->add_control (control);
-	}
 
-    sensor.sense (current_state(), random, boost::bind(&slam_data_type::add_observation, data.get(), _1, _2));
-    data->end_observation();
-    
-    data->end_simulation();
+		sensor.sense (current_state(), random, boost::bind(&slam_data_type::add_observation, data.get(), _1, _2));
+        data->end_observation();
+	}
 }
 
 
