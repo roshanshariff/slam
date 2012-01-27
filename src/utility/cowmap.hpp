@@ -10,10 +10,10 @@
 #define slam_cowmap_hpp
 
 #include <utility>
-#include <functional>
 
 #include <boost/compressed_pair.hpp>
 
+#include "utility/utility.hpp"
 #include "utility/cowtree.hpp"
 
 template <class K, class V, class Compare = std::less<K> >
@@ -30,15 +30,8 @@ public:
     typedef size_t                  size_type;
     
     typedef Compare                 key_compare;
-    
-    class value_compare : public std::binary_function<value_type, value_type, bool> {
-        key_compare comp;
-    public:
-        value_compare (const key_compare& comp) : comp(comp) { }
-        bool operator() (const value_type& a, const value_type& b) const {
-            return comp (a.first, b.first);
-        }
-    };
+
+    typedef pair_compare_first<const K, key_compare> value_compare;
     
     key_compare key_comp () const { return data.second(); }
     value_compare value_comp () const { return value_compare (key_comp()); }
@@ -50,6 +43,8 @@ public:
     mapped_type get (const key_type& key) const {
         return find_subtree(key).template value<value_type>().second;
     }
+    
+    template <class Functor> void for_each (Functor f) const { inorder_traverse (root(), f); }
     
     bool insert (const value_type& entry) {
         cowtree::editor editor (root());
@@ -72,6 +67,8 @@ private:
     const cowtree& find_subtree (const key_type& key) const;
     
     bool insert (const value_type& entry, cowtree::editor& editor);
+    
+    template <class Functor> void inorder_traverse (const cowtree&, Functor&) const;
     
     boost::compressed_pair<cowtree::root, key_compare> data;
     
@@ -110,6 +107,17 @@ bool cowmap<K, V, Compare>::insert (const value_type& entry, cowtree::editor& ed
             node_value.second = entry.second;
             return false;
         }
+    }
+}
+
+
+template <class K, class V, class Compare>
+template <class Functor>
+void cowmap<K, V, Compare>::inorder_traverse (const cowtree& subtree, Functor& f) const {
+    if (!subtree.empty()) {
+        inorder_traverse (subtree.left(), f);
+        f (subtree.value<value_type>().first, subtree.value<value_type>().second);
+        inorder_traverse (subtree.right(), f);
     }
 }
 
