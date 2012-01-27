@@ -1,5 +1,5 @@
 //
-//  file.cpp
+//  utility.cpp
 //  slam
 //
 //  Created by Roshan Shariff on 12-01-25.
@@ -8,7 +8,7 @@
 
 #include <stdio.h>
 
-#include "utility/file.hpp"
+#include "utility/utility.hpp"
 
 boost::shared_ptr<FILE> open_file (const char* filename, const char* mode) {
     return boost::shared_ptr<FILE> (fopen (filename, mode), &fclose);
