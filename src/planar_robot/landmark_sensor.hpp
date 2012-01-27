@@ -30,11 +30,11 @@ namespace planar_robot {
         
         static boost::program_options::options_description program_options ();
         
-        template <class Observer>
-        void sense (const pose&, random_source&, const Observer&) const;
+        template <class Observer> void sense (const pose&, random_source&, Observer) const;
         
-        template <class FeatureFunctor>
-        void for_each_feature (FeatureFunctor f) const;
+        size_t num_features () const { return landmarks.size(); }
+        
+        const position& get_feature (size_t index) const { return landmarks.at (index); }
         
     private:
         
@@ -53,42 +53,15 @@ namespace planar_robot {
     
     
     template <class Observer>
-    class landmark_sensor::sense_helper {
-        
-        const landmark_sensor& sensor;
-        const pose& state;
-        random_source& random;
-        Observer observer;
-        
-    public:
-        
-        sense_helper (const landmark_sensor& sensor_, const pose& state_,
-                      random_source& random_, const Observer& observer_)
-        : sensor(sensor_), state(state_), random(random_), observer(observer_) { }
-        
-        void operator() (size_t i, const position& pos) {
-            position obs = sensor.model_builder(-state + pos)(random);
-            if (obs.distance() < sensor.max_range) {
-                ++sensor.hits;
-                observer (i, sensor.model_builder (obs));
+    void landmark_sensor::sense (const pose& state, random_source& random, Observer observer) const {
+        for (size_t i = 0; i < landmarks.size(); ++i) {
+            position obs = model_builder (-state + landmarks[i])(random);
+            if (obs.distance() < max_range) {
+                ++hits;
+                observer (i, model_builder (obs));
             }
         }
-    };
-    
-    
-    template <class Observer>
-    void landmark_sensor::sense (const pose& state, random_source& random, const Observer& observer) const {
-        for_each_feature (sense_helper<Observer> (*this, state, random, observer));
     }
-    
-    
-    template <class FeatureFunctor>
-    void landmark_sensor::for_each_feature (FeatureFunctor f) const {
-        for (size_t i = 0; i < landmarks.size(); ++i) {
-            f (i, landmarks[i]);
-        }
-    }
-    
     
 }
 
