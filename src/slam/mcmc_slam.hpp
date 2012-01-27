@@ -12,7 +12,7 @@
 #include <boost/program_options.hpp>
 
 #include "slam/slam_data.hpp"
-#include "slam/slam_estimator.hpp"
+#include "slam/slam_result.hpp"
 #include "utility/random.hpp"
 #include "utility/bitree.hpp"
 #include "utility/options.hpp"
@@ -26,7 +26,7 @@
 template <class ControlModel, class ObservationModel>
 class mcmc_slam :
 public slam_data<ControlModel, ObservationModel>::listener,
-public slam_estimator<ControlModel, ObservationModel> {
+public slam_result<typename ControlModel::result_type, typename ObservationModel::result_type> {
 
 	typedef slam_data<ControlModel, ObservationModel> slam_data_type;
 
@@ -96,7 +96,7 @@ public:
 	virtual void add_observation (timestep_t, featureid_t, const ObservationModel&, bool new_feature);
 	virtual void end_observation (timestep_t);
     
-    // Overridden virtual member functions of slam_estimator
+    // Overridden virtual member functions of slam_result
     
     virtual control_type state_estimate () const { return state_estimates.accumulate(); }
 

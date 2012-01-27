@@ -21,15 +21,19 @@
 #include <Eigen/Eigen>
 
 #include "slam/vector_model.hpp"
+#include "slam/particle_filter.hpp"
+#include "slam/slam_result.hpp"
 #include "utility/random.hpp"
 #include "utility/unscented.hpp"
 #include "utility/cowmap.hpp"
 #include "utility/bitree.hpp"
 #include "utility/options.hpp"
-#include "slam/particle_filter.hpp"
+
 
 template <class ControlModel, class ObservationModel>
-class fastslam : public slam_data<ControlModel, ObservationModel>::listener {
+class fastslam :
+public slam_data<ControlModel, ObservationModel>::listener,
+public slam_result<typename ControlModel::result_type, typename ObservationModel::result_type> {
     
     typedef slam_data<ControlModel, ObservationModel> slam_data_type;
     
@@ -124,11 +128,12 @@ public:
     static boost::program_options::options_description program_options ();
     
     // Overridden virtual member functions of slam_data::listener
+    
     virtual void add_control (timestep_t, const ControlModel&);
     virtual void add_observation (timestep_t, featureid_t, const ObservationModel&, bool new_feature);
     virtual void end_observation (timestep_t);
     
-    // Overridden virtual member functions of slam_estimator
+    // Overridden virtual member functions of slam_result
     
     virtual state_type state_estimate () const { return trajectory.accumulate(); }
     
