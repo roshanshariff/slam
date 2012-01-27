@@ -27,7 +27,7 @@
 #include "utility/unscented.hpp"
 #include "utility/cowmap.hpp"
 #include "utility/bitree.hpp"
-#include "utility/options.hpp"
+#include "utility/utility.hpp"
 
 
 template <class ControlModel, class ObservationModel>
@@ -135,11 +135,11 @@ public:
     
     // Overridden virtual member functions of slam_result
     
-    virtual state_type state_estimate () const { return trajectory.accumulate(); }
+    virtual state_type get_state () const { return trajectory.accumulate(); }
     
-    virtual boost::shared_ptr<const trajectory_type> trajectory_estimate () const;
+    virtual boost::shared_ptr<const trajectory_type> get_trajectory () const;
     
-    virtual boost::shared_ptr<const map_estimate_type> map_estimate () const {
+    virtual boost::shared_ptr<const map_estimate_type> get_map () const {
         boost::shared_ptr<map_estimate_type> estimate = boost::make_shared<map_estimate_type>();
         particles.max_weight_particle().features.for_each (map_estimate_inserter (*estimate));
         return estimate;
@@ -347,7 +347,7 @@ double fastslam<ControlModel, ObservationModel>
 
 template <class ControlModel, class ObservationModel>
 boost::shared_ptr<const typename fastslam<ControlModel, ObservationModel>::trajectory_type>
-fastslam<ControlModel, ObservationModel>::trajectory_estimate () const {
+fastslam<ControlModel, ObservationModel>::get_trajectory () const {
     
     if (keep_particle_trajectory) {
 

@@ -18,15 +18,15 @@ template <class State, class Feature>
 class slam_result {
     
     typedef bitree<State> trajectory_type;
-    typedef boost::container::flat_map<size_t, Feature> map_estimate_type;
+    typedef boost::container::flat_map<size_t, Feature> feature_map_type;
 
 public:
     
-    virtual State state_estimate () const = 0;
+    virtual State get_state () const = 0;
     
-    virtual boost::shared_ptr<const trajectory_type> trajectory_estimate () const = 0;
+    virtual boost::shared_ptr<const trajectory_type> get_trajectory () const = 0;
     
-    virtual boost::shared_ptr<const map_estimate_type> map_estimate () const = 0;
+    virtual boost::shared_ptr<const feature_map_type> get_map () const = 0;
     
 };
 

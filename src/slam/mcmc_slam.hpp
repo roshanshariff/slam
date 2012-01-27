@@ -15,7 +15,6 @@
 #include "slam/slam_result.hpp"
 #include "utility/random.hpp"
 #include "utility/bitree.hpp"
-#include "utility/options.hpp"
 #include "utility/utility.hpp"
 
 /** This class implements the MCMC SLAM algorithm. To use it, construct an instance passing in
@@ -98,13 +97,13 @@ public:
     
     // Overridden virtual member functions of slam_result
     
-    virtual control_type state_estimate () const { return state_estimates.accumulate(); }
+    virtual control_type get_state () const { return state_estimates.accumulate(); }
 
-    virtual boost::shared_ptr<const trajectory_type> trajectory_estimate () const {
+    virtual boost::shared_ptr<const trajectory_type> get_trajectory () const {
         return boost::shared_ptr<const trajectory_type> (this->shared_from_this(), &state_estimates);
     }
     
-    virtual boost::shared_ptr<const map_estimate_type> map_estimate () const;
+    virtual boost::shared_ptr<const map_estimate_type> get_map () const;
     
 private:
     
@@ -368,7 +367,7 @@ void mcmc_slam<ControlModel, ObservationModel>
 /** Returns current estimates of the positions of all observed features. */
 template <class ControlModel, class ObservationModel>
 boost::shared_ptr<const typename mcmc_slam<ControlModel, ObservationModel>::map_estimate_type>
-mcmc_slam<ControlModel, ObservationModel>::map_estimate () const {
+mcmc_slam<ControlModel, ObservationModel>::get_map () const {
     
     boost::container::vector<typename map_estimate_type::value_type> estimates;
     estimates.reserve (feature_estimates.size());
