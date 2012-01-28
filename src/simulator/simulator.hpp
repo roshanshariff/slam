@@ -10,12 +10,15 @@
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/container/flat_map.hpp>
 #include <boost/program_options.hpp>
+#include <boost/signals2.hpp>
+#include <boost/utility.hpp>
 
 #include "slam/slam_data.hpp"
 #include "slam/slam_result.hpp"
 #include "utility/random.hpp"
 #include "utility/bitree.hpp"
 #include "utility/utility.hpp"
+
 
 template <class Controller, class Sensor>
 class simulator
@@ -34,6 +37,8 @@ public:
 
     typedef typename slam_data_type::featureid_t featureid_t;
     typedef typename slam_data_type::timestep_t timestep_t;
+
+    typedef boost::signals2::signal<void (timestep_t)> timestep_signal_type;
     
 private:
     
@@ -52,6 +57,8 @@ private:
 	trajectory_type trajectory;
     feature_map_type feature_map;
 
+    timestep_signal_type timestep_signal;
+    
 public:
     
     simulator (boost::program_options::variables_map& options, unsigned int seed);
@@ -64,6 +71,10 @@ public:
     
     boost::shared_ptr<const slam_data_type> get_slam_data () const {
         return boost::shared_ptr<const slam_data_type> (this->shared_from_this(), &data);
+    }
+    
+    boost::signals2::connection connect_timestep_listener (const timestep_signal_type::slot_type& l) {
+        return timestep_signal.connect (l);
     }
     
     // Overridden virtual member functions of slam_result
@@ -100,6 +111,8 @@ void simulator<Controller, Sensor>::operator() () {
     sensor.sense (get_state(), random, boost::bind (&slam_data_type::add_observation, boost::ref(data), _1, _2));
     data.end_observation();
 
+    timestep_signal (data.current_timestep());
+    
 	while (!controller.finished()) {
 
 		control_model_type control = controller.control (get_state());
@@ -108,6 +121,8 @@ void simulator<Controller, Sensor>::operator() () {
 
         sensor.sense (get_state(), random, boost::bind (&slam_data_type::add_observation, boost::ref(data), _1, _2));
         data.end_observation();
+        
+        timestep_signal (data.current_timestep());
 	}
 }
 
