@@ -8,7 +8,7 @@
 
 #include <cmath>
 
-#include <boost/container/flat_map>
+#include <boost/container/flat_map.hpp>
 
 #include "simulator/gnuplot.hpp"
 #include "utility/bitree.hpp"
@@ -32,11 +32,14 @@ void gnuplot::plot (size_t timestep) {
 }
 
 
-void gnuplot::add_data_source (boost::shared_ptr<const slam_result_type> source,
-                               bool autoscale_map, std::string feature_point_style,
-                               std::string trajectory_line_style, std::string state_arrow_style) {
+void gnuplot::add_data_source (boost::shared_ptr<const slam_result_type> source, bool autoscale_map,
+                               std::string trajectory_title, std::string landmark_title,
+                               std::string feature_point_style, std::string trajectory_line_style,
+                               std::string state_arrow_style)
+{
     data_source source_info = {
-        source, autoscale_map, feature_point_style, trajectory_line_style, state_arrow_style
+        source, autoscale_map, trajectory_title, landmark_title,
+        feature_point_style, trajectory_line_style, state_arrow_style
     };
     data_sources.push_back (source_info);
 }
@@ -53,13 +56,15 @@ void gnuplot::write_buffer () {
 
 
 void gnuplot::add_plot (size_t num_records) {
-    std::fprintf (gnuplot_process.get(), "'-' binary record=%zu format='%%double%%double' ");
+    std::fprintf (gnuplot_process.get(), "'-' binary record=%zu format='%%double%%double' ", num_records);
 }
 
 
 void gnuplot::plot_data_source (const data_source& source) {
     plot_map (source);
+    fputs (", ");
     plot_trajectory (source);
+    fputs (", ");
     plot_state (source);
 }
 
@@ -73,7 +78,7 @@ void gnuplot::plot_map (const data_source& source) {
     size_t num_records = 0;
     
     for (; iter != map->end(); ++iter) {
-        position pos = initial_pose + iter->second();
+        position pos = initial_pose + iter->second;
         buffer.emplace_back (pos.x(), pos.y());
         ++num_records;
     }
@@ -82,6 +87,12 @@ void gnuplot::plot_map (const data_source& source) {
     
     add_plot (num_records);    
     if (!source.autoscale_map) fputs ("noautoscale ");
+    if (!source.landmark_title.empty()) {
+        std::fprintf (gnuplot_process.get(), "title '%s' ", source.landmark_title.c_str());
+    }
+    else {
+        fputs ("notitle ");
+    }
     fputs ("with points ");
     fputs (source.feature_point_style.c_str());
 }
@@ -89,7 +100,7 @@ void gnuplot::plot_map (const data_source& source) {
 
 void gnuplot::plot_trajectory (const data_source& source) {
     
-    boost::shared_ptr<const bitree<position> > trajectory = source.source->get_trajectory();
+    boost::shared_ptr<const bitree<pose> > trajectory = source.source->get_trajectory();
     
     pose state = initial_pose;
     buffer.emplace_back (state.x(), state.y());
@@ -104,19 +115,25 @@ void gnuplot::plot_trajectory (const data_source& source) {
     trajectory.reset();
     
     add_plot (num_records);
-    fputs ("noautoscale with lines ");
+    fputs ("noautoscale notitle with lines ");
     fputs (source.trajectory_line_style.c_str());
 }
 
 
 void gnuplot::plot_state (const data_source& source) {
     pose state = initial_pose + source.source->get_state();
-    double epsilon = 0.1;
+    double epsilon = 2;
     double xdelta = epsilon * std::cos (state.bearing());
     double ydelta = epsilon * std::sin (state.bearing());
-    buffer.emplace_back (state.x() - xdelta, state.y() - ydelta);
+    buffer.emplace_back (state.x(), state.y());
     buffer.emplace_back (xdelta, ydelta);
-    fputs ("'-' binary record=1 format='%%double%%double%%double%%double' noautoscale with vectors ")
-    fputs (source.state_arrow_style().c_str());
+    fputs ("'-' binary record=1 format='%double%double%double%double' noautoscale with vectors ");
+    if (!source.trajectory_title.empty()) {
+        std::fprintf (gnuplot_process.get(), "title '%s' ", source.trajectory_title.c_str());
+    }
+    else {
+        fputs ("notitle ");
+    }
+    fputs (source.state_arrow_style.c_str());
 }
 

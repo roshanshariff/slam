@@ -11,11 +11,12 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 
-#include "simulator/simulator.hpp"
 #include "planar_robot/waypoint_controller.hpp"
 #include "planar_robot/landmark_sensor.hpp"
 #include "slam/mcmc_slam.hpp"
 #include "slam/fastslam.hpp"
+#include "simulator/simulator.hpp"
+#include "simulator/gnuplot.hpp"
 #include "utility/random.hpp"
 #include "utility/utility.hpp"
 
@@ -52,13 +53,45 @@ int main (int argc, char* argv[]) {
     boost::shared_ptr<sim_types::simulator_type> sim
     = boost::make_shared<sim_types::simulator_type> (boost::ref(options), random());
     
-    boost::shared_ptr<sim_types::mcmc_slam_type> mcmc_slam
-    = boost::make_shared<sim_types::mcmc_slam_type> (boost::ref(options), random());
-    mcmc_slam->connect (sim->get_slam_data());
+    boost::shared_ptr<sim_types::mcmc_slam_type> mcmc_slam;
+    if (options.count ("mcmc-slam")) {
+        mcmc_slam = boost::make_shared<sim_types::mcmc_slam_type> (boost::ref(options), random());
+        mcmc_slam->connect (sim->get_slam_data());
+    }
     
-    boost::shared_ptr<sim_types::fastslam_type> fastslam
-    = boost::make_shared<sim_types::fastslam_type> (boost::ref(options), random());
-    fastslam->connect (sim->get_slam_data());
+    boost::shared_ptr<sim_types::fastslam_type> fastslam;
+    if (options.count ("fastslam")) {
+        fastslam = boost::make_shared<sim_types::fastslam_type> (boost::ref(options), random());
+        fastslam->connect (sim->get_slam_data());
+    }
+    
+    boost::shared_ptr<gnuplot> gnuplotter;
+    if (options.count ("gnuplot")) {
+
+        gnuplotter = boost::make_shared<gnuplot> (sim->get_initial_state());
+
+        sim->connect_timestep_listener
+        (sim_types::simulator_type::timestep_slot_type (&gnuplot::plot, gnuplotter.get(), _1).track (gnuplotter));
+        
+        gnuplotter->add_data_source (sim, true, "Actual Trajectory", "Actual Landmarks",
+                                     "lc rgbcolor 'red' pt 6 ps 1.5",
+                                     "lc rgbcolor 'black' lw 5",
+                                     "size 10,20,50 filled lc rgbcolor 'black'");
+        
+        if (fastslam) {
+            gnuplotter->add_data_source (fastslam, false, "FastSLAM 2.0 Trajectory", "",
+                                         "lc rgbcolor 'blue' pt 3 ps 1",
+                                         "lc rgbcolor 'blue' lw 2",
+                                         "size 10,20,50 filled lc rgbcolor 'blue'");
+        }
+
+        if (mcmc_slam) {
+            gnuplotter->add_data_source (mcmc_slam, false, "MCMC-SLAM Trajectory", "",
+                                         "lc rgbcolor 'green' pt 3 ps 1",
+                                         "lc rgbcolor 'green' lw 2",
+                                         "size 10,20,50 filled lc rgbcolor 'green'");
+        }
+    }
     
     /* set up simulation logging */
     
@@ -91,6 +124,9 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     ("output-dir,o", po::value<std::string>()->default_value("./output"),
      "directory for simulation output files")
     ("log", "produce detailed simulation logs")
+    ("mcmc-slam", "enable MCMC-SLAM")
+    ("fastslam", "enable FastSLAM 2.0")
+    ("gnuplot", "produce gnuplot output")
     ("seed", po::value<unsigned int>(), "seed for global random number generator");
 
     po::options_description simulator_options = sim_types::simulator_type::program_options();

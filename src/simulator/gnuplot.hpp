@@ -22,11 +22,11 @@
 
 class gnuplot {
     
-    using planar_robot::pose;
-    using planar_robot::position;
-    
     typedef size_t timestep_t;
     typedef size_t featureid_t;
+    
+    typedef planar_robot::pose pose;
+    typedef planar_robot::position position;
 
     typedef slam_result<pose, position> slam_result_type;
     typedef std::pair<double, double> record_type;
@@ -34,10 +34,12 @@ class gnuplot {
     struct data_source {
         boost::shared_ptr<const slam_result_type> source;
         bool autoscale_map;
+        std::string trajectory_title;
+        std::string landmark_title;
         std::string feature_point_style;
         std::string trajectory_line_style;
         std::string state_arrow_style;
-    }
+    };
 
     /** Data members */
     
@@ -48,7 +50,7 @@ class gnuplot {
     pose initial_pose;
     
     /** Implementation member functions. */
-    int fputs (const char* str) { std::fputs (str, gnuplot_process.get()); }
+    int fputs (const char* str) { return std::fputs (str, gnuplot_process.get()); }
     void write_buffer ();
     void add_plot (size_t num_records);
 
@@ -59,13 +61,14 @@ class gnuplot {
         
 public:
     
-    gnuplot ();
+    gnuplot (pose initial_pose);
     
     void plot (timestep_t timestep);
     
-    void add_data_source (boost::shared_ptr<const slam_result_type> source,
-                          bool autoscale_map, std::string feature_point_style,
-                          std::string trajectory_line_style, std::string state_arrow_style);
+    void add_data_source (boost::shared_ptr<const slam_result_type> source, bool autoscale_map,
+                          std::string trajectory_title, std::string landmark_title,
+                          std::string feature_point_style, std::string trajectory_line_style,
+                          std::string state_arrow_style);
 
 };
 

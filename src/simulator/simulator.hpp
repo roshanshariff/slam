@@ -39,6 +39,7 @@ public:
     typedef typename slam_data_type::timestep_t timestep_t;
 
     typedef boost::signals2::signal<void (timestep_t)> timestep_signal_type;
+    typedef typename timestep_signal_type::slot_type timestep_slot_type;
     
 private:
     
@@ -73,7 +74,7 @@ public:
         return boost::shared_ptr<const slam_data_type> (this->shared_from_this(), &data);
     }
     
-    boost::signals2::connection connect_timestep_listener (const timestep_signal_type::slot_type& l) {
+    boost::signals2::connection connect_timestep_listener (const timestep_slot_type& l) {
         return timestep_signal.connect (l);
     }
     
