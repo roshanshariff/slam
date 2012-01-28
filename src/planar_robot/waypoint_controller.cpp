@@ -9,6 +9,7 @@
 #include <fstream>
 #include <cstdlib>
 #include <cassert>
+#include <iostream>
 
 #include <boost/math/constants/constants.hpp>
 
@@ -94,9 +95,6 @@ waypoint_controller::model_type waypoint_controller::control (const pose& state)
 
 		position to_waypoint = -state + waypoints[current_waypoint % waypoints.size()];
 
-		std::cout << "Seeking waypoint " << current_waypoint+1 << " of " << waypoints.size()
-			<< " (distance is " << to_waypoint.distance() << " m)" << std::endl;
-
 		double steering_change = to_waypoint.direction() - current_steering;
 		if (std::abs(steering_change) > steering_rate) {
 			steering_change = steering_change < 0 ? -steering_rate : steering_rate;
@@ -109,6 +107,8 @@ waypoint_controller::model_type waypoint_controller::control (const pose& state)
 
 		if (to_waypoint.distance() < proximity) {
 			++current_waypoint;
+            std::cout << "Seeking waypoint " << current_waypoint+1 << " of " << waypoints.size()
+			<< " (distance is " << to_waypoint.distance() << " m)" << std::endl;
 		}
 
 	}
