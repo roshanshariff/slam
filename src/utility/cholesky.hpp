@@ -62,8 +62,8 @@ void cholesky_downdate (Eigen::Matrix<double, N, N>& L, Eigen::Matrix<double, N,
 
 	L.template triangularView<Eigen::Lower>().solveInPlace(p);
 
-	double rho = std::sqrt(1 - p.squaredNorm());
-	assert(rho > 0); // otherwise the downdate would destroy positive definiteness.
+	assert(p.squaredNorm() < 1); // otherwise the downdate would destroy positive definiteness.
+	double rho = std::sqrt (1 - p.squaredNorm());
 
 	Eigen::JacobiRotation<double> rot;
 	Eigen::Matrix<double, N, 1> temp;

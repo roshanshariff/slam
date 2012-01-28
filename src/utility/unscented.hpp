@@ -77,9 +77,9 @@ void unscented_transform (const unscented_params<N>& params,
         .template topLeftCorner<M,M>().template triangularView<Eigen::Upper>().transpose();
 
     cholesky_update<M> (result.chol_cov(), base_innov, params.weight_first());
-
-    if (cross_cov) cross_cov->noalias() = params.weight_rest() * params.eta() * state_chol_cov
-            * (sigmapts.template rightCols<N>() - sigmapts.template leftCols<N>()).transpose();
+    
+    if (cross_cov) cross_cov->noalias() = std::sqrt(params.weight_rest()) * params.eta() * state_chol_cov
+        * (sigmapts.template block<M,N>(0,N) - sigmapts.template leftCols<N>()).transpose();
 }
 
 
@@ -104,7 +104,7 @@ void unscented_update (const unscented_params<N>& params,
     const typename ObsDist::matrix_type& p = predicted.chol_cov();
     kalman_gain = p.template triangularView<Eigen::Lower>().transpose().template solve<Eigen::OnTheRight>(kalman_gain);
     kalman_gain = p.template triangularView<Eigen::Lower>().template solve<Eigen::OnTheRight>(kalman_gain);
-
+    
     state.mean().noalias() += kalman_gain * ObsDist::subtract(obs.mean(), predicted.mean());
 
     kalman_gain *= p;
