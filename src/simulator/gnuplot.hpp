@@ -9,11 +9,10 @@
 #ifndef slam_gnuplot_hpp
 #define slam_gnuplot_hpp
 
+#include <vector>
+#include <string>
 #include <cstdio>
-#include <cstring>
-#include <utility>
 
-#include <boost/container/vector.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "planar_robot/pose.hpp"
@@ -29,7 +28,6 @@ class gnuplot {
     typedef planar_robot::position position;
 
     typedef slam_result<pose, position> slam_result_type;
-    typedef std::pair<double, double> record_type;
 
     struct data_source {
         boost::shared_ptr<const slam_result_type> source;
@@ -43,18 +41,18 @@ class gnuplot {
 
     /** Data members */
     
-    boost::shared_ptr<FILE> gnuplot_process;
-    boost::container::vector<record_type> buffer;
-    boost::container::vector<data_source> data_sources;
-    
     pose initial_pose;
+    
+    boost::shared_ptr<FILE> gnuplot_process;
+    std::vector<data_source> data_sources;
+    std::vector<float> buffer;
+    size_t num_plotted;
     
     /** Implementation member functions. */
     int fputs (const char* str) { return std::fputs (str, gnuplot_process.get()); }
-    void write_buffer ();
-    void add_plot (size_t num_records);
-
-    void plot_data_source (const data_source&);
+    void add_plot (size_t columns);
+    void finish_plotting ();
+    void add_title (const std::string& title);
     void plot_map (const data_source&);
     void plot_trajectory (const data_source&);
     void plot_state (const data_source&);

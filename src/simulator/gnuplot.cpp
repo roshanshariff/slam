@@ -7,6 +7,7 @@
 //
 
 #include <cmath>
+#include <cassert>
 
 #include <boost/container/flat_map.hpp>
 
@@ -15,20 +16,12 @@
 #include "utility/utility.hpp"
 
 
-gnuplot::gnuplot (pose initial_pose) : initial_pose(initial_pose) {
+gnuplot::gnuplot (pose initial_pose) : initial_pose(initial_pose), num_plotted(0) {
     gnuplot_process = open_process("gnuplot -p", "w");
-    fputs ("set size square\n");
-}
-
-
-void gnuplot::plot (size_t timestep) {
-    fputs ("plot ");
-    for (size_t i = 0; i < data_sources.size(); ++i) {
-        if (i > 0) fputs (", ");
-        plot_data_source (data_sources[i]);
-    }
-    fputs ("\n");
-    write_buffer();
+    fputs ("set key on outside center bottom horizontal Left reverse\n");
+    fputs ("set size ratio -1\n");
+    fputs ("set auto fix\n");
+    fputs ("set offsets graph 0.05, graph 0.05, graph 0.05, graph 0.05\n");
 }
 
 
@@ -45,54 +38,70 @@ void gnuplot::add_data_source (boost::shared_ptr<const slam_result_type> source,
 }
 
 
-void gnuplot::write_buffer () {
-    const record_type* record_ptr = buffer.data();
-    const record_type* const end = buffer.data() + buffer.size();
-    while (record_ptr < end) {
-        record_ptr += std::fwrite(record_ptr, sizeof(record_type), end-record_ptr, gnuplot_process.get());
+void gnuplot::plot (size_t timestep) {
+
+    std::vector<data_source>::const_iterator iter = data_sources.begin();
+
+    for (const char* separator = "plot "; iter != data_sources.end(); ++iter) {
+
+        fputs (separator);
+        separator = ", ";
+
+        plot_map (*iter);
+        fputs (", ");
+
+        plot_trajectory (*iter);
+        fputs (", ");
+
+        plot_state (*iter);
     }
+    finish_plotting();
+}
+
+
+void gnuplot::add_plot (size_t columns) {
+    assert (buffer.size() >= num_plotted);
+    size_t records = buffer.size() - num_plotted;
+    assert (records % columns == 0);
+    records /= columns;
+    std::fprintf (gnuplot_process.get(), "'-' binary record=%zu format='%%%zufloat' ", records, columns);
+    num_plotted = buffer.size();
+}
+
+
+void gnuplot::finish_plotting () {
+
+    fputs("\n");
+
+    const float* data = buffer.data();
+    size_t remaining = buffer.size();
+    while (remaining) remaining -= std::fwrite (data, sizeof(*data), remaining, gnuplot_process.get());
+
     buffer.clear();
+    num_plotted = 0;
 }
 
 
-void gnuplot::add_plot (size_t num_records) {
-    std::fprintf (gnuplot_process.get(), "'-' binary record=%zu format='%%double%%double' ", num_records);
-}
-
-
-void gnuplot::plot_data_source (const data_source& source) {
-    plot_map (source);
-    fputs (", ");
-    plot_trajectory (source);
-    fputs (", ");
-    plot_state (source);
+void gnuplot::add_title (const std::string& title) {
+    if (!title.empty()) std::fprintf (gnuplot_process.get(), "title '%s' ", title.c_str());
+    else fputs ("notitle ");
 }
 
 
 void gnuplot::plot_map (const data_source& source) {
     
     typedef boost::container::flat_map<featureid_t, position> feature_map_type;
-
     boost::shared_ptr<const feature_map_type> map = source.source->get_map();
-    feature_map_type::const_iterator iter = map->begin();
-    size_t num_records = 0;
     
-    for (; iter != map->end(); ++iter) {
+    for (feature_map_type::const_iterator iter = map->begin(); iter != map->end(); ++iter) {
         position pos = initial_pose + iter->second;
-        buffer.emplace_back (pos.x(), pos.y());
-        ++num_records;
+        buffer.push_back (pos.x());
+        buffer.push_back (pos.y());
     }
 
-    map.reset();
-    
-    add_plot (num_records);    
+    add_plot (2);    
     if (!source.autoscale_map) fputs ("noautoscale ");
-    if (!source.landmark_title.empty()) {
-        std::fprintf (gnuplot_process.get(), "title '%s' ", source.landmark_title.c_str());
-    }
-    else {
-        fputs ("notitle ");
-    }
+    add_title (source.landmark_title);
     fputs ("with points ");
     fputs (source.feature_point_style.c_str());
 }
@@ -103,37 +112,36 @@ void gnuplot::plot_trajectory (const data_source& source) {
     boost::shared_ptr<const bitree<pose> > trajectory = source.source->get_trajectory();
     
     pose state = initial_pose;
-    buffer.emplace_back (state.x(), state.y());
-    size_t num_records = 1;
-    
+    buffer.push_back (state.x());
+    buffer.push_back (state.y());
+
     for (size_t i = 0; i < trajectory->size(); ++i) {
         state += trajectory->get(i);
-        buffer.emplace_back (state.x(), state.y());
-        ++num_records;
+        buffer.push_back (state.x());
+        buffer.push_back (state.y());
     }
     
-    trajectory.reset();
-    
-    add_plot (num_records);
+    add_plot (2);
     fputs ("noautoscale notitle with lines ");
     fputs (source.trajectory_line_style.c_str());
 }
 
 
 void gnuplot::plot_state (const data_source& source) {
+
     pose state = initial_pose + source.source->get_state();
-    double epsilon = 2;
+    
+    double epsilon = 5;
     double xdelta = epsilon * std::cos (state.bearing());
     double ydelta = epsilon * std::sin (state.bearing());
-    buffer.emplace_back (state.x(), state.y());
-    buffer.emplace_back (xdelta, ydelta);
-    fputs ("'-' binary record=1 format='%double%double%double%double' noautoscale with vectors ");
-    if (!source.trajectory_title.empty()) {
-        std::fprintf (gnuplot_process.get(), "title '%s' ", source.trajectory_title.c_str());
-    }
-    else {
-        fputs ("notitle ");
-    }
+    buffer.push_back (state.x());
+    buffer.push_back (state.y());
+    buffer.push_back (xdelta);
+    buffer.push_back (ydelta);
+    
+    add_plot (4);
+    fputs ("noautoscale with vectors ");
+    add_title (source.trajectory_title);
     fputs (source.state_arrow_style.c_str());
 }
 
