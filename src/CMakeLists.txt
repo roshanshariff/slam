@@ -1,9 +1,10 @@
 cmake_minimum_required (VERSION 2.8)
-
 project (slam CXX)
-add_executable (slam
-    main.cpp planar_robot/waypoint_controller.cpp planar_robot/landmark_sensor.cpp
+
+set (SLAM_SRCS main.cpp planar_robot/waypoint_controller.cpp planar_robot/landmark_sensor.cpp
     utility/utility.cpp utility/cowtree.cpp simulator/gnuplot.cpp)
+
+add_executable (slam ${SLAM_SRCS})
 
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
@@ -15,3 +16,5 @@ target_link_libraries (slam ${Boost_LIBRARIES})
 
 find_package (Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
+
+set (CMAKE_BUILD_TYPE Release)
