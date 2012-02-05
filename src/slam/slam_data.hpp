@@ -5,6 +5,8 @@
 #include <map>
 #include <cassert>
 #include <utility>
+#include <cmath>
+#include <cassert>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
@@ -13,12 +15,20 @@
 #include <boost/ref.hpp>
 #include <boost/utility.hpp>
 
+#include "slam/slam_result.hpp"
+#include "utility/bitree.hpp"
+
+
 /** This class stores a record of all state changes and observations, as probability distributions.
     It is also responsible for notifying listeners when new state changes and observations are added.
     ActionModel and ObservationModel are the types of distributions over state changes and
     observations, respectively. */
 template <class ControlModel, class ObservationModel>
 class slam_data : boost::noncopyable {
+    
+    typedef typename ControlModel::result_type state_type;
+    typedef typename ObservationModel::result_type feature_type;
+    typedef slam_result<state_type, feature_type> slam_result_type;
 
 public:
 
@@ -104,6 +114,48 @@ public:
 	void end_observation () {
         foreach_listener (boost::bind (&listener::end_observation, _1, current_timestep()));
 	}
+    
+    /** Evaluate SLAM estimates */
+    
+    double log_likelihood (boost::shared_ptr<const slam_result_type> result) const {
+        
+        boost::shared_ptr<const bitree<state_type> > trajectory = result->get_trajectory();
+        boost::shared_ptr<const boost::container::flat_map<size_t, feature_type> > map = result->get_map();
+        
+        assert (trajectory->size() <= current_timestep());
+        
+        double log_likelihood = 0;
+        
+        for (timestep_t t = 0; t < trajectory->size(); ++t) {
+            log_likelihood += control(t).log_likelihood (trajectory->get(t));
+        }
+        
+        typename boost::container::flat_map<size_t, feature_type>::const_iterator map_iter = map->begin();
+        for (; map_iter != map->end(); ++map_iter) {
+            
+            const feature_data_type& data = feature_data (map_iter->first);
+            feature_type observation = map_iter->second;
+            timestep_t observation_base = 0;
+            
+            typename feature_data_type::const_iterator obs_iter = data.begin();
+            for (; obs_iter != data.end(); ++obs_iter) {
+                
+                const state_type& state_change = trajectory->accumulate (observation_base, obs_iter->first);
+                observation = -state_change + observation;
+                observation_base = obs_iter->first;
+                
+                const ObservationModel& distribution = obs_iter->second;
+                log_likelihood += distribution.log_likelihood (observation);
+            }
+        }
+        
+        return log_likelihood;
+    }
+    
+
+    double likelihood (boost::shared_ptr<const slam_result_type> result) const {
+        return std::exp (log_likelihood (result));
+    }
     
 };
 

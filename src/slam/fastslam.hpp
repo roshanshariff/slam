@@ -16,6 +16,8 @@
 #include <boost/program_options.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
+#include <boost/optional.hpp>
+#include <boost/none.hpp>
 #include <boost/bind.hpp>
 
 #include <Eigen/Eigen>
@@ -77,9 +79,9 @@ public slam_result<typename ControlModel::result_type, typename ObservationModel
     struct map_estimate_inserter;
     
     struct particle_type {
-        struct trajectory_type {
+        struct state_list {
             state_type state;
-            boost::shared_ptr<const trajectory_type> previous;
+            boost::shared_ptr<const state_list> previous;
         } trajectory;
         cowmap<featureid_t, feature_dist> features;
     };
@@ -101,7 +103,8 @@ public slam_result<typename ControlModel::result_type, typename ObservationModel
 
     /** Whether to keep a per-particle trajectory as opposed to one combined trajectory. */
     const bool keep_particle_trajectory;
-    bitree<state_type> trajectory;
+    mutable boost::shared_ptr<trajectory_type> trajectory_estimate;
+    mutable boost::shared_ptr<map_estimate_type> map_estimate;
 
     /** All the UKF parameters used by FastSLAM */
     const struct unscented_params_holder {
@@ -118,7 +121,7 @@ public slam_result<typename ControlModel::result_type, typename ObservationModel
 
     /** Current timestep, current control, and observations made in the current timestep. */
     timestep_t current_timestep;
-    ControlModel current_control;
+    boost::optional<ControlModel> current_control;
     boost::container::vector<std::pair<featureid_t, ObservationModel> > seen_features, new_features;
     
 public:
@@ -135,14 +138,19 @@ public:
     
     // Overridden virtual member functions of slam_result
     
-    virtual state_type get_state () const { return trajectory.accumulate(); }
+    virtual state_type get_state () const {
+        if (trajectory_estimate) return trajectory_estimate->accumulate();
+        else return particles.max_weight_particle().trajectory.state;
+    }
     
     virtual boost::shared_ptr<const trajectory_type> get_trajectory () const;
     
     virtual boost::shared_ptr<const map_estimate_type> get_map () const {
-        boost::shared_ptr<map_estimate_type> estimate = boost::make_shared<map_estimate_type>();
-        particles.max_weight_particle().features.for_each (map_estimate_inserter (*estimate));
-        return estimate;
+        if (!map_estimate) {
+            map_estimate = boost::make_shared<map_estimate_type>();
+            particles.max_weight_particle().features.for_each (map_estimate_inserter (*map_estimate));
+        }
+        return map_estimate;
     }
 
 };
@@ -206,6 +214,7 @@ template <class ControlModel, class ObservationModel>
 void fastslam<ControlModel, ObservationModel>
 ::add_control (timestep_t timestep, const ControlModel& control) {
     assert (timestep == current_timestep);
+    assert (!current_control);
     current_control = control;
     ++current_timestep;
 }
@@ -228,12 +237,20 @@ void fastslam<ControlModel, ObservationModel>
     // Update particle state
     
     if (timestep > 0) {
+
         if (particles.effective_size() < num_particles*resample_threshold) {
             particles.resample (random, num_particles);
         }
+
+        assert (current_control);
         particles.update (boost::bind (&fastslam::particle_state_update, this, _1));
+        current_control = boost::none;
+        
+        const state_type& state_estimate = particles.max_weight_particle().trajectory.state;
+        
+        if (keep_particle_trajectory) trajectory_estimate.reset();
+        else trajectory_estimate->push_back (-trajectory_estimate->accumulate() + state_estimate);
     }
-    trajectory.push_back (-trajectory.accumulate() + particles.max_weight_particle().trajectory.state);
     
     // Update particle features
 
@@ -282,7 +299,7 @@ double fastslam<ControlModel, ObservationModel>
     
     state_dist state, state_proposal;
 
-    unscented_transform (ukf_params.control, current_control.vector_model(), state.vector_model(),
+    unscented_transform (ukf_params.control, current_control->vector_model(), state.vector_model(),
                          state_dist::matrix_type::Zero(), state_predictor (particle.trajectory.state));
     
     { // Calculate proposal distribution
@@ -311,7 +328,7 @@ double fastslam<ControlModel, ObservationModel>
     }
     
     if (keep_particle_trajectory) {
-        particle.trajectory.previous = boost::make_shared<typename particle_type::trajectory_type> (particle.trajectory);
+        particle.trajectory.previous = boost::make_shared<typename particle_type::state_list> (particle.trajectory);
     }
     
     particle.trajectory.state = state_proposal (random);
@@ -349,23 +366,19 @@ template <class ControlModel, class ObservationModel>
 boost::shared_ptr<const typename fastslam<ControlModel, ObservationModel>::trajectory_type>
 fastslam<ControlModel, ObservationModel>::get_trajectory () const {
     
-    if (keep_particle_trajectory) {
-
-        size_t i = trajectory.size();
-        const typename particle_type::trajectory_type* p = &particles.max_weight_particle().trajectory;
-
-        boost::shared_ptr<trajectory_type> estimate = boost::make_shared<trajectory_type>(i);
-
-        while (i > 0 && p->previous) {
-            (*estimate)[--i] = -p->previous->state + p->state;
-            p = p->previous.get();
-        }
+    if (!trajectory_estimate) {
         
-        return estimate;
+        size_t i = current_control ? current_timestep-1 : current_timestep;
+        const typename particle_type::state_list* p = &particles.max_weight_particle().trajectory;
+
+        trajectory_estimate = boost::make_shared<trajectory_type>(i);
+        
+        for (; i > 0 && p->previous; p = p->previous.get()) {
+            (*trajectory_estimate)[--i] = -p->previous->state + p->state;
+        }
     }
-    else {
-        return boost::shared_ptr<const trajectory_type> (this->shared_from_this(), &trajectory);
-    }
+            
+    return trajectory_estimate;
 }
 
 
@@ -396,6 +409,11 @@ keep_particle_trajectory(options.count("particle-trajectory")),
 ukf_params              (options["ukf-alpha"].as<double>(),
                          options["ukf-beta"].as<double>(),
                          options["ukf-kappa"].as<double>()),
-current_timestep        (0) { }
+current_timestep        (0)
+{
+    if (!keep_particle_trajectory) {
+        trajectory_estimate = boost::make_shared<trajectory_type>();
+    }
+}
 
 #endif
