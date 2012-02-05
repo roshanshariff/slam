@@ -1,25 +1,29 @@
 //
-//  gnuplot.hpp
+//  slam_plotter.hpp
 //  slam
 //
 //  Created by Roshan Shariff on 12-01-27.
 //  Copyright (c) 2012 University of Alberta. All rights reserved.
 //
 
-#ifndef slam_gnuplot_hpp
-#define slam_gnuplot_hpp
+#ifndef slam_slam_plotter_hpp
+#define slam_slam_plotter_hpp
 
 #include <vector>
 #include <string>
-#include <cstdio>
 
 #include <boost/shared_ptr.hpp>
+#include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/utility.hpp>
 
 #include "planar_robot/pose.hpp"
 #include "planar_robot/position.hpp"
 #include "slam/slam_result.hpp"
+#include "simulator/gnuplot_process.hpp"
 
-class gnuplot {
+
+class slam_plotter : boost::noncopyable {
     
     typedef size_t timestep_t;
     typedef size_t featureid_t;
@@ -43,15 +47,14 @@ class gnuplot {
     
     pose initial_pose;
     
-    boost::shared_ptr<FILE> gnuplot_process;
+    bool file_output;
+    boost::filesystem::path output_dir;
+    
+    std::string title;
+    gnuplot_process gnuplot;
     std::vector<data_source> data_sources;
-    std::vector<float> buffer;
-    size_t num_plotted;
     
     /** Implementation member functions. */
-    int fputs (const char* str) { return std::fputs (str, gnuplot_process.get()); }
-    void add_plot (size_t columns);
-    void finish_plotting ();
     void add_title (const std::string& title);
     void plot_map (const data_source&);
     void plot_trajectory (const data_source&);
@@ -59,7 +62,9 @@ class gnuplot {
         
 public:
     
-    gnuplot (pose initial_pose);
+    slam_plotter (boost::program_options::variables_map&, const pose& initial_state);
+    
+    static boost::program_options::options_description program_options ();
     
     void plot (timestep_t timestep);
     

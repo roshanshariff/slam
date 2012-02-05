@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 2.8)
 project (slam CXX)
 
 set (SLAM_SRCS main.cpp planar_robot/waypoint_controller.cpp planar_robot/landmark_sensor.cpp
-    utility/utility.cpp utility/cowtree.cpp simulator/gnuplot.cpp)
+    utility/utility.cpp utility/cowtree.cpp simulator/gnuplot_process.cpp simulator/slam_plotter.cpp)
 
 add_executable (slam ${SLAM_SRCS})
 
