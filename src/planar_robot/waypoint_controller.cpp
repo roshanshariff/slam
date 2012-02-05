@@ -79,8 +79,8 @@ waypoint_controller::waypoint_controller (const po::variables_map& options)
 	}
     
 	speed = options["robot-speed"].as<double>() * dt;
-	steering_max = options["robot-steering-max"].as<double>() * RAD_PER_DEG;
-    steering_rate = options["robot-steering-rate"].as<double>() * dt * RAD_PER_DEG;
+	steering_max = options["robot-steering-max"].as<double>() * dt * RAD_PER_DEG;
+    steering_rate = options["robot-steering-rate"].as<double>() * dt * dt * RAD_PER_DEG;
     proximity = options["waypoint-proximity"].as<double>();
     repetitions = options["waypoint-repetitions"].as<double>();
     
