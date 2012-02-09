@@ -109,18 +109,20 @@ initial_state (controller.initial_state())
 template <class Controller, class Sensor>
 void simulator<Controller, Sensor>::operator() () {
 
-    sensor.sense (get_state(), random, boost::bind (&slam_data_type::add_observation, boost::ref(data), _1, _2));
+    sensor.sense (get_initial_state() + get_state(), random,
+                  boost::bind (&slam_data_type::add_observation, boost::ref(data), _1, _2));
     data.end_observation();
 
     timestep_signal (data.current_timestep());
     
 	while (!controller.finished()) {
 
-		control_model_type control = controller.control (get_state());
+		control_model_type control = controller.control (get_initial_state() + get_state());
 		trajectory.push_back(control(random));
 		data.add_control (control);
 
-        sensor.sense (get_state(), random, boost::bind (&slam_data_type::add_observation, boost::ref(data), _1, _2));
+        sensor.sense (get_initial_state() + get_state(), random,
+                      boost::bind (&slam_data_type::add_observation, boost::ref(data), _1, _2));
         data.end_observation();
         
         timestep_signal (data.current_timestep());

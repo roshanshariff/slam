@@ -252,6 +252,8 @@ void fastslam<ControlModel, ObservationModel>
         else trajectory_estimate->push_back (-trajectory_estimate->accumulate() + state_estimate);
     }
     
+    map_estimate.reset();
+    
     // Update particle features
 
     for (size_t i = 0; i < seen_features.size(); ++i) {
