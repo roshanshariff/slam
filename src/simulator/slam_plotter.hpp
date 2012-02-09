@@ -16,6 +16,7 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/utility.hpp>
+#include <boost/optional.hpp>
 
 #include "planar_robot/pose.hpp"
 #include "planar_robot/position.hpp"
@@ -47,8 +48,7 @@ class slam_plotter : boost::noncopyable {
     
     pose initial_pose;
     
-    bool file_output;
-    boost::filesystem::path output_dir;
+    boost::optional<boost::filesystem::path> output_dir;
     
     std::string title;
     gnuplot_process gnuplot;

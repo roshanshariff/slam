@@ -34,10 +34,10 @@ void slam_plotter::add_data_source (boost::shared_ptr<const slam_result_type> so
 
 void slam_plotter::plot (size_t timestep) {
     
-    if (file_output) {
+    if (output_dir) {
         std::ostringstream output_filename;
         output_filename << std::setfill('0') << std::setw(6) << timestep << ".png";
-        boost::filesystem::path output_file = output_dir/output_filename.str();
+        boost::filesystem::path output_file = (*output_dir)/output_filename.str();
         std::fprintf (gnuplot.handle(), "set output '%s'\n", output_file.c_str());
     }
 
@@ -58,7 +58,7 @@ void slam_plotter::plot (size_t timestep) {
     }
     gnuplot.plot ();
     
-    if (file_output) gnuplot.puts ("set output\n");
+    if (output_dir) gnuplot.puts ("set output\n");
 }
 
 
@@ -136,13 +136,9 @@ slam_plotter::slam_plotter (boost::program_options::variables_map& options, cons
 : initial_pose(initial_state), title (options["slam-plot-title"].as<std::string>())
 {
     if (options.count ("slam-plot-output-dir")) {
-        output_dir = options["slam-plot-output-dir"].as<std::string>();
-        boost::filesystem::create_directories (output_dir);
-        file_output = true;
+        output_dir = boost::filesystem::path (options["slam-plot-output-dir"].as<std::string>());
+        boost::filesystem::create_directories (*output_dir);
         gnuplot.puts ("set terminal pngcairo font 'Sans,8' size 640, 480\n");
-    }
-    else {
-        file_output = false;
     }
 }
 
