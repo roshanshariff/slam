@@ -17,4 +17,8 @@ target_link_libraries (slam ${Boost_LIBRARIES})
 find_package (Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
-set (CMAKE_BUILD_TYPE Release)
+set (CMAKE_BUILD_TYPE Debug)
+
+add_definitions ("-std=c++0x")
+#add_definitions ("-stdlib=libc++")
+#set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libc++")

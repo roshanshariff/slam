@@ -22,10 +22,11 @@ class gnuplot_process : boost::noncopyable {
     size_t buffer_queued;
     
     bool plot_started;
+    const bool debug_mode;
     
 public:
     
-    gnuplot_process ();
+    gnuplot_process (bool debug = false);
     virtual ~gnuplot_process ();
     FILE* handle () { return fh; }
     

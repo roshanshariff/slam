@@ -15,6 +15,7 @@
 #include "planar_robot/position.hpp"
 #include "planar_robot/range_bearing_model.hpp"
 #include "slam/vector_model.hpp"
+#include "slam/interfaces.hpp"
 #include "utility/random.hpp"
 
 namespace planar_robot {
@@ -58,7 +59,7 @@ namespace planar_robot {
             position obs = model_builder (-state + landmarks[i])(random);
             if (obs.distance() < max_range) {
                 ++hits;
-                observer (i, model_builder (obs));
+                observer (slam::featureid_type(i), model_builder (obs));
             }
         }
     }

@@ -17,7 +17,7 @@
 #include "slam/fastslam.hpp"
 #include "simulator/simulator.hpp"
 #include "simulator/slam_plotter.hpp"
-#include "simulator/likelihood_plotter.hpp"
+//#include "simulator/likelihood_plotter.hpp"
 #include "utility/random.hpp"
 #include "utility/utility.hpp"
 
@@ -32,10 +32,10 @@ struct sim_types {
     typedef simulator_type::control_model_type control_model_type;
     typedef simulator_type::observation_model_type observation_model_type;
     
-    typedef mcmc_slam<control_model_type, observation_model_type> mcmc_slam_type;
-    typedef fastslam<control_model_type, observation_model_type> fastslam_type;
+    typedef slam::mcmc_slam<control_model_type, observation_model_type> mcmc_slam_type;
+    typedef slam::fastslam<control_model_type, observation_model_type> fastslam_type;
     
-    typedef likelihood_plotter<control_model_type, observation_model_type> likelihood_plotter_type;
+    //typedef likelihood_plotter<control_model_type, observation_model_type> likelihood_plotter_type;
     
 };
 
@@ -60,24 +60,23 @@ int main (int argc, char* argv[]) {
     unsigned int mcmc_slam_seed = random();
     boost::shared_ptr<sim_types::mcmc_slam_type> mcmc_slam;
     if (options.count ("mcmc-slam")) {
-        mcmc_slam = boost::make_shared<sim_types::mcmc_slam_type> (boost::ref(options), mcmc_slam_seed);
-        mcmc_slam->connect (sim->get_slam_data());
+        mcmc_slam = boost::make_shared<sim_types::mcmc_slam_type> (sim->get_slam_data(),
+                                                                   boost::ref(options), mcmc_slam_seed);
+        sim->add_timestep_listener (mcmc_slam);
     }
     
     unsigned int fastslam_seed = random();
     boost::shared_ptr<sim_types::fastslam_type> fastslam;
     if (options.count ("fastslam")) {
         fastslam = boost::make_shared<sim_types::fastslam_type> (boost::ref(options), fastslam_seed);
-        fastslam->connect (sim->get_slam_data());
+        sim->add_data_listener (fastslam);
     }
     
     boost::shared_ptr<slam_plotter> slam_plot;
     if (options.count ("slam-plot")) {
 
         slam_plot = boost::make_shared<slam_plotter> (boost::ref(options), sim->get_initial_state());
-
-        sim_types::simulator_type::timestep_slot_type timestep_slot (&slam_plotter::plot, slam_plot.get(), _1);
-        sim->connect_timestep_listener (timestep_slot.track (slam_plot));
+        sim->add_timestep_listener (slam_plot);
         
         slam_plot->add_data_source (sim, true, "Trajectory", "Landmarks",
                                     "lc rgbcolor 'red' pt 6 ps 1.5",
@@ -99,12 +98,14 @@ int main (int argc, char* argv[]) {
         }
     }
     
+    /*
     boost::shared_ptr<sim_types::likelihood_plotter_type> likelihood_plot;
     if (options.count ("plot-likelihood")) {
         likelihood_plot = boost::make_shared<sim_types::likelihood_plotter_type> (sim->get_slam_data(), mcmc_slam, fastslam);
         sim_types::simulator_type::timestep_slot_type timestep_slot (&sim_types::likelihood_plotter_type::plot, likelihood_plot.get());
         sim->connect_timestep_listener (timestep_slot.track (likelihood_plot));
     }
+    */
     
     /* set up simulation logging */
     
@@ -195,12 +196,12 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
 		help_options.add(fastslam_options);
         help_requested = true;
 	}
-    
+
 	if (values.count("slam-plot-help")) {
 		help_options.add(slam_plot_options);
         help_requested = true;
 	}
-    
+
     if (help_requested) {
         std::cout << help_options << std::endl;
         std::exit(EXIT_SUCCESS);

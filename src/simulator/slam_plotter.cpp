@@ -32,11 +32,11 @@ void slam_plotter::add_data_source (boost::shared_ptr<const slam_result_type> so
 }
 
 
-void slam_plotter::plot (size_t timestep) {
+void slam_plotter::timestep (slam::timestep_type t) {
     
     if (output_dir) {
         std::ostringstream output_filename;
-        output_filename << std::setfill('0') << std::setw(6) << timestep << ".png";
+        output_filename << std::setfill('0') << std::setw(6) << std::size_t(t) << ".png";
         boost::filesystem::path output_file = (*output_dir)/output_filename.str();
         std::fprintf (gnuplot.handle(), "set output '%s'\n", output_file.c_str());
     }
@@ -70,11 +70,11 @@ void slam_plotter::add_title (const std::string& title) {
 
 void slam_plotter::plot_map (const data_source& source) {
     
-    typedef boost::container::flat_map<featureid_t, position> feature_map_type;
-    boost::shared_ptr<const feature_map_type> map = source.source->get_map();
+    auto map = source.source->get_map();
+    if (map->empty()) return;
     
-    for (feature_map_type::const_iterator iter = map->begin(); iter != map->end(); ++iter) {
-        position pos = initial_pose + iter->second;
+    for (const auto& feature : *map) {
+        position pos = initial_pose + feature.second;
         gnuplot << pos.x() << pos.y();
     }
 
@@ -88,7 +88,7 @@ void slam_plotter::plot_map (const data_source& source) {
 
 void slam_plotter::plot_trajectory (const data_source& source) {
     
-    boost::shared_ptr<const bitree<pose> > trajectory = source.source->get_trajectory();
+    auto trajectory = source.source->get_trajectory();
     
     pose state = initial_pose;
     gnuplot << state.x() << state.y();
@@ -127,13 +127,15 @@ boost::program_options::options_description slam_plotter::program_options () {
     ("slam-plot-title", po::value<std::string>()->default_value("Simultaneous Localization and Mapping"),
      "Plot title")
     ("slam-plot-output-dir", po::value<std::string>(),
-     "Output directory for plots (displayed on screen if unset)");
+     "Output directory for plots (displayed on screen if unset)")
+    ("debug-slam-plot", "switch to debugging mode");
     return options;
 }
 
 
 slam_plotter::slam_plotter (boost::program_options::variables_map& options, const pose& initial_state)
-: initial_pose(initial_state), title (options["slam-plot-title"].as<std::string>())
+: initial_pose(initial_state), title (options["slam-plot-title"].as<std::string>()),
+gnuplot(options.count("debug-slam-plot") != 0)
 {
     if (options.count ("slam-plot-output-dir")) {
         output_dir = boost::filesystem::path (options["slam-plot-output-dir"].as<std::string>());

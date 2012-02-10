@@ -20,19 +20,16 @@
 
 #include "planar_robot/pose.hpp"
 #include "planar_robot/position.hpp"
-#include "slam/slam_result.hpp"
+#include "slam/interfaces.hpp"
 #include "simulator/gnuplot_process.hpp"
 
 
-class slam_plotter : boost::noncopyable {
-    
-    typedef size_t timestep_t;
-    typedef size_t featureid_t;
+class slam_plotter : public slam::timestep_listener {
     
     typedef planar_robot::pose pose;
     typedef planar_robot::position position;
 
-    typedef slam_result<pose, position> slam_result_type;
+    typedef slam::slam_result<pose, position> slam_result_type;
 
     struct data_source {
         boost::shared_ptr<const slam_result_type> source;
@@ -66,7 +63,7 @@ public:
     
     static boost::program_options::options_description program_options ();
     
-    void plot (timestep_t timestep);
+    virtual void timestep (slam::timestep_type) override;
     
     void add_data_source (boost::shared_ptr<const slam_result_type> source, bool autoscale_map,
                           std::string trajectory_title, std::string landmark_title,

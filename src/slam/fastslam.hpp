@@ -24,13 +24,15 @@
 
 #include "slam/vector_model.hpp"
 #include "slam/particle_filter.hpp"
-#include "slam/slam_result.hpp"
+#include "slam/interfaces.hpp"
 #include "utility/random.hpp"
 #include "utility/unscented.hpp"
 #include "utility/cowmap.hpp"
 #include "utility/bitree.hpp"
 #include "utility/utility.hpp"
 
+
+namespace slam {
 
 template <class ControlModel, class ObservationModel>
 class fastslam :
@@ -39,10 +41,6 @@ public slam_result<typename ControlModel::result_type, typename ObservationModel
     
     typedef slam_data<ControlModel, ObservationModel> slam_data_type;
     
-	/** The types of action and feature identifiers, respectively. Usually same as size_t. */
-	typedef typename slam_data_type::timestep_t timestep_t;
-	typedef typename slam_data_type::featureid_t featureid_t;
-        
     /** The types of controls and observations, respectively. Also used as states and features. */
 	typedef typename ControlModel::result_type state_type;
 	typedef typename ObservationModel::result_type feature_type;
@@ -67,8 +65,8 @@ public slam_result<typename ControlModel::result_type, typename ObservationModel
     typedef vector_model_adapter<multivariate_normal_adapter<state_type> > state_dist;
     typedef vector_model_adapter<multivariate_normal_adapter<feature_type> > feature_dist;
     
-    typedef bitree<state_type> trajectory_type;
-    typedef boost::container::flat_map<featureid_t, feature_type> map_estimate_type;
+    typedef utility::bitree<state_type> trajectory_type;
+    typedef boost::container::flat_map<featureid_type, feature_type> map_estimate_type;
     
     /** Nested types */
     
@@ -83,7 +81,7 @@ public slam_result<typename ControlModel::result_type, typename ObservationModel
             state_type state;
             boost::shared_ptr<const state_list> previous;
         } trajectory;
-        cowmap<featureid_t, feature_dist> features;
+        cowmap<featureid_type, feature_dist> features;
     };
     
     /* Private implementation members */
@@ -120,9 +118,9 @@ public slam_result<typename ControlModel::result_type, typename ObservationModel
     } ukf_params;
 
     /** Current timestep, current control, and observations made in the current timestep. */
-    timestep_t current_timestep;
+    timestep_type timestep_counter;
     boost::optional<ControlModel> current_control;
-    boost::container::vector<std::pair<featureid_t, ObservationModel> > seen_features, new_features;
+    boost::container::vector<std::pair<featureid_type, ObservationModel> > seen_features, new_features;
     
 public:
     
@@ -130,11 +128,18 @@ public:
     
     static boost::program_options::options_description program_options ();
     
-    // Overridden virtual member functions of slam_data::listener
+    // Overridden virtual member functions of slam::timestep_listener
     
-    virtual void add_control (timestep_t, const ControlModel&);
-    virtual void add_observation (timestep_t, featureid_t, const ObservationModel&, bool new_feature);
-    virtual void end_observation (timestep_t);
+    virtual void timestep (timestep_type t) override;
+    
+    // Overridden virtual member functions of slam::data_source
+    
+    virtual timestep_type current_timestep () const override { return timestep_counter; }
+        
+    // Overridden virtual member functions of slam::slam_data::listener
+    
+    virtual void control (timestep_type, const ControlModel&);
+    virtual void observation (timestep_type, const typename slam_data_type::observation_data_type&);
     
     // Overridden virtual member functions of slam_result
     
@@ -204,7 +209,7 @@ template <class ControlModel, class ObservationModel>
 struct fastslam<ControlModel, ObservationModel>::map_estimate_inserter {
     map_estimate_type& map;
     map_estimate_inserter (map_estimate_type& map) : map(map) { }
-    void operator() (featureid_t feature_id, const feature_dist& estimate) {
+    void operator() (featureid_type feature_id, const feature_dist& estimate) {
         map.emplace_hint (map.end(), feature_id, estimate.mean());
     }
 };
@@ -212,27 +217,27 @@ struct fastslam<ControlModel, ObservationModel>::map_estimate_inserter {
 
 template <class ControlModel, class ObservationModel>
 void fastslam<ControlModel, ObservationModel>
-::add_control (timestep_t timestep, const ControlModel& control) {
-    assert (timestep == current_timestep);
+::control (timestep_type timestep, const ControlModel& control) {
+    assert (timestep == current_timestep());
     assert (!current_control);
     current_control = control;
-    ++current_timestep;
+    ++timestep_counter;
 }
 
 
 template <class ControlModel, class ObservationModel>
 void fastslam<ControlModel, ObservationModel>
-::add_observation (timestep_t timestep, featureid_t feature_id, const ObservationModel& obs, bool new_feature) {
-    assert (timestep == current_timestep);
-    (new_feature ? new_features : seen_features).emplace_back (feature_id, obs);
+    ::observation (timestep_type t, const typename slam_data<ControlModel, ObservationModel>::observation_data_type& obs) {
+    assert (t == current_timestep());
+    (obs.sequence() == 0 ? new_features : seen_features).emplace_back (obs.feature_id(), obs.observation());
 }
 
 
 template <class ControlModel, class ObservationModel>
 void fastslam<ControlModel, ObservationModel>
-::end_observation (timestep_t timestep) {
+::timestep (timestep_type timestep) {
     
-    assert (timestep == current_timestep);
+    assert (timestep == current_timestep());
 
     // Update particle state
     
@@ -258,7 +263,7 @@ void fastslam<ControlModel, ObservationModel>
 
     for (size_t i = 0; i < seen_features.size(); ++i) {
 
-        const featureid_t feature_id = seen_features[i].first;
+        const featureid_type feature_id = seen_features[i].first;
         const ObservationModel& obs = seen_features[i].second;
 
         for (size_t j = 0; j < particles.size(); ++j) {
@@ -277,7 +282,7 @@ void fastslam<ControlModel, ObservationModel>
     
     for (size_t i = 0; i < new_features.size(); ++i) {
         
-        const featureid_t feature_id = new_features[i].first;
+        const featureid_type feature_id = new_features[i].first;
         const ObservationModel& obs = new_features[i].second;
         
         for (size_t j = 0; j < particles.size(); ++j) {
@@ -370,7 +375,7 @@ fastslam<ControlModel, ObservationModel>::get_trajectory () const {
     
     if (!trajectory_estimate) {
         
-        size_t i = current_control ? current_timestep-1 : current_timestep;
+        size_t i = current_control ? current_timestep()-1 : current_timestep();
         const typename particle_type::state_list* p = &particles.max_weight_particle().trajectory;
 
         trajectory_estimate = boost::make_shared<trajectory_type>(i);
@@ -411,11 +416,13 @@ keep_particle_trajectory(options.count("particle-trajectory")),
 ukf_params              (options["ukf-alpha"].as<double>(),
                          options["ukf-beta"].as<double>(),
                          options["ukf-kappa"].as<double>()),
-current_timestep        (0)
+timestep_counter        (0)
 {
     if (!keep_particle_trajectory) {
         trajectory_estimate = boost::make_shared<trajectory_type>();
     }
+}
+    
 }
 
 #endif

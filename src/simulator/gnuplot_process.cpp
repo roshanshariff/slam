@@ -11,11 +11,18 @@
 
 #include "gnuplot_process.hpp"
 
-gnuplot_process::gnuplot_process ()
-: fh (popen ("gnuplot -p", "w")), buffer_queued(0), plot_started(false) { }
+gnuplot_process::gnuplot_process (bool debug)
+: buffer_queued(0), plot_started(false), debug_mode(debug)
+{
+    if (!debug_mode) fh = popen ("gnuplot -p", "w");
+    else fh = fopen ("debug-slam-plot.txt", "w");
+}
 
 gnuplot_process::~gnuplot_process () {
-    if (fh) pclose (fh);
+    if (fh) {
+        if (!debug_mode) pclose (fh);
+        else fclose (fh);
+    }
 }
 
 void gnuplot_process::plot (size_t columns) {
@@ -39,10 +46,20 @@ void gnuplot_process::plot () {
     plot_started = false;
     
     const float* data = buffer.data();
-    while (buffer_queued > 0) {
-        size_t written = std::fwrite (data, sizeof(*data), buffer_queued, fh);
-        data += written;
-        buffer_queued -= written;
+    
+    if (!debug_mode) {
+        while (buffer_queued > 0) {
+            size_t written = std::fwrite (data, sizeof(*data), buffer_queued, fh);
+            data += written;
+            buffer_queued -= written;
+        }
+    } else {
+        size_t line_number = 0;
+        while (buffer_queued > 0) {
+            std::fprintf(fh, "%4zu: %f\n", ++line_number, *data);
+            ++data;
+            --buffer_queued;
+        }
     }
     
     buffer.clear();
