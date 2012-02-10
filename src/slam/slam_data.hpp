@@ -127,7 +127,7 @@ public:
         double log_likelihood = 0;
         
         for (timestep_t t = 0; t < trajectory->size(); ++t) {
-            log_likelihood += control(t).log_likelihood (trajectory->get(t));
+            log_likelihood += control(t).log_likelihood ((*trajectory)[t]);
         }
         
         typename boost::container::flat_map<size_t, feature_type>::const_iterator map_iter = map->begin();

@@ -94,7 +94,7 @@ void slam_plotter::plot_trajectory (const data_source& source) {
     gnuplot << state.x() << state.y();
 
     for (size_t i = 0; i < trajectory->size(); ++i) {
-        state += trajectory->get(i);
+        state += (*trajectory)[i];
         gnuplot << state.x() << state.y();
     }
     
