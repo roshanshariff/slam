@@ -2,7 +2,8 @@ cmake_minimum_required (VERSION 2.8)
 project (slam CXX)
 
 set (SLAM_SRCS main.cpp planar_robot/waypoint_controller.cpp planar_robot/landmark_sensor.cpp
-    utility/utility.cpp utility/cowtree.cpp simulator/gnuplot_process.cpp simulator/slam_plotter.cpp)
+    utility/utility.cpp utility/cowtree.cpp simulator/gnuplot_process.cpp simulator/slam_plotter.cpp
+    simulator/time_series_plotter.cpp)
 
 add_executable (slam ${SLAM_SRCS})
 
@@ -17,8 +18,6 @@ target_link_libraries (slam ${Boost_LIBRARIES})
 find_package (Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
-set (CMAKE_BUILD_TYPE Debug)
+set (CMAKE_BUILD_TYPE Release)
 
-add_definitions ("-std=c++0x")
-#add_definitions ("-stdlib=libc++")
-#set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libc++")
+add_definitions ("-std=c++0x -Wall -Werror")

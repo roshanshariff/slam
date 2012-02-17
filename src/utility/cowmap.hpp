@@ -31,10 +31,22 @@ public:
     
     typedef Compare                 key_compare;
 
-    typedef pair_compare_first<const K, key_compare> value_compare;
+    struct value_compare : private key_compare {
+        value_compare (const key_compare& comp) : key_compare(comp) { }
+        bool operator() (const value_type& lhs, const value_type& rhs) const {
+            return key_compare::operator()(lhs.first, rhs.first);
+        }
+        const key_compare& get_key_compare() const { return *this; }
+        key_compare& get_key_compare() { return *this; }
+    };
     
-    key_compare key_comp () const { return data.second(); }
-    value_compare value_comp () const { return value_compare (key_comp()); }
+    cowmap (const key_compare& pred = key_compare()) : data (cowtree::root(), key_compare(pred)) { }
+    
+    const value_compare& value_comp () const { return data.second(); }
+    value_compare& value_comp () { return data.second(); }
+    
+    const key_compare& key_comp () const { return value_comp().get_key_compare(); }
+    key_compare& key_comp () { return value_comp().get_key_compare(); }
     
     bool empty () const { return root().empty(); }
     
@@ -70,7 +82,7 @@ private:
     
     template <class Functor> void inorder_traverse (const cowtree&, Functor&) const;
     
-    boost::compressed_pair<cowtree::root, key_compare> data;
+    boost::compressed_pair<cowtree::root, value_compare> data;
     
 };
 

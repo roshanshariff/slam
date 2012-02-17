@@ -15,9 +15,10 @@
 #include "planar_robot/landmark_sensor.hpp"
 #include "slam/mcmc_slam.hpp"
 #include "slam/fastslam.hpp"
+#include "slam/slam_likelihood.hpp"
 #include "simulator/simulator.hpp"
 #include "simulator/slam_plotter.hpp"
-//#include "simulator/likelihood_plotter.hpp"
+#include "simulator/time_series_plotter.hpp"
 #include "utility/random.hpp"
 #include "utility/utility.hpp"
 
@@ -54,10 +55,12 @@ int main (int argc, char* argv[]) {
     random_source random (remember_option(options, "seed", (unsigned int)std::time(0)));
     
     unsigned int sim_seed = random();
+    unsigned int mcmc_slam_seed = random();
+    unsigned int fastslam_seed = random();
+
     boost::shared_ptr<sim_types::simulator_type> sim
     = boost::make_shared<sim_types::simulator_type> (boost::ref(options), sim_seed);
     
-    unsigned int mcmc_slam_seed = random();
     boost::shared_ptr<sim_types::mcmc_slam_type> mcmc_slam;
     if (options.count ("mcmc-slam")) {
         mcmc_slam = boost::make_shared<sim_types::mcmc_slam_type> (sim->get_slam_data(),
@@ -65,19 +68,19 @@ int main (int argc, char* argv[]) {
         sim->add_timestep_listener (mcmc_slam);
     }
     
-    unsigned int fastslam_seed = random();
     boost::shared_ptr<sim_types::fastslam_type> fastslam;
     if (options.count ("fastslam")) {
         fastslam = boost::make_shared<sim_types::fastslam_type> (boost::ref(options), fastslam_seed);
         sim->add_data_listener (fastslam);
+        
+        if (mcmc_slam && options.count("mcmc-init")) mcmc_slam->set_initialiser (fastslam);
     }
     
     boost::shared_ptr<slam_plotter> slam_plot;
     if (options.count ("slam-plot")) {
 
         slam_plot = boost::make_shared<slam_plotter> (boost::ref(options), sim->get_initial_state());
-        sim->add_timestep_listener (slam_plot);
-        
+
         slam_plot->add_data_source (sim, true, "Trajectory", "Landmarks",
                                     "lc rgbcolor 'red' pt 6 ps 1.5",
                                     "lc rgbcolor 'black' lw 5",
@@ -96,16 +99,47 @@ int main (int argc, char* argv[]) {
                                         "lc rgbcolor 'green' lw 2",
                                         "size 10,20,50 filled lc rgbcolor 'green'");
         }
+
+        sim->add_timestep_listener (slam_plot);
     }
     
-    /*
-    boost::shared_ptr<sim_types::likelihood_plotter_type> likelihood_plot;
+    boost::shared_ptr<time_series_plotter> likelihood_plot;
     if (options.count ("plot-likelihood")) {
-        likelihood_plot = boost::make_shared<sim_types::likelihood_plotter_type> (sim->get_slam_data(), mcmc_slam, fastslam);
-        sim_types::simulator_type::timestep_slot_type timestep_slot (&sim_types::likelihood_plotter_type::plot, likelihood_plot.get());
-        sim->connect_timestep_listener (timestep_slot.track (likelihood_plot));
+        
+        likelihood_plot = boost::make_shared<time_series_plotter> (300);
+        
+        if (mcmc_slam) {
+            
+            struct {
+                boost::shared_ptr <const sim_types::simulator_type> sim;
+                boost::shared_ptr <const sim_types::mcmc_slam_type> mcmc_slam;
+                double operator() (slam::timestep_type) const {
+                    return slam::slam_log_likelihood (*sim->get_slam_data(), *mcmc_slam)
+                    - sim->get_log_likelihood();
+                }
+            } mcmc_slam_log_likelihood = { sim, mcmc_slam };
+
+            likelihood_plot->add_data_source (mcmc_slam_log_likelihood,
+                                              "MCMC-SLAM log likelihood", "lc rgbcolor 'green' lw 5");
+        }
+        
+        if (fastslam) {
+            
+            struct {
+                boost::shared_ptr <const sim_types::simulator_type> sim;
+                boost::shared_ptr <const sim_types::fastslam_type> fastslam;
+                double operator() (slam::timestep_type) const {
+                    return slam::slam_log_likelihood (*sim->get_slam_data(), *fastslam)
+                    - sim->get_log_likelihood();
+                }
+            } fastslam_log_likelihood = { sim, fastslam };
+            
+            likelihood_plot->add_data_source (fastslam_log_likelihood,
+                                              "FastSLAM log likelihood", "lc rgbcolor 'blue' lw 5");
+        }
+        
+        sim->add_timestep_listener (likelihood_plot);
     }
-    */
     
     /* set up simulation logging */
     
@@ -141,6 +175,7 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     ("log", "produce detailed simulation logs")
     ("mcmc-slam", "enable MCMC-SLAM")
     ("fastslam", "enable FastSLAM 2.0")
+    ("mcmc-init", "initialise MCMC estimate from FastSLAM")
     ("slam-plot", "produce SLAM gnuplot output")
     ("plot-likelihood", "produce plots of log-likelihood")
     ("seed", po::value<unsigned int>(), "seed for global random number generator");

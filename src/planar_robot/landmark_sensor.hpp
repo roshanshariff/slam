@@ -41,6 +41,7 @@ namespace planar_robot {
         
         double max_range;
         mutable unsigned long hits;
+        mutable double log_likelihood = 0;
         model_type::builder model_builder;
         std::vector<position> landmarks;
         
@@ -48,18 +49,20 @@ namespace planar_robot {
         
     public:
         
-        unsigned long num_observations() const { return hits; }
-        
+        unsigned long num_observations () const { return hits; }
+        double get_log_likelihood () const { return log_likelihood; }
     };
     
     
     template <class Observer>
     void landmark_sensor::sense (const pose& state, random_source& random, Observer observer) const {
         for (size_t i = 0; i < landmarks.size(); ++i) {
-            position obs = model_builder (-state + landmarks[i])(random);
-            if (obs.distance() < max_range) {
+            position observation = -state + landmarks[i];
+            auto model = model_builder (model_builder(observation)(random));
+            if (model.mean().distance() < max_range) {
                 ++hits;
-                observer (slam::featureid_type(i), model_builder (obs));
+                observer (slam::featureid_type(i), model);
+                log_likelihood += model.log_likelihood (observation);
             }
         }
     }

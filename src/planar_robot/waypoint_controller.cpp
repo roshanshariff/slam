@@ -107,8 +107,7 @@ waypoint_controller::model_type waypoint_controller::control (const pose& state)
 
 		if (to_waypoint.distance() < proximity) {
 			++current_waypoint;
-            std::cout << "Seeking waypoint " << current_waypoint+1 << " of " << waypoints.size()
-			<< " (distance is " << to_waypoint.distance() << " m)" << std::endl;
+            std::cout << "Seeking waypoint " << current_waypoint << " of " << waypoints.size() << std::endl;
 		}
 
 	}

@@ -8,7 +8,6 @@
 #include <boost/bind.hpp>
 #include <boost/ref.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
 #include <boost/container/flat_map.hpp>
 #include <boost/program_options.hpp>
 #include <boost/utility.hpp>
@@ -23,8 +22,7 @@
 
 template <class Controller, class Sensor>
 class simulator
-: public slam::slam_result <typename Controller::model_type::result_type, typename Sensor::model_type::result_type>,
-public boost::enable_shared_from_this<simulator<Controller, Sensor> > {
+: public slam::slam_result_of <typename Controller::model_type, typename Sensor::model_type> {
 
 public:
     
@@ -52,8 +50,14 @@ private:
     const state_type initial_state;
 	trajectory_type trajectory;
     feature_map_type feature_map;
+    
+    double state_log_likelihood = 0;
 
     utility::listeners<slam::timestep_listener> listeners;
+    
+    void timestep () {
+        listeners.for_each (boost::bind (&slam::timestep_listener::timestep, _1, current_timestep()));
+    }
     
 public:
     
@@ -75,25 +79,35 @@ public:
     
     boost::shared_ptr<const slam_data_type> get_slam_data () const { return data; }
     
+    double get_log_likelihood () const { return state_log_likelihood + sensor.get_log_likelihood(); }
+    
     // Overridden virtual member functions of slam_result
     
     virtual void timestep (slam::timestep_type t) override {
-        assert (t == current_timestep());
-        listeners.for_each (boost::bind (&slam::timestep_listener::timestep, _1, t));
+        assert (t <= current_timestep());
     }
     
-    virtual slam::timestep_type current_timestep () const override { return data->current_timestep(); }
-    
-    virtual state_type get_state () const override { return trajectory.accumulate(); }
-    
-    virtual boost::shared_ptr<const trajectory_type> get_trajectory () const override {
-        return boost::shared_ptr<const trajectory_type> (this->shared_from_this(), &trajectory);
+    virtual slam::timestep_type current_timestep () const override {
+        return data->current_timestep();
     }
     
-    virtual boost::shared_ptr<const feature_map_type> get_map () const override {
-        return boost::shared_ptr<const feature_map_type> (this->shared_from_this(), &feature_map);
+    virtual state_type get_state (slam::timestep_type t) const override {
+        assert (t <= trajectory.size());
+        return trajectory.accumulate(t);
     }
-
+    
+    virtual feature_type get_feature (slam::featureid_type id) const override {
+        return feature_map.at(id);
+    }
+    
+    virtual const trajectory_type& get_trajectory () const override {
+        return trajectory;
+    }
+    
+    virtual const feature_map_type& get_feature_map () const override {
+        return feature_map;
+    }
+    
 };
 
 
@@ -115,19 +129,23 @@ initial_state (controller.initial_state())
 template <class Controller, class Sensor>
 void simulator<Controller, Sensor>::operator() () {
 
-    sensor.sense (get_initial_state() + get_state(), random,
+    sensor.sense (get_initial_state() + get_state(current_timestep()), random,
                   boost::bind (&slam_data_type::add_observation, data.get(), _1, _2));
-    timestep (current_timestep());
+    timestep ();
     
 	while (!controller.finished()) {
 
-		control_model_type control = controller.control (get_initial_state() + get_state());
-		trajectory.push_back(control(random));
-		data->add_control (control);
+		auto control_dist = controller.control (get_initial_state() + get_state(current_timestep()));
+        auto control = control_dist(random);
 
-        sensor.sense (get_initial_state() + get_state(), random,
+		trajectory.push_back (control);
+        state_log_likelihood += control_dist.log_likelihood (control);
+        
+		data->add_control (control_dist);
+
+        sensor.sense (get_initial_state() + get_state(current_timestep()), random,
                       boost::bind (&slam_data_type::add_observation, data.get(), _1, _2));
-        timestep (current_timestep());
+        timestep ();
 	}
 }
 

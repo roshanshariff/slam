@@ -29,11 +29,10 @@ void apply_jacobi_rotation (
 		const Eigen::MatrixBase<VectorTypeB>& b,
 		const Eigen::JacobiRotation<ScalarType>& rot)
 {
-	Eigen::internal::apply_rotation_in_the_plane(
-			const_cast<Eigen::MatrixBase<VectorTypeA>&>(a),
-			const_cast<Eigen::MatrixBase<VectorTypeB>&>(b),
-			rot
-	);
+	Eigen::internal::apply_rotation_in_the_plane
+    (const_cast<Eigen::MatrixBase<VectorTypeA>&>(a),
+     const_cast<Eigen::MatrixBase<VectorTypeB>&>(b),
+     rot);
 }
 
 

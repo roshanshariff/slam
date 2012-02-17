@@ -29,13 +29,15 @@ class particle_filter {
     };
     
     boost::container::vector<particle> particles;
+    const particle* max_weight;
 
     double weight_sum;
     double squared_weight_sum;
     
 public:
     
-    particle_filter () : particles(1), weight_sum(1.0), squared_weight_sum(1.0) { }
+    particle_filter ()
+    : particles(1), max_weight(particles.begin()), weight_sum(1.0), squared_weight_sum(1.0) { }
     
     size_t size () const { return particles.size(); }
     double effective_size () const { return weight_sum * weight_sum / squared_weight_sum; }
@@ -48,33 +50,32 @@ public:
     const T& operator[] (size_t index) const { return particles[index].data; }
     T& operator[] (size_t index) { return particles[index].data; }
     
-    const T& max_weight_particle () const {
-        return std::max_element (particles.begin(), particles.end())->data;
-    }
+    const T& max_weight_particle () const { return max_weight->data; }
     
 };
 
 template <class Particle>
 void particle_filter<Particle>::resample (random_source& random, size_t new_size) {
     
-    assert (!particles.empty());
-    assert (weight_sum > 0);
+    std::sort (particles.rbegin(), particles.rend());
 
     boost::container::vector<particle> new_particles;
     new_particles.reserve (new_size);
     
-    const double U = random.uniform();
-    
-    size_t i = 0;
-    double t = particles.front().weight;
-    for (size_t j = 0; j < new_size; ++j) {
-        while (t * new_size <= (j+U)*weight_sum && i < particles.size() - 1) {
-            t += particles[++i].weight;
+    const double offset = random.uniform();
+    double weight = 0;
+
+    for (const auto& particle : particles) {
+        weight += particle.weight;
+        while (weight_sum * (offset + new_particles.size()) < weight * new_size) {
+            new_particles.emplace_back (particle.data);
         }
-        new_particles.emplace_back (particles[i].data);
     }
     
+    assert (new_particles.size() == new_size)
     particles.swap (new_particles);
+    
+    max_weight = &particles.front();
     weight_sum = squared_weight_sum = new_size;
 }
 
@@ -84,11 +85,13 @@ void particle_filter<Particle>::update (Updater f) {
 
     weight_sum = 0;
     squared_weight_sum = 0;
-
-    for (size_t i = 0; i < size(); ++i) {
-        particles[i].weight *= f (particles[i].data);
-        weight_sum += particles[i].weight;
-        squared_weight_sum += particles[i].weight * particles[i].weight;
+    max_weight = particles.begin();
+    
+    for (auto& particle : particles) {
+        particle.weight *= f (particle.data);
+        weight_sum += particle.weight;
+        squared_weight_sum += particle.weight * particle.weight;
+        if (particle.weight > max_weight->weight) max_weight = &particle;
     }
 }
 

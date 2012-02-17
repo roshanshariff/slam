@@ -3,19 +3,17 @@
 
 #include <vector>
 #include <map>
-#include <cassert>
+#include <functional>
 #include <utility>
-#include <cmath>
 #include <cassert>
 
 #include <boost/shared_ptr.hpp>
-#include <boost/container/flat_map.hpp>
 #include <boost/bind.hpp>
 #include <boost/ref.hpp>
-#include <boost/utility.hpp>
 
 #include "slam/interfaces.hpp"
 #include "utility/listeners.hpp"
+#include "utility/flat_map.hpp"
 
 
 namespace slam {
@@ -28,26 +26,23 @@ namespace slam {
     template <class ControlModel, class ObservationModel>
     struct slam_data : public data_source {
 
-        using feature_data_type
-        = boost::container::flat_map<timestep_type, ObservationModel>;
+        using feature_data_type = utility::flat_map<timestep_type, ObservationModel>;
         
         class observation_data_type {
 
             featureid_type id;
-            ObservationModel obs;
-            std::size_t seq;
             const feature_data_type* data;
+            std::size_t ix;
 
         public:
 
-            observation_data_type (featureid_type id, const ObservationModel& obs,
-                                   std::size_t seq, const feature_data_type& data)
-            : id(id), obs(obs), seq(seq), data(&data) { }
+            observation_data_type (featureid_type id, const feature_data_type& data, std::size_t ix)
+            : id(id), data(&data), ix(ix) { }
 
             featureid_type feature_id () const { return id; }
-            const ObservationModel& observation () const { return obs; }
-            std::size_t sequence () const { return seq; }
             const feature_data_type& feature_data () const { return *data; }
+            const ObservationModel& observation () const { return (data->begin()+ix)->second; }
+            std::size_t index () const { return ix; }
         };
         
         struct listener : public timestep_listener {
@@ -59,11 +54,12 @@ namespace slam {
         
         std::vector<ControlModel> controls;
         std::map<featureid_type, feature_data_type> features;
-        boost::container::flat_multimap<timestep_type, observation_data_type> observations;
-        using observation_iterator = typename boost::container::flat_multimap<timestep_type, observation_data_type>::const_iterator;
-
+        utility::flat_multimap<timestep_type, observation_data_type> observations;
+        
         utility::listeners<listener> listeners;
         
+        using observation_iterator = typename utility::flat_multimap<timestep_type, observation_data_type>::const_iterator;
+
     public:
         
         slam_data () = default;
@@ -74,11 +70,11 @@ namespace slam {
         
         /** Member functions from data_source */
         
-        timestep_type current_timestep () const override {
+        virtual timestep_type current_timestep () const override {
             return timestep_type (controls.size());
         }
         
-        void timestep (timestep_type timestep) override {
+        virtual void timestep (timestep_type timestep) override {
             assert (timestep == current_timestep());
             listeners.for_each (boost::bind (&listener::timestep, _1, timestep));
         }
@@ -117,7 +113,7 @@ namespace slam {
         
         /** Retrieve features. */
         
-        bool feature_exists (featureid_type f) const { return features.find(f) != features.end(); }
+        bool feature_observed (featureid_type f) const { return features.find(f) != features.end(); }
         
         const feature_data_type& feature_data (featureid_type featureid) const {
             return features.at(featureid);
@@ -153,14 +149,14 @@ namespace slam {
         timestep_type t = current_timestep();
         
         auto& feature_data = features[featureid];
-        std::size_t seq = feature_data.size();
+        std::size_t index = feature_data.size();
         
         feature_data.emplace_hint (feature_data.end(), t, obs);
         
-        observation_data_type obs_data (featureid, obs, seq, feature_data);
-        auto obs_data_iter = observations.emplace_hint (observations.end(), t, obs_data);
+        observation_data_type obs_data (featureid, feature_data, index);
+        observations.emplace_hint (observations.end(), t, obs_data);
         
-        listeners.for_each (boost::bind (&listener::observation, _1, t, boost::cref(obs_data_iter->second)));
+        listeners.for_each (boost::bind (&listener::observation, _1, t, boost::cref(obs_data)));
     }
     
     /*

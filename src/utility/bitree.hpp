@@ -6,6 +6,9 @@
 #include <iterator>
 #include <algorithm>
 
+#include "utility/container_fwd.hpp"
+
+
 namespace utility {
     
     template <class Grp>

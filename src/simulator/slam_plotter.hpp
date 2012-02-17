@@ -32,7 +32,7 @@ class slam_plotter : public slam::timestep_listener {
     typedef slam::slam_result<pose, position> slam_result_type;
 
     struct data_source {
-        boost::shared_ptr<const slam_result_type> source;
+        boost::shared_ptr<slam_result_type> source;
         bool autoscale_map;
         std::string trajectory_title;
         std::string landmark_title;
@@ -65,7 +65,7 @@ public:
     
     virtual void timestep (slam::timestep_type) override;
     
-    void add_data_source (boost::shared_ptr<const slam_result_type> source, bool autoscale_map,
+    void add_data_source (boost::shared_ptr<slam_result_type> source, bool autoscale_map,
                           std::string trajectory_title, std::string landmark_title,
                           std::string feature_point_style, std::string trajectory_line_style,
                           std::string state_arrow_style);
