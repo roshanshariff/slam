@@ -35,10 +35,10 @@ class particle_filter {
     double squared_weight_sum;
     
 public:
-    
+
     particle_filter ()
-    : particles(1), max_weight(particles.begin()), weight_sum(1.0), squared_weight_sum(1.0) { }
-    
+    : particles(1), max_weight(&particles.front()), weight_sum(1.0), squared_weight_sum(1.0) { }
+
     size_t size () const { return particles.size(); }
     double effective_size () const { return weight_sum * weight_sum / squared_weight_sum; }
     
@@ -72,7 +72,7 @@ void particle_filter<Particle>::resample (random_source& random, size_t new_size
         }
     }
     
-    assert (new_particles.size() == new_size)
+    assert (new_particles.size() == new_size);
     particles.swap (new_particles);
     
     max_weight = &particles.front();
@@ -85,7 +85,7 @@ void particle_filter<Particle>::update (Updater f) {
 
     weight_sum = 0;
     squared_weight_sum = 0;
-    max_weight = particles.begin();
+    max_weight = &particles.front();
     
     for (auto& particle : particles) {
         particle.weight *= f (particle.data);
