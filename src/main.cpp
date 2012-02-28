@@ -104,7 +104,7 @@ int main (int argc, char* argv[]) {
     }
     
     boost::shared_ptr<time_series_plotter> likelihood_plot;
-    if (options.count ("plot-likelihood")) {
+    if (options.count ("plot-stats")) {
         
         likelihood_plot = boost::make_shared<time_series_plotter> (300);
         
@@ -136,6 +136,10 @@ int main (int argc, char* argv[]) {
             
             likelihood_plot->add_data_source (fastslam_log_likelihood,
                                               "FastSLAM log likelihood", "lc rgbcolor 'blue' lw 5");
+            
+            likelihood_plot->add_data_source (boost::bind (&sim_types::fastslam_type::effective_particle_ratio,
+                                                           fastslam),
+                                              "FastSLAM effective particles", "lc rgbcolor 'red' lw 5", true);
         }
         
         sim->add_timestep_listener (likelihood_plot);
@@ -177,7 +181,7 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     ("fastslam", "enable FastSLAM 2.0")
     ("mcmc-init", "initialise MCMC estimate from FastSLAM")
     ("slam-plot", "produce SLAM gnuplot output")
-    ("plot-likelihood", "produce plots of log-likelihood")
+    ("plot-stats", "produce plots of various summary statistics")
     ("seed", po::value<unsigned int>(), "seed for global random number generator");
 
     po::options_description simulator_options = sim_types::simulator_type::program_options();
