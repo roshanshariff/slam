@@ -9,6 +9,8 @@
 #ifndef slam_container_fwd_hpp
 #define slam_container_fwd_hpp
 
+#include <memory>
+
 #include <boost/container/container_fwd.hpp>
 
 namespace utility {
@@ -16,7 +18,7 @@ namespace utility {
     using boost::container::flat_map;
     using boost::container::flat_multimap;
     
-    template <class Grp> class bitree;
+    template <class Grp, class Alloc = std::allocator<Grp>> class bitree;
 
 }
 

@@ -3,46 +3,104 @@
 
 #include <cassert>
 #include <vector>
-#include <iterator>
-#include <algorithm>
+#include <cstddef>
+
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/iterator/iterator_adaptor.hpp>
 
 #include "utility/container_fwd.hpp"
 
 
 namespace utility {
     
-    template <class Grp>
+    template <typename Grp, typename Alloc>
     class bitree {
+        
     public:
         
-        typedef Grp value_type;
-        typedef typename std::vector<value_type>::size_type size_type;
+        using value_type        = Grp;
+        using allocator_type    = Alloc;
+        using size_type         = std::size_t;
+        using difference_type   = std::ptrdiff_t;
         
-        class reference;
-        friend class reference;
+        struct const_iterator;
+        struct iterator;
         
-        typedef value_type const_reference;
-        
-        class reference {
-            
-            bitree& container;
-            const size_type index;
-            
-            reference (bitree& c, size_type i) : container(c), index(i) { }
-            
-        public:
-            
+        struct const_reference {
+            friend class bitree;
+            friend struct const_iterator;
             operator value_type () const {
-                return const_cast<const bitree&>(container)[index];
+                return container->get(index);
             }
-            
-            reference& operator= (const value_type& value) {
-                container.update_element (index, value);
+        protected:
+            const bitree* container;
+            const size_type index;
+            const_reference (const bitree& c, size_type i) : container(&c), index(i) { }
+        };
+        
+
+        struct reference : public const_reference {
+            friend class bitree;
+            friend struct const_iterator;
+            const reference& operator= (const value_type& v) const {
+                const_cast<bitree*>(const_reference::container)->set(const_reference::index, v);
                 return *this;
             }
-            
-            friend class bitree;
+        protected:
+            reference (bitree& c, size_type i) : const_reference(c, i) { }
         };
+        
+    private:
+        
+        using const_iterator_base
+        = boost::iterator_facade<const_iterator, value_type, boost::random_access_traversal_tag, const_reference>;
+        
+        using iterator_base
+        = boost::iterator_adaptor<iterator, const_iterator, boost::use_default, boost::use_default, reference>;
+        
+    public:
+        
+        struct const_iterator : public const_iterator_base {
+
+            friend class boost::iterator_core_access;
+            friend struct iterator;
+            
+            explicit const_iterator (const const_reference& cref) : ref(*cref.container, cref.index) { }
+
+        private:
+            
+            reference ref;
+            
+            const const_reference& dereference () const { return ref; }
+
+            void increment () { ++ref.index; }
+            void decrement () { --ref.index; }
+            void advance (difference_type n) { ref.index += n; }
+
+            difference_type distance_to (const const_iterator& i) const {
+                return i.ref.index - ref.index;
+            }
+
+            bool equal (const const_iterator& i) const {
+                return ref.container == i.ref.container && ref.index == i.ref.index;
+            }
+        };
+        
+
+        struct iterator : public iterator_base {
+            
+            friend class boost::iterator_core_access;
+            
+            explicit iterator (const reference& ref) : iterator_base(const_iterator(ref)) { }
+            
+            operator const const_iterator& () const { return iterator_base::base_reference(); }
+            operator const_iterator& () { return iterator_base::base_reference(); }
+            
+        private:
+            
+            const reference& dereference () const { return iterator_base::base_reference().ref; }
+        };
+        
         
         bitree () { }
         bitree (size_type n) : elements(n) { }
@@ -54,17 +112,24 @@ namespace utility {
         bool empty () const { return elements.empty(); }
         
         reference operator[] (size_type i) { return reference (*this, i); }
-        const_reference operator[] (size_type i) const;
+        const_reference operator[] (size_type i) const { return const_reference(*this, i); }
         
         reference front () { return (*this)[0]; }
-        reference back () { return (*this)[size()-1]; }
         const_reference front () const { return *this[0]; }
+
+        reference back () { return (*this)[size()-1]; }
         const_reference back () const { return *this[size()-1]; }
         
+        iterator begin () { return iterator((*this)[0]); }
+        const_iterator begin () const { return const_iterator((*this)[0]); }
+
+        iterator end () { return iterator((*this)[size()]); }
+        const_iterator end () const { return const_iterator((*this)[size()]); }
+
         void pop_back () { elements.pop_back(); }
         void push_back (const value_type& value) { elements.push_back (compute_element(size(), value)); }
         
-        void resize (size_type n, value_type v = value_type());
+        void resize (size_type n, const value_type& v = value_type());
         void reserve (size_type n) { elements.reserve(n); }
         void clear () { elements.clear(); }
         
@@ -77,31 +142,31 @@ namespace utility {
         
     private:
         
-        std::vector<value_type> elements;
+        std::vector<value_type, allocator_type> elements;
         
         value_type accumulate_relative (size_type i, size_type ancestor) const;
         value_type compute_element (size_type i, const value_type& value) const;
-        void update_element (size_type i, const value_type& value);
-        
+        void set (size_type i, const value_type& value);
+        value_type get (size_type i) const;        
     };
     
     
     namespace bitree_impl {
         
         /** Clears the lowest set bit. */
-        inline size_t parent (size_t i) {
+        inline std::size_t parent (std::size_t i) {
             assert (i > 0);
             return i & (i - 1);
         }
         
         /** Isolates the lowest set bit and adds resulting value to input. */
-        inline size_t next_sibling (size_t i) {
+        inline std::size_t next_sibling (std::size_t i) {
             assert (i > 0);
             return i + (i & -i);
         }
         
         /** Returns the immediate child of 'parent' that contains descendant 'i'. */
-        inline size_t child_containing (size_t parent, size_t i) {
+        inline std::size_t child_containing (std::size_t parent, std::size_t i) {
             assert (i > parent);
             i -= parent;
             i |= i >> 1;
@@ -116,7 +181,7 @@ namespace utility {
         }
         
         /** Returns the closest common ancestor of both a and b. **/
-        inline size_t common_ancestor (size_t a, size_t b) {
+        inline std::size_t common_ancestor (std::size_t a, std::size_t b) {
             b ^= a;
             b |= b >> 1;
             b |= b >> 2;
@@ -131,8 +196,9 @@ namespace utility {
     }
     
     
-    template <class Grp>
-    Grp bitree<Grp>::accumulate_relative (size_type i, size_type ancestor) const {
+    template <typename Grp, typename Alloc>
+    auto bitree<Grp, Alloc>
+    ::accumulate_relative (size_type i, size_type ancestor) const -> value_type {
         using namespace bitree_impl;
         assert (i < elements.size());
         value_type result = value_type();
@@ -144,8 +210,9 @@ namespace utility {
     }
     
     
-    template <class Grp>
-    Grp bitree<Grp>::compute_element (size_type i, const value_type& value) const {
+    template <typename Grp, typename Alloc>
+    auto bitree<Grp, Alloc>
+    ::compute_element (size_type i, const value_type& value) const -> value_type {
         using namespace bitree_impl;
         assert (i <= elements.size());
         if (i == 0) return value;
@@ -153,8 +220,9 @@ namespace utility {
     }
     
     
-    template <class Grp>
-    void bitree<Grp>::update_element (size_type i, const value_type& value) {
+    template <typename Grp, typename Alloc>
+    void bitree<Grp, Alloc>
+    ::set (size_type i, const value_type& value) {
         using namespace bitree_impl;
         assert (i < elements.size());
         value_type origin = elements[i];
@@ -175,8 +243,9 @@ namespace utility {
     }
     
     
-    template <class Grp>
-    Grp bitree<Grp>::operator[] (size_type i) const {
+    template <typename Grp, typename Alloc>
+    auto bitree<Grp, Alloc>
+    ::get (size_type i) const -> value_type {
         using namespace bitree_impl;
         assert (i < elements.size());
         if (i == 0) return elements[0];
@@ -184,20 +253,17 @@ namespace utility {
     }
     
     
-    template <class Grp>
-    void bitree<Grp>::resize (size_type n, value_type v) {
-        if (n < elements.size()) {
-            elements.resize(n);
-        }
-        else if (n > elements.size()) {
-            reserve(n);
-            std::fill_n (std::back_inserter(*this), n - elements.size(), v);
-        }
+    template <typename Grp, typename Alloc>
+    void bitree<Grp, Alloc>
+    ::resize (size_type n, const value_type& v) {
+        if (elements.size() > n) elements.resize(n);
+        else while (elements.size() < n) elements.push_back (v);
     }
     
     
-    template <class Grp>
-    Grp bitree<Grp>::accumulate (size_type begin, size_type end) const {
+    template <typename Grp, typename Alloc>
+    auto bitree<Grp, Alloc>
+    ::accumulate (size_type begin, size_type end) const -> value_type {
         using namespace bitree_impl;
         assert (begin <= elements.size() && end <= elements.size());
         if (begin == end) {
@@ -216,8 +282,9 @@ namespace utility {
     }
     
     
-    template <class Grp>
-    typename bitree<Grp>::size_type bitree<Grp>::binary_search (const value_type& value) const {
+    template <typename Grp, typename Alloc>
+    auto bitree<Grp, Alloc>
+    ::binary_search (const value_type& value) const -> size_type {
         using namespace bitree_impl;
         if (elements.size() == 0 || value < elements[0]) {
             return 0;
