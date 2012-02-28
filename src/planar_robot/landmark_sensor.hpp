@@ -39,7 +39,7 @@ namespace planar_robot {
         
     private:
         
-        double max_range;
+        double max_range, min_range;
         mutable unsigned long hits;
         mutable double log_likelihood = 0;
         model_type::builder model_builder;
@@ -59,7 +59,7 @@ namespace planar_robot {
         for (size_t i = 0; i < landmarks.size(); ++i) {
             position observation = -state + landmarks[i];
             auto model = model_builder (model_builder(observation)(random));
-            if (model.mean().distance() < max_range) {
+            if (min_range < model.mean().distance() && model.mean().distance() < max_range) {
                 ++hits;
                 observer (slam::featureid_type(i), model);
                 log_likelihood += model.log_likelihood (observation);
