@@ -17,8 +17,13 @@ void time_series_plotter::timestep (slam::timestep_type timestep) {
     const int xmin = xmax + 1 - history_capacity;
     std::fprintf (gnuplot.handle(), "set xrange [%d:%d]\n", xmin, xmax);
     
+    bool use_y2 = false;
+    
     for (auto& source : data_sources) {
         auto value = source.function (timestep);
+        
+        use_y2 = use_y2 || source.secondary_axis;
+        
         auto& range = source.secondary_axis ? y2range : yrange;
         if (value < range.first) range.first = value;
         if (value > range.second) range.second = value;
@@ -26,6 +31,8 @@ void time_series_plotter::timestep (slam::timestep_type timestep) {
     }
     std::fprintf (gnuplot.handle(), "set yrange [%f:%f]\n", yrange.first, yrange.second);
     std::fprintf (gnuplot.handle(), "set y2range [%f:%f]\n", y2range.first, y2range.second);
+    
+    if (use_y2) gnuplot.puts ("set y2tics border\n");
     
     for (auto& source : data_sources) {
         

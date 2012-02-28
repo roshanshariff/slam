@@ -56,8 +56,8 @@ private:
     gnuplot_process gnuplot;
     const std::size_t history_capacity;
     
-    std::pair<float, float> yrange = std::make_pair (0.0, 1.1);
-    std::pair<float, float> y2range = std::make_pair (0.0, 1.1);
+    std::pair<float, float> yrange = std::make_pair (0.0, 1.0);
+    std::pair<float, float> y2range = std::make_pair (0.0, 1.0);
     
     std::vector<data_source> data_sources;
 };
