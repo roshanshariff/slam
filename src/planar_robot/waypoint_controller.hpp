@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <functional>
+#include <cstddef>
 
 #include <boost/program_options.hpp>
 
@@ -18,7 +19,7 @@ namespace planar_robot {
         
     public:
         
-        typedef vector_model_adapter<velocity_model> model_type;
+        using model_type = vector_model_adapter<velocity_model>;
         
         waypoint_controller (const boost::program_options::variables_map&);
         
@@ -30,11 +31,27 @@ namespace planar_robot {
         
         model_type::builder model_builder;
         std::vector<position> waypoints;
-        double speed, steering_max, steering_rate, proximity, repetitions;
+        double speed, max_steering, max_steering_rate, proximity, repetitions;
+        double param_P, param_D, smoothing;
+                
+        double steering = 0;
+        std::size_t waypoint = 0;
         
-        double current_steering;
-        size_t current_waypoint;
+        double direction = 0;
+        double direction_deriv = 0;
         
+        void next_waypoint () {
+            ++waypoint;
+            direction = 0;
+            direction_deriv = 0;
+            std::cout << "Seeking waypoint " << (1 + waypoint%waypoints.size())
+            << " of " << waypoints.size() << std::endl;
+        }
+        
+        const position& current_waypoint () const {
+            return waypoints[waypoint % waypoints.size()];
+        }
+
     public:
         
         pose initial_state () const {
@@ -42,8 +59,10 @@ namespace planar_robot {
         }
         
         bool finished () const {
-            return current_waypoint >= waypoints.size() * repetitions;
+            return waypoint >= waypoints.size() * repetitions;
         }
+        
+        double dt () const { return model_builder.vector_builder.dt(); }
         
     };
     
