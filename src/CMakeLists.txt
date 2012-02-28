@@ -18,6 +18,6 @@ target_link_libraries (slam ${Boost_LIBRARIES})
 find_package (Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
-set (CMAKE_BUILD_TYPE Release)
+set (CMAKE_BUILD_TYPE Debug)
 
-add_definitions ("-std=c++0x -Wall -Werror")
+add_definitions ("-std=c++0x -Wall -Werror -Wno-c++11-narrowing")
