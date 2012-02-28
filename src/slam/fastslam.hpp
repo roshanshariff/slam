@@ -120,6 +120,8 @@ namespace slam {
         
         static boost::program_options::options_description program_options ();
         
+        double effective_particle_ratio () const { return particles.effective_size()/particles.size(); }
+        
         // Overridden virtual member functions of slam::slam_result
         
         virtual void timestep (timestep_type) override;
@@ -219,6 +221,8 @@ void slam::fastslam<ControlModel, ObservationModel>
     
     map_estimate.clear();
     ++next_timestep;
+    
+    std::cout << "Effective particle set: " << particles.effective_size() << std::endl;
 }
 
 
@@ -262,9 +266,11 @@ auto slam::fastslam<ControlModel, ObservationModel>
     
     particle.trajectory.state = state_proposal (random);
     
-    return std::exp (particle_log_weight (particle)
-                     + state.log_likelihood (particle.trajectory.state)
-                     - state_proposal.log_likelihood (particle.trajectory.state));
+    const double obs_log_likelihood = particle_log_weight (particle);
+    const double state_log_likelihood = state.log_likelihood (particle.trajectory.state);
+    const double proposal_log_likelihood = state_proposal.log_likelihood (particle.trajectory.state);
+    
+    return std::exp (obs_log_likelihood + state_log_likelihood - proposal_log_likelihood);
 }
 
 
@@ -365,8 +371,8 @@ auto slam::fastslam<ControlModel, ObservationModel>
     namespace po = boost::program_options;
     po::options_description options ("FastSLAM 2.0 Parameters");
     options.add_options()
-    ("num-particles", po::value<size_t>()->default_value(10), "Number of particles in the particle filter")
-    ("resample-threshold", po::value<double>()->default_value(0.5), "Minimum ratio of effective particles")
+    ("num-particles", po::value<size_t>()->default_value(100), "Number of particles in the particle filter")
+    ("resample-threshold", po::value<double>()->default_value(0.75), "Minimum ratio of effective particles")
     ("no-history", "Don't keep per-particle trajectory information")
     ("ukf-alpha", po::value<double>()->default_value(0.002), "The alpha parameter for the scaled UKF")
     ("ukf-beta", po::value<double>()->default_value(2), "The beta parameter for the scaled UKF")

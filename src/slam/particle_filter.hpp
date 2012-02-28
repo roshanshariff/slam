@@ -14,6 +14,7 @@
 #include <algorithm>
 
 #include <boost/container/vector.hpp>
+#include <boost/math/special_functions/fpclassify.hpp>
 
 #include "utility/random.hpp"
 
@@ -40,7 +41,9 @@ public:
     : particles(1), max_weight(&particles.front()), weight_sum(1.0), squared_weight_sum(1.0) { }
 
     size_t size () const { return particles.size(); }
-    double effective_size () const { return weight_sum * weight_sum / squared_weight_sum; }
+    double effective_size () const {
+        return squared_weight_sum > 0 ? weight_sum*weight_sum/squared_weight_sum : 0;
+    }
     
     void resample (random_source& random, size_t new_size);
     void resample (random_source& random) { resample (random, size()); }
@@ -89,6 +92,7 @@ void particle_filter<Particle>::update (Updater f) {
     
     for (auto& particle : particles) {
         particle.weight *= f (particle.data);
+        if (!(boost::math::isfinite(particle.weight)) || particle.weight < 0) particle.weight = 0;
         weight_sum += particle.weight;
         squared_weight_sum += particle.weight * particle.weight;
         if (particle.weight > max_weight->weight) max_weight = &particle;
