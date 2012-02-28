@@ -10,6 +10,7 @@
 
 #include <boost/shared_ptr.hpp>
 #include <boost/program_options.hpp>
+#include <boost/math/special_functions/fpclassify.hpp>
 
 #include "slam/interfaces.hpp"
 #include "slam/slam_data.hpp"
@@ -265,7 +266,10 @@ void slam::mcmc_slam<ControlModel, ObservationModel>
         mcmc_updates += mcmc_updates_per_step;
     }
     
-    while (mcmc_updates--) update();
+    unsigned int accepted = 0;
+    
+    for (unsigned int i = 0; i < mcmc_updates; ++i) accepted += update() ? 1 : 0;
+    std::cout << "accept ratio: " << accepted << "/" << mcmc_updates << "\n";
 }
 
 
@@ -282,22 +286,20 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
     //std::cout << "state: " << state_weight << ", feature: " << feature_weight << '\n';
     
     if ((state_weight+feature_weight) * random.uniform() < state_weight) {
+
         timestep_type timestep;
-        while (timestep >= current_timestep()) {
-            timestep = timestep_type (state_weights.binary_search (state_weight*random.uniform()));
-        }
-        bool accepted = update (state_edge (*this, timestep), true);
-        //if (accepted) std::cout << "state change\n";
-        return accepted;
+        do { timestep = timestep_type (state_weights.binary_search (state_weight*random.uniform())); }
+        while (timestep >= current_timestep());
+
+        return update (state_edge (*this, timestep), true);
     }
     else {
+
         std::size_t index;
-        while (index >= feature_estimates.size()) {
-            index = feature_weights.binary_search (feature_weight*random.uniform());
-        }
-        bool accepted = update (feature_edge (*this, index), true);
-        //if (accepted) std::cout << "feature change\n";
-        return accepted;
+        do { index = feature_weights.binary_search (feature_weight*random.uniform()); }
+        while (index >= feature_estimates.size());
+
+        return update (feature_edge (*this, index), true);
     }
 }
 
@@ -309,12 +311,14 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
     
     const auto proposed = edge.distribution(random);
     const double log_ratio = edge_log_likelihood_ratio (edge, proposed);
+    assert (boost::math::isfinite (log_ratio));
     
     const double old_log_likelihood = edge.distribution.log_likelihood (edge.estimate);
     const double new_log_likelihood = edge.distribution.log_likelihood (proposed);
 
     const double new_log_weight = edge_log_weight (new_log_likelihood, edge);
     const double new_weight = std::exp (new_log_weight);
+    assert (boost::math::isfinite (new_weight));
     
     bool accept;
     
@@ -332,7 +336,7 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
     if (accept) {
         edge.estimate = proposed;
         edge.weight = new_weight;
-        log_likelihood += log_ratio - old_log_likelihood + new_log_likelihood;
+        log_likelihood += log_ratio + new_log_likelihood - old_log_likelihood;
         map_estimate.clear();
     }
     
