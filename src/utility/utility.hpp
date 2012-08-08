@@ -36,8 +36,9 @@ template <class Iter>
 struct iter_pair_range : std::pair<Iter,Iter> {
     iter_pair_range (const std::pair<Iter,Iter>& x) : std::pair<Iter,Iter>(x) { }
     iter_pair_range (Iter begin, Iter end) : std::pair<Iter,Iter>(begin, end) { }
-    Iter begin() const { return this->first; }
-    Iter end() const { return this->second; }
+    auto begin() const -> Iter { return this->first; }
+    auto end() const -> Iter { return this->second; }
+    auto size() const -> decltype(Iter() - Iter()) { return end() - begin(); }
 };
 
 

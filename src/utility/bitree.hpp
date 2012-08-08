@@ -29,9 +29,9 @@ namespace utility {
         struct const_reference {
             friend class bitree;
             friend struct const_iterator;
-            operator value_type () const {
-                return container->get(index);
-            }
+            operator value_type () const { return container->get(index); }
+            const_reference (const const_reference&) = default;
+            const_reference& operator= (const const_reference&) = delete;
         protected:
             const bitree* container;
             const size_type index;
@@ -64,8 +64,16 @@ namespace utility {
 
             friend class boost::iterator_core_access;
             friend struct iterator;
+            friend struct const_reference;
             
             explicit const_iterator (const const_reference& cref) : ref(*cref.container, cref.index) { }
+            
+            const_iterator (const const_iterator&) = default;
+
+            const_iterator& operator= (const const_iterator& ci) {
+                ref.container = ci.ref.container;
+                ref.index = ci.ref.index;
+            }
 
         private:
             
@@ -90,6 +98,7 @@ namespace utility {
         struct iterator : public iterator_base {
             
             friend class boost::iterator_core_access;
+            friend struct reference;
             
             explicit iterator (const reference& ref) : iterator_base(const_iterator(ref)) { }
             

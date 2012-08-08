@@ -15,6 +15,8 @@
 
 namespace utility {
     
+    using boost::container::vector;
+    using boost::container::map;
     using boost::container::flat_map;
     using boost::container::flat_multimap;
     
