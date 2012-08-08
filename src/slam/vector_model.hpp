@@ -25,7 +25,7 @@ public:
     typedef typename vector_model_type::matrix_type matrix_type;
 	typedef typename vector_model_type::associated_type result_type;
 
-	static const int vector_dim = vector_model_type::vector_dim;
+	const static int vector_dim = vector_model_type::vector_dim;
 
 	vector_model_adapter () { }
 

@@ -44,7 +44,7 @@ namespace slam {
             
             assert (data.feature_observed (id));
             
-            for (const auto& obs : data.feature_data(id)) {
+            for (const auto& obs : data.get_observations(id)) {
                 
                 observation = trajectory.accumulate (obs.first, timestep) + observation;
 

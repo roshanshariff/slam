@@ -12,21 +12,24 @@
 #include <cassert>
 #include <utility>
 #include <algorithm>
+#include <iterator>
 
 #include <boost/container/vector.hpp>
 #include <boost/math/special_functions/fpclassify.hpp>
 
 #include "utility/random.hpp"
 
-template <class T>
+template <class Particle>
 class particle_filter {
     
-    struct particle {
+    struct particle : public Particle {
         double weight;
-        T data;
-        particle () : weight(1.0) { }
-        particle (const T& data) : weight(1.0), data(data) { }
-        bool operator< (const particle& p) const { return weight < p.weight; }
+        particle (double w = 1.0) : weight(w) { }
+        particle (const Particle& p, double w = 1.0) : Particle(p), weight(w) { }
+    };
+    
+    struct compare_particle_weight {
+        bool operator() (const particle& a, const particle& b) const { return a.weight > b.weight; }
     };
     
     boost::container::vector<particle> particles;
@@ -45,22 +48,41 @@ public:
         return squared_weight_sum > 0 ? weight_sum*weight_sum/squared_weight_sum : 0;
     }
     
+    template <class Updater> void update (Updater);
+    
     void resample (random_source& random, size_t new_size);
     void resample (random_source& random) { resample (random, size()); }
     
-    template <class Updater> void update (Updater);
+    template <class Initializer> void reinitialize (size_t new_size, Initializer);
     
-    const T& operator[] (size_t index) const { return particles[index].data; }
-    T& operator[] (size_t index) { return particles[index].data; }
+    const Particle& operator[] (size_t index) const { return particles[index]; }
+    Particle& operator[] (size_t index) { return particles[index]; }
     
-    const T& max_weight_particle () const { return max_weight->data; }
+    const Particle& max_weight_particle () const { return *max_weight; }
     
 };
 
 template <class Particle>
+template <class Updater>
+void particle_filter<Particle>::update (Updater f) {
+    
+    weight_sum = 0;
+    squared_weight_sum = 0;
+    max_weight = &particles.front();
+    
+    for (auto& particle : particles) {
+        particle.weight *= f (static_cast<Particle&>(particle));
+        if (!boost::math::isfinite(particle.weight) || particle.weight < 0) particle.weight = 0;
+        weight_sum += particle.weight;
+        squared_weight_sum += particle.weight * particle.weight;
+        if (compare_particle_weight()(particle, *max_weight)) max_weight = &particle;
+    }
+}
+
+template <class Particle>
 void particle_filter<Particle>::resample (random_source& random, size_t new_size) {
     
-    std::sort (particles.rbegin(), particles.rend());
+    std::sort (particles.begin(), particles.end(), compare_particle_weight());
 
     boost::container::vector<particle> new_particles;
     new_particles.reserve (new_size);
@@ -71,7 +93,7 @@ void particle_filter<Particle>::resample (random_source& random, size_t new_size
     for (const auto& particle : particles) {
         weight += particle.weight;
         while (weight_sum * (offset + new_particles.size()) < weight * new_size) {
-            new_particles.emplace_back (particle.data);
+            new_particles.emplace_back (particle, 1.0);
         }
     }
     
@@ -83,21 +105,13 @@ void particle_filter<Particle>::resample (random_source& random, size_t new_size
 }
 
 template <class Particle>
-template <class Updater>
-void particle_filter<Particle>::update (Updater f) {
-
-    weight_sum = 0;
-    squared_weight_sum = 0;
+template <class Initializer>
+void particle_filter<Particle>::reinitialize (size_t new_size, Initializer init) {
+    particles.clear();
+    particles.reserve(new_size);
+    std::generate_n (std::back_inserter (particles), new_size, init);
     max_weight = &particles.front();
-    
-    for (auto& particle : particles) {
-        particle.weight *= f (particle.data);
-        if (!(boost::math::isfinite(particle.weight)) || particle.weight < 0) particle.weight = 0;
-        weight_sum += particle.weight;
-        squared_weight_sum += particle.weight * particle.weight;
-        if (particle.weight > max_weight->weight) max_weight = &particle;
-    }
+    weight_sum = squared_weight_sum = new_size;
 }
-
 
 #endif

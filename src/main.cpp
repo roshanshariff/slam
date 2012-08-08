@@ -15,6 +15,7 @@
 #include "planar_robot/landmark_sensor.hpp"
 #include "slam/mcmc_slam.hpp"
 #include "slam/fastslam.hpp"
+#include "slam/fastslam_mcmc.hpp"
 #include "slam/slam_likelihood.hpp"
 #include "simulator/simulator.hpp"
 #include "simulator/slam_plotter.hpp"
@@ -35,8 +36,7 @@ struct sim_types {
     
     typedef slam::mcmc_slam<control_model_type, observation_model_type> mcmc_slam_type;
     typedef slam::fastslam<control_model_type, observation_model_type> fastslam_type;
-    
-    //typedef likelihood_plotter<control_model_type, observation_model_type> likelihood_plotter_type;
+    typedef slam::fastslam_mcmc<control_model_type, observation_model_type> fastslam_mcmc_type;
     
 };
 
@@ -45,11 +45,11 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]);
 
 
 int main (int argc, char* argv[]) {
-
-	/* parse program options */
+    
+    /* parse program options */
     
     boost::program_options::variables_map options = parse_options (argc, argv);
-
+    
     /* set up simulation objects */
     
     random_source random (remember_option(options, "seed", (unsigned int)std::time(0)));
@@ -57,7 +57,7 @@ int main (int argc, char* argv[]) {
     unsigned int sim_seed = random();
     unsigned int mcmc_slam_seed = random();
     unsigned int fastslam_seed = random();
-
+    
     boost::shared_ptr<sim_types::simulator_type> sim
     = boost::make_shared<sim_types::simulator_type> (boost::ref(options), sim_seed);
     
@@ -65,7 +65,7 @@ int main (int argc, char* argv[]) {
     if (options.count ("mcmc-slam")) {
         mcmc_slam = boost::make_shared<sim_types::mcmc_slam_type> (sim->get_slam_data(),
                                                                    boost::ref(options), mcmc_slam_seed);
-        sim->add_timestep_listener (mcmc_slam);
+        //sim->add_timestep_listener (mcmc_slam);
     }
     
     boost::shared_ptr<sim_types::fastslam_type> fastslam;
@@ -76,11 +76,17 @@ int main (int argc, char* argv[]) {
         if (mcmc_slam && options.count("mcmc-init")) mcmc_slam->set_initialiser (fastslam);
     }
     
+    boost::shared_ptr<sim_types::fastslam_mcmc_type> fastslam_mcmc;
+    fastslam_mcmc = boost::make_shared<sim_types::fastslam_mcmc_type> (boost::ref(options));
+    fastslam_mcmc->set_fastslam(fastslam);
+    fastslam_mcmc->set_mcmc_slam(mcmc_slam);
+    sim->add_timestep_listener(fastslam_mcmc);
+    
     boost::shared_ptr<slam_plotter> slam_plot;
     if (options.count ("slam-plot")) {
-
+        
         slam_plot = boost::make_shared<slam_plotter> (boost::ref(options), sim->get_initial_state());
-
+        
         slam_plot->add_data_source (sim, true, "Trajectory", "Landmarks",
                                     "lc rgbcolor 'red' pt 6 ps 1.5",
                                     "lc rgbcolor 'black' lw 5",
@@ -92,14 +98,14 @@ int main (int argc, char* argv[]) {
                                         "lc rgbcolor 'blue' lw 2",
                                         "size 10,20,50 filled lc rgbcolor 'blue'");
         }
-
+        
         if (mcmc_slam) {
             slam_plot->add_data_source (mcmc_slam, false, "MCMC-SLAM", "",
                                         "lc rgbcolor 'green' pt 3 ps 1",
                                         "lc rgbcolor 'green' lw 2",
                                         "size 10,20,50 filled lc rgbcolor 'green'");
         }
-
+        
         sim->add_timestep_listener (slam_plot);
     }
     
@@ -118,7 +124,7 @@ int main (int argc, char* argv[]) {
                     - sim->get_log_likelihood();
                 }
             } mcmc_slam_log_likelihood = { sim, mcmc_slam };
-
+            
             likelihood_plot->add_data_source (mcmc_slam_log_likelihood,
                                               "MCMC-SLAM log likelihood", "lc rgbcolor 'green' lw 5");
         }
@@ -147,33 +153,34 @@ int main (int argc, char* argv[]) {
     
     /* set up simulation logging */
     
-	boost::filesystem::path output_dir (options["output-dir"].as<std::string>());
+    boost::filesystem::path output_dir (options["output-dir"].as<std::string>());
     boost::filesystem::create_directories (output_dir);
-
-	(*sim)();
     
-	return EXIT_SUCCESS;
-
+    (*sim)();
+    
+    return EXIT_SUCCESS;
+    
 }
 
 
 boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     
-	namespace po = boost::program_options;
-
-	po::options_description command_line_options ("Command Line Options");
-	command_line_options.add_options()
+    namespace po = boost::program_options;
+    
+    po::options_description command_line_options ("Command Line Options");
+    command_line_options.add_options()
     ("help,h", "usage information")
     ("simulator-help", "simulator options")
     ("controller-help", "controller options")
     ("sensor-help", "sensor options")
     ("mcmc-slam-help", "MCMC-SLAM options")
     ("fastslam-help", "FastSLAM 2.0 options")
+    ("fastslam-mcmc-help", "FastSLAM 2.0 options")
     ("slam-plot-help", "SLAM plotting options")
     ("config-file,f", po::value<std::vector<std::string> >()->composing(), "configuration files");
-
-	po::options_description general_options ("General Options");
-	general_options.add_options()
+    
+    po::options_description general_options ("General Options");
+    general_options.add_options()
     ("output-dir,o", po::value<std::string>()->default_value("./output"),
      "directory for simulation output files")
     ("log", "produce detailed simulation logs")
@@ -183,81 +190,87 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     ("slam-plot", "produce SLAM gnuplot output")
     ("plot-stats", "produce plots of various summary statistics")
     ("seed", po::value<unsigned int>(), "seed for global random number generator");
-
+    
     po::options_description simulator_options = sim_types::simulator_type::program_options();
-	po::options_description controller_options = sim_types::controller_type::program_options();
-	po::options_description sensor_options = sim_types::sensor_type::program_options();
-	po::options_description mcmc_slam_options = sim_types::mcmc_slam_type::program_options();
+    po::options_description controller_options = sim_types::controller_type::program_options();
+    po::options_description sensor_options = sim_types::sensor_type::program_options();
+    po::options_description mcmc_slam_options = sim_types::mcmc_slam_type::program_options();
     po::options_description fastslam_options = sim_types::fastslam_type::program_options();
+    po::options_description fastslam_mcmc_options = sim_types::fastslam_mcmc_type::program_options();
     po::options_description slam_plot_options = slam_plotter::program_options();
-
-	po::options_description config_options;
-	config_options
+    
+    po::options_description config_options;
+    config_options
     .add(general_options).add(simulator_options).add(controller_options).add(sensor_options)
-    .add(mcmc_slam_options).add(fastslam_options).add(slam_plot_options);
-
-	po::options_description all_options;
-	all_options.add(command_line_options).add(config_options);
-
-	po::variables_map values;
-	po::store (po::command_line_parser (argc, argv).options(all_options).allow_unregistered().run(), values);
-	po::notify (values);
+    .add(mcmc_slam_options).add(fastslam_options).add(fastslam_mcmc_options).add(slam_plot_options);
+    
+    po::options_description all_options;
+    all_options.add(command_line_options).add(config_options);
+    
+    po::variables_map values;
+    po::store (po::command_line_parser (argc, argv).options(all_options).allow_unregistered().run(), values);
+    po::notify (values);
     
     po::options_description help_options;
     bool help_requested = false;
-
-	if (values.count ("help")) {
-		help_options.add(command_line_options).add(general_options);
+    
+    if (values.count ("help")) {
+        help_options.add(command_line_options).add(general_options);
         help_requested = true;
-	}
+    }
     
     if (values.count("simulator-help")) {
         help_options.add(simulator_options);
         help_requested = true;
     }
     
-	if (values.count("controller-help")) {
-		help_options.add(controller_options);
+    if (values.count("controller-help")) {
+        help_options.add(controller_options);
         help_requested = true;
-	}
+    }
     
-	if (values.count("sensor-help")) {
-		help_options.add(sensor_options);
+    if (values.count("sensor-help")) {
+        help_options.add(sensor_options);
         help_requested = true;
-	}
+    }
     
-	if (values.count("mcmc-slam-help")) {
-		help_options.add(mcmc_slam_options);
+    if (values.count("mcmc-slam-help")) {
+        help_options.add(mcmc_slam_options);
         help_requested = true;
-	}
+    }
     
-	if (values.count("fastslam-help")) {
-		help_options.add(fastslam_options);
+    if (values.count("fastslam-help")) {
+        help_options.add(fastslam_options);
         help_requested = true;
-	}
-
-	if (values.count("slam-plot-help")) {
-		help_options.add(slam_plot_options);
+    }
+    
+    if (values.count("fastslam-mcmc-help")) {
+        help_options.add(fastslam_mcmc_options);
         help_requested = true;
-	}
-
+    }
+    
+    if (values.count("slam-plot-help")) {
+        help_options.add(slam_plot_options);
+        help_requested = true;
+    }
+    
     if (help_requested) {
         std::cout << help_options << std::endl;
         std::exit(EXIT_SUCCESS);
     }
-
-	if (values.count("config-file")) {
-		std::vector<std::string> files = values["config-file"].as<std::vector<std::string> >();
-		for (std::vector<std::string>::const_iterator i = files.begin(); i != files.end(); ++i) {
-			std::ifstream in (i->c_str());
-			if (!in) {
-				std::cerr << "Could not read configuration file: " << *i << std::endl;
-				std::exit(EXIT_FAILURE);
-			}
-			po::store (po::parse_config_file (in, config_options, true), values);
-			po::notify (values);
-		}
-	}
-
-	return values;
+    
+    if (values.count("config-file")) {
+        std::vector<std::string> files = values["config-file"].as<std::vector<std::string> >();
+        for (std::vector<std::string>::const_iterator i = files.begin(); i != files.end(); ++i) {
+            std::ifstream in (i->c_str());
+            if (!in) {
+                std::cerr << "Could not read configuration file: " << *i << std::endl;
+                std::exit(EXIT_FAILURE);
+            }
+            po::store (po::parse_config_file (in, config_options, true), values);
+            po::notify (values);
+        }
+    }
+    
+    return values;
 }

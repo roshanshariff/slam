@@ -9,7 +9,6 @@
 #ifndef slam_fastslam_hpp
 #define slam_fastslam_hpp
 
-#include <vector>
 #include <cmath>
 #include <functional>
 
@@ -27,6 +26,7 @@
 #include "slam/particle_filter.hpp"
 #include "utility/random.hpp"
 #include "utility/unscented.hpp"
+#include "utility/vector.hpp"
 #include "utility/cowmap.hpp"
 #include "utility/flat_map.hpp"
 #include "utility/bitree.hpp"
@@ -35,17 +35,22 @@
 
 namespace slam {
     
+    
+    template <class ControlModel, class ObservationModel> class fastslam_mcmc;
+
+    
     template <class ControlModel, class ObservationModel>
     class fastslam :
     public slam_result_of<ControlModel, ObservationModel>,
     public slam_data<ControlModel, ObservationModel>::listener
     {
         
+        friend class fastslam_mcmc<ControlModel, ObservationModel>;
+        
         using state_type = typename ControlModel::result_type;
         using feature_type = typename ObservationModel::result_type;
         
         using slam_data_type = slam_data<ControlModel, ObservationModel>;
-        using observation_data_type = typename slam_data_type::observation_data_type;
         
         using vec = vector_transform_functors<ControlModel, ObservationModel>;
         
@@ -71,12 +76,6 @@ namespace slam {
         };
         
         
-        /* Private member functions */
-        
-        double particle_state_update (particle_type&) const;
-        double particle_log_weight (const particle_type&) const;
-        
-        
         /** Private data members */
         
         /** Our very own pseudo-random number generator. */
@@ -85,13 +84,14 @@ namespace slam {
         /** Current timestep, current control, and observations made in the current timestep. */
         timestep_type next_timestep;
         boost::optional<ControlModel> current_control;
-        std::vector<observed_feature_type> seen_features, new_features;
+        utility::vector<observed_feature_type> seen_features, new_features;
         std::size_t num_features = 0;
         
         /** The particle filter, its target size, and the resample threshold. */
         particle_filter<particle_type> particles;
         size_t num_particles;
         double resample_threshold;
+        double collapse_threshold;
         
         /** Whether to keep a per-particle trajectory as opposed to one combined trajectory. */
         const bool discard_history;
@@ -110,6 +110,20 @@ namespace slam {
             feature(alpha, beta, kappa),
             state_feature(alpha, beta, kappa) { }
         } ukf_params;
+        
+
+        /* Private member functions */
+        
+        double particle_state_update (particle_type&) const;
+        double particle_log_weight (const particle_type&) const;
+        
+        bool filter_collapsed () const {
+            return particles.effective_size() < num_particles*collapse_threshold;
+        }
+        
+        bool resample_required () const {
+            return particles.effective_size() < num_particles*resample_threshold;
+        }
         
     public:
         
@@ -149,10 +163,10 @@ namespace slam {
             current_control = control;
         }
         
-        virtual void observation (timestep_type t, const observation_data_type& obs) override {
+        virtual void observation (timestep_type t, const typename slam_data_type::observation_info& obs) override {
             assert (t == next_timestep);
             auto& features = obs.index() == 0 ? new_features : seen_features;
-            features.push_back (observed_feature_type(obs.feature_id(), obs.observation()));
+            features.emplace_back (obs.id(), obs.observation());
         }
         
     };
@@ -171,9 +185,7 @@ void slam::fastslam<ControlModel, ObservationModel>
     
     if (timestep > 0) {
         
-        if (particles.effective_size() < num_particles*resample_threshold) {
-            particles.resample (random, num_particles);
-        }
+        if (resample_required()) particles.resample (random, num_particles);
         
         assert (current_control);
         particles.update (boost::bind (&fastslam::particle_state_update, this, _1));
@@ -373,6 +385,7 @@ auto slam::fastslam<ControlModel, ObservationModel>
     options.add_options()
     ("num-particles", po::value<size_t>()->default_value(100), "Number of particles in the particle filter")
     ("resample-threshold", po::value<double>()->default_value(0.75), "Minimum ratio of effective particles")
+    ("resample-threshold-min", po::value<double>()->default_value(0.5), "Minimum ratio before filter collapses")
     ("no-history", "Don't keep per-particle trajectory information")
     ("ukf-alpha", po::value<double>()->default_value(0.002), "The alpha parameter for the scaled UKF")
     ("ukf-beta", po::value<double>()->default_value(2), "The beta parameter for the scaled UKF")
