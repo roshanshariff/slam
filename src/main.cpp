@@ -16,6 +16,7 @@
 #include "slam/mcmc_slam.hpp"
 #include "slam/fastslam.hpp"
 #include "slam/fastslam_mcmc.hpp"
+#include "slam/g2o_slam.hpp"
 #include "slam/slam_likelihood.hpp"
 #include "simulator/simulator.hpp"
 #include "simulator/slam_plotter.hpp"
@@ -37,6 +38,8 @@ struct sim_types {
     typedef slam::mcmc_slam<control_model_type, observation_model_type> mcmc_slam_type;
     typedef slam::fastslam<control_model_type, observation_model_type> fastslam_type;
     typedef slam::fastslam_mcmc<control_model_type, observation_model_type> fastslam_mcmc_type;
+    
+    typedef slam::g2o_slam<control_model_type, observation_model_type> g2o_slam_type;
     
 };
 
@@ -82,13 +85,19 @@ int main (int argc, char* argv[]) {
     fastslam_mcmc->set_mcmc_slam(mcmc_slam);
     sim->add_timestep_listener(fastslam_mcmc);
     
+    boost::shared_ptr<sim_types::g2o_slam_type> g2o_slam;
+    if (options.count ("g2o")) {
+        g2o_slam = boost::make_shared<sim_types::g2o_slam_type> ();
+        sim->add_data_listener (g2o_slam);
+    }
+    
     boost::shared_ptr<slam_plotter> slam_plot;
     if (options.count ("slam-plot")) {
         
         slam_plot = boost::make_shared<slam_plotter> (boost::ref(options), sim->get_initial_state());
         
         slam_plot->add_data_source (sim, true, "Trajectory", "Landmarks",
-                                    "lc rgbcolor 'red' pt 6 ps 1.5",
+                                    "lc rgbcolor 'black' pt 6 ps 1.5",
                                     "lc rgbcolor 'black' lw 5",
                                     "size 10,20,50 filled lc rgbcolor 'black'");
         
@@ -103,6 +112,13 @@ int main (int argc, char* argv[]) {
             slam_plot->add_data_source (mcmc_slam, false, "MCMC-SLAM", "",
                                         "lc rgbcolor 'green' pt 3 ps 1",
                                         "lc rgbcolor 'green' lw 2",
+                                        "size 10,20,50 filled lc rgbcolor 'green'");
+        }
+        
+        if (g2o_slam) {
+            slam_plot->add_data_source (g2o_slam, false, "G2O", "",
+                                        "lc rgbcolor 'red' pt 3 ps 1",
+                                        "lc rgbcolor 'red' lw 2",
                                         "size 10,20,50 filled lc rgbcolor 'green'");
         }
         
@@ -186,6 +202,7 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     ("log", "produce detailed simulation logs")
     ("mcmc-slam", "enable MCMC-SLAM")
     ("fastslam", "enable FastSLAM 2.0")
+    ("g2o", "enable offline SLAM using G2O")
     ("mcmc-init", "initialise MCMC estimate from FastSLAM")
     ("slam-plot", "produce SLAM gnuplot output")
     ("plot-stats", "produce plots of various summary statistics")
