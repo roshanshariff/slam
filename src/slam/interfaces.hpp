@@ -56,7 +56,7 @@ namespace slam {
     
     struct timestep_listener {
         virtual void timestep (timestep_type) = 0;
-        virtual ~timestep_listener () = default;
+        virtual ~timestep_listener () { }
     };
     
     

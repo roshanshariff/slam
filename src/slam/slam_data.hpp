@@ -151,11 +151,11 @@ namespace slam {
         assert (obs_iter+1 == feature_obs.end());
         const std::size_t index = obs_iter - feature_obs.begin();
         
-        observation_info obs_info (feature_iter, index);
-        const auto obs_info_iter = m_observations.emplace_hint (m_observations.end(), t, obs_info);
+        const auto obs_info_iter = m_observations.emplace_hint (m_observations.end(), t,
+                                                                observation_info (feature_iter, index));
         assert (obs_info_iter+1 == m_observations.end());
         
-        m_listeners.for_each (boost::bind (&listener::observation, _1, t, boost::cref(obs_info)));
+        m_listeners.for_each (boost::bind (&listener::observation, _1, t, boost::cref(obs_info_iter->second)));
     }
     
 

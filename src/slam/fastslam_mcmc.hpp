@@ -30,8 +30,8 @@ namespace slam {
         using fastslam_type = fastslam<ControlModel, ObservationModel>;
         using mcmc_slam_type = mcmc_slam<ControlModel, ObservationModel>;
         
-        boost::shared_ptr<fastslam_type> fastslam;
-        boost::shared_ptr<mcmc_slam_type> mcmc_slam;
+        boost::shared_ptr<fastslam_type> m_fastslam;
+        boost::shared_ptr<mcmc_slam_type> m_mcmc_slam;
         
         typename fastslam_type::particle_type sample_particle () const;
         
@@ -42,7 +42,7 @@ namespace slam {
         bool resample_required = false;
         
         std::size_t mcmc_slam_vertices () const {
-            return mcmc_slam->state_estimates.size() + mcmc_slam->feature_estimates.size();
+            return m_mcmc_slam->state_estimates.size() + m_mcmc_slam->feature_estimates.size();
         }
         
     public:
@@ -55,8 +55,8 @@ namespace slam {
         
         virtual void timestep (timestep_type) override;
         
-        void set_fastslam (const decltype(fastslam)& p) { fastslam = p; }
-        void set_mcmc_slam (const decltype(mcmc_slam)& p) { mcmc_slam = p; }
+        void set_fastslam (const decltype(m_fastslam)& p) { m_fastslam = p; }
+        void set_mcmc_slam (const decltype(m_mcmc_slam)& p) { m_mcmc_slam = p; }
     };
         
 }
@@ -65,29 +65,29 @@ template <class ControlModel, class ObservationModel>
 void slam::fastslam_mcmc<ControlModel, ObservationModel>
 ::timestep (const timestep_type t) {
     
-    if (mcmc_slam) {
-        if (!fastslam) {
+    if (m_mcmc_slam) {
+        if (!m_fastslam) {
             auto vertices_before = mcmc_slam_vertices();
-            mcmc_slam->timestep(t);
+            m_mcmc_slam->timestep(t);
             auto vertices_after = mcmc_slam_vertices();
             unsigned int num_updates = mcmc_updates * (vertices_after - vertices_before);
-            for (unsigned int i = 0; i < num_updates; ++i) mcmc_slam->update();
+            for (unsigned int i = 0; i < num_updates; ++i) m_mcmc_slam->update();
             return;
         }
     }
     else return;
     
-    fastslam->timestep(t);
+    m_fastslam->timestep(t);
     if (t == 0) return;
 
     bool resample_required_previous = resample_required;
-    resample_required = fastslam->resample_required();
+    resample_required = m_fastslam->resample_required();
     
     if (resample_required && resample_required_previous) {
-    fastslam->get_trajectory();
-        mcmc_slam->timestep(t);
+    m_fastslam->get_trajectory();
+        m_mcmc_slam->timestep(t);
         std::cout << "Reinitialising FastSLAM... ";
-        fastslam->particles.reinitialize (fastslam->num_particles,
+        m_fastslam->particles.reinitialize (m_fastslam->num_particles,
                                           boost::bind(&fastslam_mcmc::sample_particle, this));
         std::cout <<"done\n";
         resample_required = false;
@@ -100,37 +100,37 @@ auto slam::fastslam_mcmc<ControlModel, ObservationModel>
 ::sample_particle () const -> typename fastslam_type::particle_type {
     
     auto num_updates = mcmc_updates;
-    num_updates *= mcmc_slam->state_estimates.size() + mcmc_slam->feature_estimates.size();
+    num_updates *= m_mcmc_slam->state_estimates.size() + m_mcmc_slam->feature_estimates.size();
     
     for (std::size_t i = 0; i < num_updates; ++i) {
-        mcmc_slam->update();
+        m_mcmc_slam->update();
     }
         
     typename fastslam_type::particle_type particle;
     
-    for (std::size_t i = 0; i < mcmc_slam->get_trajectory().size(); ++i) {
+    for (std::size_t i = 0; i < m_mcmc_slam->get_trajectory().size(); ++i) {
         particle.trajectory.previous = boost::make_shared<decltype(particle.trajectory)>(particle.trajectory);
-        particle.trajectory.state += mcmc_slam->get_trajectory()[i];
+        particle.trajectory.state += m_mcmc_slam->get_trajectory()[i];
     }
     
-    for (std::size_t feature_index = 0; feature_index < mcmc_slam->feature_estimates.size(); ++feature_index) {
+    for (std::size_t feature_index = 0; feature_index < m_mcmc_slam->feature_estimates.size(); ++feature_index) {
         
-        const auto& f = mcmc_slam->feature_estimates[feature_index];
+        const auto& f = m_mcmc_slam->feature_estimates[feature_index];
         
         using feature_dist = typename fastslam_type::feature_dist;
         using feature_vector = typename feature_dist::vector_type;
         static const int feature_dim = fastslam_type::vec::feature_dim;
         
-        const feature_vector base = (mcmc_slam->get_state(f.parent_timestep()) + f.estimate()).to_vector();
+        const feature_vector base = (m_mcmc_slam->get_state(f.parent_timestep()) + f.estimate()).to_vector();
         Eigen::Matrix<double, fastslam_type::vec::feature_dim, Eigen::Dynamic> samples (feature_dim, num_feature_samples);
         
         for (unsigned int i = 0; i < num_feature_samples; ++i) {
             
             for (unsigned int j = 0; j < mcmc_feature_updates; ++j) {
-                mcmc_slam->update (typename mcmc_slam_type::feature_edge (*mcmc_slam, feature_index), false);
+                m_mcmc_slam->update (typename mcmc_slam_type::feature_edge (*m_mcmc_slam, feature_index), false);
             }
             
-            feature_vector feature = (mcmc_slam->get_state(f.parent_timestep()) + f.estimate()).to_vector();
+            feature_vector feature = (m_mcmc_slam->get_state(f.parent_timestep()) + f.estimate()).to_vector();
             samples.col(i) = feature_dist::subtract (base, feature);
         }
         
