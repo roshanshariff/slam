@@ -362,14 +362,10 @@ auto slam::fastslam<ControlModel, ObservationModel>
         map_estimate.clear();
         map_estimate.reserve(num_features);
         
-        struct {
-            decltype(map_estimate)& map;
-            void operator() (featureid_type id, const feature_dist& estimate) const {
-                this->map.emplace_hint (this->map.end(), id, estimate.mean());
-            }
-        } map_estimate_inserter = { map_estimate };
-        
-        particles.max_weight_particle().features.for_each (map_estimate_inserter);
+        particles.max_weight_particle().features.for_each
+        ([&](featureid_type id, const feature_dist& estimate) {
+            map_estimate.emplace_hint (map_estimate.end(), id, estimate.mean());
+        });
     }
     
     assert (map_estimate.size() == num_features);

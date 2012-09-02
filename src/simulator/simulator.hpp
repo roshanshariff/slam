@@ -23,36 +23,38 @@
 template <class Controller, class Sensor>
 class simulator
 : public slam::slam_result_of <typename Controller::model_type, typename Sensor::model_type> {
-
+    
 public:
     
-	typedef typename Controller::model_type control_model_type;
-	typedef typename Sensor::model_type observation_model_type;
-
+    typedef typename Controller::model_type control_model_type;
+    typedef typename Sensor::model_type observation_model_type;
+    
     typedef typename control_model_type::result_type state_type;
     typedef typename observation_model_type::result_type feature_type;
     
-	typedef slam::slam_data<control_model_type, observation_model_type> slam_data_type;
-
+    typedef slam::slam_data<control_model_type, observation_model_type> slam_data_type;
+    
 private:
     
     typedef utility::bitree<state_type> trajectory_type;
     typedef boost::container::flat_map<slam::featureid_type, feature_type> feature_map_type;
-
+    
     // Data members
     
-	random_source random;    
+    random_source random;
     boost::shared_ptr<slam_data_type> data;
     
     Controller controller;
     Sensor sensor;
-
+    
     const state_type initial_state;
-	trajectory_type trajectory;
+    trajectory_type trajectory;
     feature_map_type feature_map;
     
     double state_log_likelihood = 0;
-
+    
+    bool sim_completed = false;
+    
     utility::listeners<slam::timestep_listener> listeners;
     
     void timestep () {
@@ -70,10 +72,10 @@ public:
     void add_data_listener (const boost::shared_ptr<typename slam_data_type::listener>& l) {
         data->add_listener(l);
     }
-
+    
     static boost::program_options::options_description program_options ();
     
-	void operator() ();
+    void operator() ();
     
     state_type get_initial_state () const { return initial_state; }
     
@@ -85,6 +87,10 @@ public:
     
     virtual void timestep (slam::timestep_type t) override {
         assert (t <= current_timestep());
+    }
+    
+    virtual void completed () override {
+        assert (sim_completed);
     }
     
     virtual slam::timestep_type current_timestep () const override {
@@ -128,25 +134,30 @@ initial_state (controller.initial_state())
 
 template <class Controller, class Sensor>
 void simulator<Controller, Sensor>::operator() () {
-
+    
+    assert (!sim_completed);
+    
     sensor.sense (get_initial_state() + get_state(current_timestep()), random,
                   boost::bind (&slam_data_type::add_observation, data.get(), _1, _2));
     timestep ();
     
-	while (!controller.finished()) {
-
-		auto control_dist = controller.control (get_initial_state() + get_state(current_timestep()));
+    while (!controller.finished()) {
+        
+        auto control_dist = controller.control (get_initial_state() + get_state(current_timestep()));
         auto control = control_dist(random);
-
-		trajectory.push_back (control);
+        
+        trajectory.push_back (control);
         state_log_likelihood += control_dist.log_likelihood (control);
         
-		data->add_control (control_dist);
-
+        data->add_control (control_dist);
+        
         sensor.sense (get_initial_state() + get_state(current_timestep()), random,
                       boost::bind (&slam_data_type::add_observation, data.get(), _1, _2));
         timestep ();
-	}
+    }
+    
+    sim_completed = true;
+    listeners.for_each (boost::bind (&slam::timestep_listener::completed, _1));
 }
 
 
