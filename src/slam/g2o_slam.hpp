@@ -290,6 +290,7 @@ void slam::g2o_slam<ControlModel, ObservationModel>
         map_estimate.clear();
     }
     
+    ++next_timestep;    
 }
 
 
