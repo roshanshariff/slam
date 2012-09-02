@@ -56,6 +56,7 @@ namespace slam {
     
     struct timestep_listener {
         virtual void timestep (timestep_type) = 0;
+        virtual void completed () { }
         virtual ~timestep_listener () { }
     };
     
@@ -82,17 +83,6 @@ namespace slam {
     using slam_result_of = slam_result<typename ControlModel::result_type, typename ObsModel::result_type>;
     
     
-    template <class Functor>
-    auto make_timestep_listener (const Functor& functor) -> boost::shared_ptr<timestep_listener> {
-        
-        struct listener : public timestep_listener {
-            Functor functor;
-            listener (const Functor& functor) : functor(functor) { }
-            virtual void timestep (timestep_type t) { this->functor(t); }
-        };
-        
-        return boost::make_shared<listener>(functor);
-    }
 }
 
 #endif

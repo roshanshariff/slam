@@ -87,6 +87,10 @@ namespace slam {
             m_listeners.for_each (boost::bind (&listener::timestep, _1, timestep));
         }
         
+        virtual void completed () override {
+            m_listeners.for_each (boost::bind (&listener::completed, _1));
+        }
+        
         /** Retrieve controls. */
         
         const ControlModel& control (timestep_type timestep) const {
@@ -144,15 +148,22 @@ namespace slam {
     ::add_observation (featureid_type id, const ObservationModel& obs) {
         
         const timestep_type t = current_timestep();
-        const auto feature_iter = m_features.emplace(id, feature_observations());
+        
+        auto feature_iter = m_features.find (id);
+        
+        if (feature_iter == m_features.end()) {
+            feature_iter = m_features.emplace_hint (feature_iter, id, feature_observations());
+        }
 
         auto& feature_obs = feature_iter->second;
-        const auto obs_iter = feature_obs.emplace_hint (feature_obs.end(), t, obs);
+        
+        auto obs_iter = feature_obs.emplace_hint (feature_obs.end(), t, obs);
         assert (obs_iter+1 == feature_obs.end());
+        
         const std::size_t index = obs_iter - feature_obs.begin();
         
-        const auto obs_info_iter = m_observations.emplace_hint (m_observations.end(), t,
-                                                                observation_info (feature_iter, index));
+        auto obs_info_iter = m_observations.emplace_hint (m_observations.end(), t,
+                                                          observation_info (feature_iter, index));
         assert (obs_info_iter+1 == m_observations.end());
         
         m_listeners.for_each (boost::bind (&listener::observation, _1, t, boost::cref(obs_info_iter->second)));
