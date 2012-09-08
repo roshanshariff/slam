@@ -2,8 +2,8 @@ cmake_minimum_required (VERSION 2.8)
 project (slam CXX)
 
 set (SLAM_SRCS main.cpp planar_robot/waypoint_controller.cpp planar_robot/landmark_sensor.cpp
-    utility/utility.cpp utility/cowtree.cpp simulator/gnuplot_process.cpp simulator/slam_plotter.cpp
-    simulator/time_series_plotter.cpp)
+    planar_robot/rms_error.cpp utility/utility.cpp utility/cowtree.cpp simulator/gnuplot_process.cpp
+    simulator/slam_plotter.cpp simulator/time_series_plotter.cpp)
 
 add_executable (slam ${SLAM_SRCS})
 
@@ -11,7 +11,7 @@ set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules
 
 set (CMAKE_INCLUDE_CURRENT_DIR true)
 
-find_package (Boost 1.48.0 COMPONENTS program_options filesystem system REQUIRED)
+find_package (Boost 1.50.0 COMPONENTS program_options filesystem system timer REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 target_link_libraries (slam ${Boost_LIBRARIES})
 

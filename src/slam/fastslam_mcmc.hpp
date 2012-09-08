@@ -35,7 +35,8 @@ namespace slam {
         
         typename fastslam_type::particle_type sample_particle () const;
         
-        unsigned int mcmc_updates;
+        unsigned int mcmc_steps;
+        unsigned int mcmc_end_steps;
         unsigned int mcmc_feature_updates;
         unsigned int num_feature_samples;
         
@@ -55,6 +56,8 @@ namespace slam {
         
         virtual void timestep (timestep_type) override;
         
+        virtual void completed () override;
+        
         void set_fastslam (const decltype(m_fastslam)& p) { m_fastslam = p; }
         void set_mcmc_slam (const decltype(m_mcmc_slam)& p) { m_mcmc_slam = p; }
     };
@@ -70,7 +73,7 @@ void slam::fastslam_mcmc<ControlModel, ObservationModel>
             auto vertices_before = mcmc_slam_vertices();
             m_mcmc_slam->timestep(t);
             auto vertices_after = mcmc_slam_vertices();
-            unsigned int num_updates = mcmc_updates * (vertices_after - vertices_before);
+            unsigned int num_updates = mcmc_steps * (vertices_after - vertices_before);
             for (unsigned int i = 0; i < num_updates; ++i) m_mcmc_slam->update();
             return;
         }
@@ -96,10 +99,23 @@ void slam::fastslam_mcmc<ControlModel, ObservationModel>
 
 
 template <class ControlModel, class ObservationModel>
+void slam::fastslam_mcmc<ControlModel, ObservationModel>
+::completed () {
+    
+    std::cout << "Running MCMC steps at end.\n";
+
+    if (m_mcmc_slam) {
+        for (unsigned int i = 0; i < mcmc_end_steps; ++i) m_mcmc_slam->update();
+    }
+    
+}
+
+
+template <class ControlModel, class ObservationModel>
 auto slam::fastslam_mcmc<ControlModel, ObservationModel>
 ::sample_particle () const -> typename fastslam_type::particle_type {
     
-    auto num_updates = mcmc_updates;
+    auto num_updates = mcmc_steps;
     num_updates *= m_mcmc_slam->state_estimates.size() + m_mcmc_slam->feature_estimates.size();
     
     for (std::size_t i = 0; i < num_updates; ++i) {
@@ -163,7 +179,8 @@ auto slam::fastslam_mcmc<ControlModel, ObservationModel>
     namespace po = boost::program_options;
     po::options_description options ("FastSLAM-MCMC Parameters");
     options.add_options()
-    ("mcmc-updates", po::value<unsigned int>()->default_value(1), "MCMC iterations per graph vertex")
+    ("mcmc-steps", po::value<unsigned int>()->default_value(1), "MCMC iterations per graph vertex")
+    ("mcmc-end-steps", po::value<unsigned int>()->default_value(0), "MCMC iterations after simulation")
     ("mcmc-feature-updates", po::value<unsigned int>()->default_value(10), "MCMC iterations per feature")
     ("feature-samples", po::value<unsigned int>()->default_value(100), "number of independent samples of each feature");
     return options;
@@ -173,7 +190,8 @@ auto slam::fastslam_mcmc<ControlModel, ObservationModel>
 template <class ControlModel, class ObservationModel>
 slam::fastslam_mcmc<ControlModel, ObservationModel>
 ::fastslam_mcmc (boost::program_options::variables_map& options)
-: mcmc_updates (options["mcmc-updates"].as<unsigned int>()),
+: mcmc_steps (options["mcmc-steps"].as<unsigned int>()),
+mcmc_end_steps (options["mcmc-end-steps"].as<unsigned int>()),
 mcmc_feature_updates (options["mcmc-feature-updates"].as<unsigned int>()),
 num_feature_samples (options["feature-samples"].as<unsigned int>())
 { }

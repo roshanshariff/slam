@@ -55,6 +55,8 @@ private:
     
     bool sim_completed = false;
     
+    unsigned int sensor_skip;
+    
     utility::listeners<slam::timestep_listener> listeners;
     
     void timestep () {
@@ -123,7 +125,8 @@ simulator<Controller, Sensor>::simulator (boost::program_options::variables_map&
 data(boost::make_shared<slam_data_type>()),
 controller (options),
 sensor (options),
-initial_state (controller.initial_state())
+initial_state (controller.initial_state()),
+sensor_skip (options["sensor-skip"].as<unsigned int>())
 {
     add_timestep_listener (data);
     for (size_t i = 0; i < sensor.num_features(); ++i) {
@@ -151,8 +154,11 @@ void simulator<Controller, Sensor>::operator() () {
         
         data->add_control (control_dist);
         
-        sensor.sense (get_initial_state() + get_state(current_timestep()), random,
-                      boost::bind (&slam_data_type::add_observation, data.get(), _1, _2));
+        if (current_timestep() % sensor_skip == 0) {
+            sensor.sense (get_initial_state() + get_state(current_timestep()), random,
+                          boost::bind (&slam_data_type::add_observation, data.get(), _1, _2));
+        }
+        
         timestep ();
     }
     
@@ -167,7 +173,8 @@ simulator<Controller, Sensor>::program_options() {
     namespace po = boost::program_options;
     po::options_description options ("Simulator parameters");
     options.add_options()
-    ("sim-seed", po::value<unsigned int>(), "Seed for control and observation noise");
+    ("sim-seed", po::value<unsigned int>(), "Seed for control and observation noise")
+    ("sensor-skip", po::value<unsigned int>()->default_value(8), "Take sensor readings every n time steps");
     return options;
 }
 

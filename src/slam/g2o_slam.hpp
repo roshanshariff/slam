@@ -12,6 +12,8 @@
 #include <memory>
 #include <iostream>
 
+#include <boost/program_options.hpp>
+
 #include <Eigen/Core>
 
 #include <g2o/core/base_vertex.h>
@@ -149,6 +151,10 @@ namespace slam {
         
         /** Private data members */
         
+        unsigned int g2o_steps;
+        unsigned int g2o_end_steps;
+        bool need_init = false;
+        
         g2o::SparseOptimizer optimizer;
         int next_vertex_id = 0;
         
@@ -162,7 +168,8 @@ namespace slam {
         
     public:
         
-        g2o_slam ();
+        g2o_slam (boost::program_options::variables_map& options);
+        static boost::program_options::options_description program_options ();
         
         // Overridden virtual member functions of slam::slam_data::listener
 
@@ -170,6 +177,7 @@ namespace slam {
         virtual void observation (timestep_type t, const typename slam_data_type::observation_info& obs) override;
         
         virtual void timestep (timestep_type) override;
+        virtual void completed () override;
         
         // Overridden virtual member functions of slam::slam_result
         
@@ -196,31 +204,6 @@ namespace slam {
 
 
 template <class ControlModel, class ObservationModel>
-slam::g2o_slam<ControlModel, ObservationModel>
-::g2o_slam () {
-    
-    using SlamBlockSolver = g2o::BlockSolver<g2o::BlockSolverTraits<-1, -1>>;
-    using SlamLinearSolver = g2o::LinearSolverCSparse<SlamBlockSolver::PoseMatrixType>;
-    using OptimizationAlgorithm = g2o::OptimizationAlgorithmGaussNewton;
-    
-    std::unique_ptr<SlamLinearSolver> linearSolver (new SlamLinearSolver);
-    linearSolver->setBlockOrdering(false);
-    
-    std::unique_ptr<SlamBlockSolver> blockSolver (new SlamBlockSolver (linearSolver.release()));
-    
-    std::unique_ptr<OptimizationAlgorithm> solver (new OptimizationAlgorithm (blockSolver.release()));
-    optimizer.setAlgorithm(solver.release());
-    
-    std::unique_ptr<vertex_state> v (new vertex_state (next_vertex_id++, state_type()));
-    v->setFixed (true);
-    
-    state_vertices.push_back (v.get());
-    optimizer.addVertex (v.release());
-}
-
-
-
-template <class ControlModel, class ObservationModel>
 void slam::g2o_slam<ControlModel, ObservationModel>
 ::control (timestep_type t, const ControlModel& control) {
     
@@ -241,6 +224,8 @@ void slam::g2o_slam<ControlModel, ObservationModel>
     
     optimizer.addVertex (v1.release());
     optimizer.addEdge (e.release());
+    
+    need_init = true;
 }    
 
 
@@ -271,6 +256,8 @@ void slam::g2o_slam<ControlModel, ObservationModel>
     e->setInformation (chol_cov_inv.transpose() * chol_cov_inv);
     
     optimizer.addEdge (e.release());
+    
+    need_init = true;
 }
 
 
@@ -281,16 +268,37 @@ void slam::g2o_slam<ControlModel, ObservationModel>
     if (t < next_timestep) return;
     assert (t == next_timestep);
     
-    if (t > 0) {
+    if (t > 0 && g2o_steps > 0) {
         
-        optimizer.initializeOptimization();
-        optimizer.optimize(10);
+        if (need_init) {
+            optimizer.initializeOptimization();
+            need_init = false;
+        }
+        optimizer.optimize(g2o_steps);
         
         trajectory_estimate.clear();
         map_estimate.clear();
     }
     
     ++next_timestep;    
+}
+
+
+template <class ControlModel, class ObservationModel>
+void slam::g2o_slam<ControlModel, ObservationModel>
+::completed () {
+    
+    if (g2o_end_steps > 0) {
+        
+        if (need_init) {
+            optimizer.initializeOptimization();
+            need_init = false;
+        }
+        optimizer.optimize(g2o_end_steps);
+        
+        trajectory_estimate.clear();
+        map_estimate.clear();
+    }
 }
 
 
@@ -330,6 +338,44 @@ auto slam::g2o_slam<ControlModel, ObservationModel>
     
     assert (map_estimate.size() == feature_vertices.size());
     return map_estimate;
+}
+
+template <class ControlModel, class ObservationModel>
+auto slam::g2o_slam<ControlModel, ObservationModel>
+::program_options () -> boost::program_options::options_description {
+    namespace po = boost::program_options;
+    po::options_description options ("G2O-SLAM Parameters");
+    options.add_options()
+    ("g2o-steps", po::value<unsigned int>()->default_value(1), "MCMC iterations per graph vertex")
+    ("g2o-end-steps", po::value<unsigned int>()->default_value(0), "MCMC iterations after simulation");
+    return options;
+}
+
+
+template <class ControlModel, class ObservationModel>
+slam::g2o_slam<ControlModel, ObservationModel>
+::g2o_slam (boost::program_options::variables_map& options)
+: g2o_steps (options["g2o-steps"].as<unsigned int>()),
+g2o_end_steps (options["g2o-end-steps"].as<unsigned int>())
+{
+    
+    using SlamBlockSolver = g2o::BlockSolver<g2o::BlockSolverTraits<-1, -1>>;
+    using SlamLinearSolver = g2o::LinearSolverCSparse<SlamBlockSolver::PoseMatrixType>;
+    using OptimizationAlgorithm = g2o::OptimizationAlgorithmGaussNewton;
+    
+    std::unique_ptr<SlamLinearSolver> linearSolver (new SlamLinearSolver);
+    linearSolver->setBlockOrdering(false);
+    
+    std::unique_ptr<SlamBlockSolver> blockSolver (new SlamBlockSolver (linearSolver.release()));
+    
+    std::unique_ptr<OptimizationAlgorithm> solver (new OptimizationAlgorithm (blockSolver.release()));
+    optimizer.setAlgorithm(solver.release());
+    
+    std::unique_ptr<vertex_state> v (new vertex_state (next_vertex_id++, state_type()));
+    v->setFixed (true);
+    
+    state_vertices.push_back (v.get());
+    optimizer.addVertex (v.release());
 }
 
 

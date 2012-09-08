@@ -10,9 +10,11 @@
 #include <boost/ref.hpp>
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/timer/timer.hpp>
 
 #include "planar_robot/waypoint_controller.hpp"
 #include "planar_robot/landmark_sensor.hpp"
+#include "planar_robot/rms_error.hpp"
 #include "slam/mcmc_slam.hpp"
 #include "slam/fastslam.hpp"
 #include "slam/fastslam_mcmc.hpp"
@@ -38,7 +40,6 @@ struct sim_types {
     typedef slam::mcmc_slam<control_model_type, observation_model_type> mcmc_slam_type;
     typedef slam::fastslam<control_model_type, observation_model_type> fastslam_type;
     typedef slam::fastslam_mcmc<control_model_type, observation_model_type> fastslam_mcmc_type;
-    
     typedef slam::g2o_slam<control_model_type, observation_model_type> g2o_slam_type;
     
 };
@@ -87,7 +88,7 @@ int main (int argc, char* argv[]) {
     
     boost::shared_ptr<sim_types::g2o_slam_type> g2o_slam;
     if (options.count ("g2o")) {
-        g2o_slam = boost::make_shared<sim_types::g2o_slam_type> ();
+        g2o_slam = boost::make_shared<sim_types::g2o_slam_type> (boost::ref(options));
         sim->add_data_listener (g2o_slam);
     }
     
@@ -131,33 +132,17 @@ int main (int argc, char* argv[]) {
         likelihood_plot = boost::make_shared<time_series_plotter> (300);
         
         if (mcmc_slam) {
-            
-            struct {
-                boost::shared_ptr <const sim_types::simulator_type> sim;
-                boost::shared_ptr <const sim_types::mcmc_slam_type> mcmc_slam;
-                double operator() (slam::timestep_type) const {
-                    return slam::slam_log_likelihood (*sim->get_slam_data(), *mcmc_slam)
-                    - sim->get_log_likelihood();
-                }
-            } mcmc_slam_log_likelihood = { sim, mcmc_slam };
-            
-            likelihood_plot->add_data_source (mcmc_slam_log_likelihood,
-                                              "MCMC-SLAM log likelihood", "lc rgbcolor 'green' lw 5");
+
+            likelihood_plot->add_data_source ([=](slam::timestep_type) {
+                return slam::slam_log_likelihood (*sim->get_slam_data(), *mcmc_slam) - sim->get_log_likelihood();
+            }, "MCMC-SLAM log likelihood", "lc rgbcolor 'green' lw 5");
         }
         
         if (fastslam) {
             
-            struct {
-                boost::shared_ptr <const sim_types::simulator_type> sim;
-                boost::shared_ptr <const sim_types::fastslam_type> fastslam;
-                double operator() (slam::timestep_type) const {
-                    return slam::slam_log_likelihood (*sim->get_slam_data(), *fastslam)
-                    - sim->get_log_likelihood();
-                }
-            } fastslam_log_likelihood = { sim, fastslam };
-            
-            likelihood_plot->add_data_source (fastslam_log_likelihood,
-                                              "FastSLAM log likelihood", "lc rgbcolor 'blue' lw 5");
+            likelihood_plot->add_data_source ([=](slam::timestep_type) {
+                return slam::slam_log_likelihood (*sim->get_slam_data(), *fastslam) - sim->get_log_likelihood();
+            }, "FastSLAM log likelihood", "lc rgbcolor 'blue' lw 5");
             
             likelihood_plot->add_data_source (boost::bind (&sim_types::fastslam_type::effective_particle_ratio,
                                                            fastslam),
@@ -172,7 +157,32 @@ int main (int argc, char* argv[]) {
     boost::filesystem::path output_dir (options["output-dir"].as<std::string>());
     boost::filesystem::create_directories (output_dir);
     
-    (*sim)();
+    {
+        boost::timer::auto_cpu_timer timer (3, "CPU Time: %t seconds\n\n");
+        (*sim)();
+    }
+    
+    if (mcmc_slam) {
+        std::cout
+        << "MCMC-SLAM Trajectory RMSE: "
+        << planar_robot::trajectory_rmse (sim->get_trajectory(), mcmc_slam->get_trajectory()) << '\n'
+        << "MCMC-SLAM Map RMSE: "
+        << planar_robot::map_rmse (sim->get_feature_map(), mcmc_slam->get_feature_map()) << '\n'
+        << "MCMC-SLAM log likelihood ratio: "
+        << slam::slam_log_likelihood (*sim->get_slam_data(), *mcmc_slam) - sim->get_log_likelihood()
+        << "\n\n";
+    }
+    
+    if (g2o_slam) {
+        std::cout
+        << "G2O-SLAM Trajectory RMSE: "
+        << planar_robot::trajectory_rmse (sim->get_trajectory(), g2o_slam->get_trajectory()) << '\n'
+        << "G2O-SLAM Map RMSE: "
+        << planar_robot::map_rmse (sim->get_feature_map(), g2o_slam->get_feature_map()) << '\n'
+        << "G2O-SLAM log likelihood ratio: "
+        << slam::slam_log_likelihood (*sim->get_slam_data(), *g2o_slam) - sim->get_log_likelihood()
+        << "\n\n";
+    }
     
     return EXIT_SUCCESS;
     
@@ -192,6 +202,7 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     ("mcmc-slam-help", "MCMC-SLAM options")
     ("fastslam-help", "FastSLAM 2.0 options")
     ("fastslam-mcmc-help", "FastSLAM 2.0 options")
+    ("g2o-slam-help", "G2O-SLAM options")
     ("slam-plot-help", "SLAM plotting options")
     ("config-file,f", po::value<std::vector<std::string> >()->composing(), "configuration files");
     
@@ -214,12 +225,14 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     po::options_description mcmc_slam_options = sim_types::mcmc_slam_type::program_options();
     po::options_description fastslam_options = sim_types::fastslam_type::program_options();
     po::options_description fastslam_mcmc_options = sim_types::fastslam_mcmc_type::program_options();
+    po::options_description g2o_slam_options = sim_types::g2o_slam_type::program_options();
     po::options_description slam_plot_options = slam_plotter::program_options();
     
     po::options_description config_options;
     config_options
     .add(general_options).add(simulator_options).add(controller_options).add(sensor_options)
-    .add(mcmc_slam_options).add(fastslam_options).add(fastslam_mcmc_options).add(slam_plot_options);
+    .add(mcmc_slam_options).add(fastslam_options).add(fastslam_mcmc_options).add(g2o_slam_options)
+    .add(slam_plot_options);
     
     po::options_description all_options;
     all_options.add(command_line_options).add(config_options);
@@ -263,6 +276,11 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     
     if (values.count("fastslam-mcmc-help")) {
         help_options.add(fastslam_mcmc_options);
+        help_requested = true;
+    }
+    
+    if (values.count("g2o-slam-help")) {
+        help_options.add(g2o_slam_options);
         help_requested = true;
     }
     
