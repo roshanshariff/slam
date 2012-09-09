@@ -120,7 +120,7 @@ int main (int argc, char* argv[]) {
             slam_plot->add_data_source (g2o_slam, false, "G2O", "",
                                         "lc rgbcolor 'red' pt 3 ps 1",
                                         "lc rgbcolor 'red' lw 2",
-                                        "size 10,20,50 filled lc rgbcolor 'green'");
+                                        "size 10,20,50 filled lc rgbcolor 'red'");
         }
         
         sim->add_timestep_listener (slam_plot);
