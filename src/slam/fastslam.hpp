@@ -21,6 +21,7 @@
 #include <Eigen/Eigen>
 
 #include "slam/interfaces.hpp"
+#include "slam/slam_data.hpp"
 #include "slam/vector_model.hpp"
 #include "slam/vector_transforms.hpp"
 #include "slam/particle_filter.hpp"
@@ -32,6 +33,7 @@
 #include "utility/bitree.hpp"
 #include "utility/utility.hpp"
 
+#include "main.hpp"
 
 namespace slam {
     
@@ -403,5 +405,7 @@ ukf_params         (options["ukf-alpha"].as<double>(),
                     options["ukf-kappa"].as<double>())
 { }
 
+
+extern template class slam::fastslam<control_model_type, observation_model_type>;
 
 #endif

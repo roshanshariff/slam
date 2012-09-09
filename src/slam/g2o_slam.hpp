@@ -27,6 +27,10 @@
 
 #include "slam/interfaces.hpp"
 #include "slam/slam_data.hpp"
+#include "utility/bitree.hpp"
+
+#include "main.hpp"
+
 
 namespace slam {    
     
@@ -378,5 +382,7 @@ g2o_end_steps (options["g2o-end-steps"].as<unsigned int>())
     optimizer.addVertex (v.release());
 }
 
+
+extern template class slam::g2o_slam<control_model_type, observation_model_type>;
 
 #endif

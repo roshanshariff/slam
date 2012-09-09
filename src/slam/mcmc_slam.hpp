@@ -19,6 +19,8 @@
 #include "utility/vector.hpp"
 #include "utility/utility.hpp"
 
+#include "main.hpp"
+
 
 namespace slam {
     
@@ -485,5 +487,7 @@ feature_dim (options["observation-edge-importance"].as<double>())
 //    mcmc_updates_per_step = options["mcmc-steps"].as<unsigned int>();
 }
 
+
+extern template class slam::mcmc_slam<control_model_type, observation_model_type>;
 
 #endif //_SLAM_MCMC_SLAM_HPP

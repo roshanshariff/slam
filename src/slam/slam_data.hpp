@@ -16,6 +16,8 @@
 #include "utility/listeners.hpp"
 #include "utility/utility.hpp"
 
+#include "main.hpp"
+
 
 namespace slam {
     
@@ -131,45 +133,48 @@ namespace slam {
         
     };
     
-
-    template <class ControlModel, class ObservationModel>
-    void slam_data<ControlModel, ObservationModel>
-    ::add_control (const ControlModel& control) {
-
-        timestep_type t = current_timestep();
-        
-        m_controls.push_back (control);
-        m_listeners.for_each (boost::bind (&listener::control, _1, t, boost::cref(control)));
-    }
-    
-    
-    template <class ControlModel, class ObservationModel>
-    void slam_data<ControlModel, ObservationModel>
-    ::add_observation (featureid_type id, const ObservationModel& obs) {
-        
-        const timestep_type t = current_timestep();
-        
-        auto feature_iter = m_features.find (id);
-        
-        if (feature_iter == m_features.end()) {
-            feature_iter = m_features.emplace_hint (feature_iter, id, feature_observations());
-        }
-
-        auto& feature_obs = feature_iter->second;
-        
-        auto obs_iter = feature_obs.emplace_hint (feature_obs.end(), t, obs);
-        assert (obs_iter+1 == feature_obs.end());
-        
-        const std::size_t index = obs_iter - feature_obs.begin();
-        
-        auto obs_info_iter = m_observations.emplace_hint (m_observations.end(), t,
-                                                          observation_info (feature_iter, index));
-        assert (obs_info_iter+1 == m_observations.end());
-        
-        m_listeners.for_each (boost::bind (&listener::observation, _1, t, boost::cref(obs_info_iter->second)));
-    }
-    
-
 } // namespace slam
+
+
+template <class ControlModel, class ObservationModel>
+void slam::slam_data<ControlModel, ObservationModel>
+::add_control (const ControlModel& control) {
+    
+    timestep_type t = current_timestep();
+    
+    m_controls.push_back (control);
+    m_listeners.for_each (boost::bind (&listener::control, _1, t, boost::cref(control)));
+}
+
+
+template <class ControlModel, class ObservationModel>
+void slam::slam_data<ControlModel, ObservationModel>
+::add_observation (featureid_type id, const ObservationModel& obs) {
+    
+    const timestep_type t = current_timestep();
+    
+    auto feature_iter = m_features.find (id);
+    
+    if (feature_iter == m_features.end()) {
+        feature_iter = m_features.emplace_hint (feature_iter, id, feature_observations());
+    }
+    
+    auto& feature_obs = feature_iter->second;
+    
+    auto obs_iter = feature_obs.emplace_hint (feature_obs.end(), t, obs);
+    assert (obs_iter+1 == feature_obs.end());
+    
+    const std::size_t index = obs_iter - feature_obs.begin();
+    
+    auto obs_info_iter = m_observations.emplace_hint (m_observations.end(), t,
+                                                      observation_info (feature_iter, index));
+    assert (obs_info_iter+1 == m_observations.end());
+    
+    m_listeners.for_each (boost::bind (&listener::observation, _1, t, boost::cref(obs_info_iter->second)));
+}
+
+
+extern template class slam::slam_data<control_model_type, observation_model_type>;
+
 
 #endif //_SLAM_SLAM_DATA_HPP

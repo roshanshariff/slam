@@ -21,6 +21,8 @@
 #include "slam/fastslam.hpp"
 #include "slam/mcmc_slam.hpp"
 
+#include "main.hpp"
+
 
 namespace slam {
     
@@ -196,5 +198,7 @@ mcmc_feature_updates (options["mcmc-feature-updates"].as<unsigned int>()),
 num_feature_samples (options["feature-samples"].as<unsigned int>())
 { }
 
+
+extern template class slam::fastslam_mcmc<control_model_type, observation_model_type>;
 
 #endif

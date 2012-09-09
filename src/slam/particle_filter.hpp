@@ -19,52 +19,57 @@
 
 #include "utility/random.hpp"
 
-template <class Particle>
-class particle_filter {
+namespace slam {
     
-    struct particle : public Particle {
-        double weight;
-        particle (double w = 1.0) : weight(w) { }
-        particle (const Particle& p, double w = 1.0) : Particle(p), weight(w) { }
+    template <class Particle>
+    class particle_filter {
+        
+        struct particle : public Particle {
+            double weight;
+            particle (double w = 1.0) : weight(w) { }
+            particle (const Particle& p, double w = 1.0) : Particle(p), weight(w) { }
+        };
+        
+        struct compare_particle_weight {
+            bool operator() (const particle& a, const particle& b) const { return a.weight > b.weight; }
+        };
+        
+        boost::container::vector<particle> particles;
+        const particle* max_weight;
+        
+        double weight_sum;
+        double squared_weight_sum;
+        
+    public:
+        
+        particle_filter ()
+        : particles(1), max_weight(&particles.front()), weight_sum(1.0), squared_weight_sum(1.0) { }
+        
+        size_t size () const { return particles.size(); }
+        double effective_size () const {
+            return squared_weight_sum > 0 ? weight_sum*weight_sum/squared_weight_sum : 0;
+        }
+        
+        template <class Updater> void update (Updater);
+        
+        void resample (random_source& random, size_t new_size);
+        void resample (random_source& random) { resample (random, size()); }
+        
+        template <class Initializer> void reinitialize (size_t new_size, Initializer);
+        
+        const Particle& operator[] (size_t index) const { return particles[index]; }
+        Particle& operator[] (size_t index) { return particles[index]; }
+        
+        const Particle& max_weight_particle () const { return *max_weight; }
+        
     };
     
-    struct compare_particle_weight {
-        bool operator() (const particle& a, const particle& b) const { return a.weight > b.weight; }
-    };
-    
-    boost::container::vector<particle> particles;
-    const particle* max_weight;
+}
 
-    double weight_sum;
-    double squared_weight_sum;
-    
-public:
-
-    particle_filter ()
-    : particles(1), max_weight(&particles.front()), weight_sum(1.0), squared_weight_sum(1.0) { }
-
-    size_t size () const { return particles.size(); }
-    double effective_size () const {
-        return squared_weight_sum > 0 ? weight_sum*weight_sum/squared_weight_sum : 0;
-    }
-    
-    template <class Updater> void update (Updater);
-    
-    void resample (random_source& random, size_t new_size);
-    void resample (random_source& random) { resample (random, size()); }
-    
-    template <class Initializer> void reinitialize (size_t new_size, Initializer);
-    
-    const Particle& operator[] (size_t index) const { return particles[index]; }
-    Particle& operator[] (size_t index) { return particles[index]; }
-    
-    const Particle& max_weight_particle () const { return *max_weight; }
-    
-};
 
 template <class Particle>
 template <class Updater>
-void particle_filter<Particle>::update (Updater f) {
+void slam::particle_filter<Particle>::update (Updater f) {
     
     weight_sum = 0;
     squared_weight_sum = 0;
@@ -80,16 +85,16 @@ void particle_filter<Particle>::update (Updater f) {
 }
 
 template <class Particle>
-void particle_filter<Particle>::resample (random_source& random, size_t new_size) {
+void slam::particle_filter<Particle>::resample (random_source& random, size_t new_size) {
     
     std::sort (particles.begin(), particles.end(), compare_particle_weight());
-
+    
     boost::container::vector<particle> new_particles;
     new_particles.reserve (new_size);
     
     const double offset = random.uniform();
     double weight = 0;
-
+    
     for (const auto& particle : particles) {
         weight += particle.weight;
         while (weight_sum * (offset + new_particles.size()) < weight * new_size) {
@@ -106,7 +111,7 @@ void particle_filter<Particle>::resample (random_source& random, size_t new_size
 
 template <class Particle>
 template <class Initializer>
-void particle_filter<Particle>::reinitialize (size_t new_size, Initializer init) {
+void slam::particle_filter<Particle>::reinitialize (size_t new_size, Initializer init) {
     particles.clear();
     particles.reserve(new_size);
     std::generate_n (std::back_inserter (particles), new_size, init);
