@@ -9,7 +9,11 @@
 #define LANDMARK_SENSOR_HPP_
 
 #include <vector>
+#include <string>
+#include <fstream>
+
 #include <boost/program_options.hpp>
+#include <boost/math/constants/constants.hpp>
 
 #include "planar_robot/pose.hpp"
 #include "planar_robot/position.hpp"
@@ -18,56 +22,95 @@
 #include "slam/interfaces.hpp"
 #include "utility/random.hpp"
 
+#include "main.hpp"
+
+
 namespace planar_robot {
     
-    
-    class landmark_sensor {
+    template <class ObservationModel> class landmark_sensor {
         
     public:
         
-        typedef vector_model_adapter<range_bearing_model> model_type;
+        using model_type = ObservationModel;
+        using model_builder_type = typename ObservationModel::builder;
         
         landmark_sensor (const boost::program_options::variables_map&);
         
-        static boost::program_options::options_description program_options ();
+        static auto program_options () -> boost::program_options::options_description;
         
         template <class Observer> void sense (const pose&, random_source&, Observer) const;
         
-        size_t num_features () const { return landmarks.size(); }
+        auto num_features () const -> size_t { return landmarks.size(); }
         
-        const position& get_feature (size_t index) const { return landmarks.at (index); }
+        auto get_feature (size_t index) const -> const position& { return landmarks.at (index); }
         
     private:
         
         double max_range, min_range;
-        mutable unsigned long hits;
+        mutable unsigned long hits = 0;
         mutable double log_likelihood = 0;
-        model_type::builder model_builder;
         std::vector<position> landmarks;
-        
-        template <class Observer> class sense_helper;
-        
+
+        model_builder_type model_builder;
+
     public:
         
-        unsigned long num_observations () const { return hits; }
-        double get_log_likelihood () const { return log_likelihood; }
+        auto num_observations () -> unsigned long const { return hits; }
+        auto get_log_likelihood () const -> double { return log_likelihood; }
+        
     };
-    
-    
-    template <class Observer>
-    void landmark_sensor::sense (const pose& state, random_source& random, Observer observer) const {
-        for (size_t i = 0; i < landmarks.size(); ++i) {
-            position observation = -state + landmarks[i];
-            auto model = model_builder (model_builder(observation)(random));
-            if (min_range < model.mean().distance() && model.mean().distance() < max_range) {
-                ++hits;
-                observer (slam::featureid_type(i), model);
-                log_likelihood += model.log_likelihood (observation);
-            }
-        }
-    }
     
 }
 
+template <class ObservationModel>
+auto planar_robot::landmark_sensor<ObservationModel>
+::program_options () -> boost::program_options::options_description {
+    
+    namespace po = boost::program_options;
+    po::options_description sensor_options ("Landmark Sensor Options");
+    
+    sensor_options.add_options()
+    ("sensor-range-max", po::value<double>()->default_value(30), "maximum sensor range, in m")
+    ("sensor-range-min", po::value<double>()->default_value(1), "minimum sensor range, in m")
+    ("landmark-file", po::value<std::string>(),
+     "filename of landmarks file");
+    
+    sensor_options.add (model_builder_type::program_options());
+    return sensor_options;
+}
+
+
+template <class ObservationModel>
+planar_robot::landmark_sensor<ObservationModel>
+::landmark_sensor (const boost::program_options::variables_map& options)
+: max_range (options["sensor-range-max"].as<double>()),
+min_range (options["sensor-range-min"].as<double>()),
+model_builder (options)
+{
+    if (options.count("landmark-file")) {
+        double x, y;
+        std::ifstream landmark_file (options["landmark-file"].as<std::string>().c_str());
+        while (landmark_file >> x >> y) landmarks.push_back (position::cartesian (x, y));
+    }
+}
+
+
+template <class ObservationModel>
+template <class Observer>
+void planar_robot::landmark_sensor<ObservationModel>
+::sense (const pose& state, random_source& random, Observer observer) const {
+    for (size_t i = 0; i < landmarks.size(); ++i) {
+        position observation = -state + landmarks[i];
+        auto model = model_builder (model_builder(observation)(random));
+        if (min_range < model.mean().distance() && model.mean().distance() < max_range) {
+            ++hits;
+            observer (slam::featureid_type(i), model);
+            log_likelihood += model.log_likelihood (observation);
+        }
+    }
+}
+
+
+extern template class planar_robot::landmark_sensor<observation_model_type>;
 
 #endif /* LANDMARK_SENSOR_HPP_ */

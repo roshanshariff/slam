@@ -12,8 +12,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/timer/timer.hpp>
 
-#include "planar_robot/waypoint_controller.hpp"
-#include "planar_robot/landmark_sensor.hpp"
 #include "planar_robot/rms_error.hpp"
 #include "slam/mcmc_slam.hpp"
 #include "slam/multi_mcmc.hpp"
@@ -27,16 +25,12 @@
 #include "utility/random.hpp"
 #include "utility/utility.hpp"
 
+#include "main.hpp"
 
-struct sim_types {
-    
-    typedef planar_robot::waypoint_controller controller_type;
-    typedef planar_robot::landmark_sensor sensor_type;
+
+namespace sim_types {
     
     typedef simulator<controller_type, sensor_type> simulator_type;
-    
-    typedef simulator_type::control_model_type control_model_type;
-    typedef simulator_type::observation_model_type observation_model_type;
     
     typedef slam::mcmc_slam<control_model_type, observation_model_type> mcmc_slam_type;
     typedef slam::multi_mcmc<control_model_type, observation_model_type> multi_mcmc_type;
@@ -256,8 +250,8 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     ("seed", po::value<unsigned int>(), "seed for global random number generator");
     
     po::options_description simulator_options = sim_types::simulator_type::program_options();
-    po::options_description controller_options = sim_types::controller_type::program_options();
-    po::options_description sensor_options = sim_types::sensor_type::program_options();
+    po::options_description controller_options = controller_type::program_options();
+    po::options_description sensor_options = sensor_type::program_options();
     po::options_description mcmc_slam_options = sim_types::mcmc_slam_type::program_options();
     po::options_description multi_mcmc_options = sim_types::multi_mcmc_type::program_options();
     po::options_description fastslam_options = sim_types::fastslam_type::program_options();

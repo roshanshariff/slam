@@ -1,6 +1,8 @@
 #ifndef _UTILITY_RANDOM_HPP
 #define _UTILITY_RANDOM_HPP
 
+#include <cmath>
+
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_01.hpp>
 #include <boost/random/normal_distribution.hpp>
@@ -219,6 +221,9 @@ protected:
 
 public:
 
+        const vector_type& stddev () const { return m_stddev; }
+        vector_type& stddev () { return m_stddev; }
+    
 	matrix_type chol_cov () const { return m_stddev.asDiagonal(); }
 
 	void chol_cov_multiply (vector_type& v) const { v.array() *= m_stddev.array(); }

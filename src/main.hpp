@@ -9,13 +9,23 @@
 #ifndef slam_main_hpp
 #define slam_main_hpp
 
-#include "planar_robot/waypoint_controller.hpp"
-#include "planar_robot/landmark_sensor.hpp"
+namespace planar_robot {
+    class waypoint_controller;
+    class range_bearing_model;
+    class range_only_model;
+    class velocity_model;
+    template <class ObservationModel> class landmark_sensor;
+}
+
+template <class VectorModel> class vector_model_adapter;
+
+using control_model_type = vector_model_adapter<planar_robot::velocity_model>;
+using observation_model_type = vector_model_adapter<planar_robot::range_only_model>;
 
 using controller_type = planar_robot::waypoint_controller;
-using sensor_type = planar_robot::landmark_sensor;
+using sensor_type = planar_robot::landmark_sensor<observation_model_type>;
 
-using control_model_type = controller_type::model_type;
-using observation_model_type = sensor_type::model_type;
+#include "planar_robot/waypoint_controller.hpp"
+#include "planar_robot/landmark_sensor.hpp"
 
 #endif
