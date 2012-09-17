@@ -144,7 +144,6 @@ namespace slam {
         void add_state_edge ();
         void add_feature_edge (const typename slam_data_type::observation_info&);
         
-        bool update ();
         template <class EdgeType> bool update (EdgeType&&, bool use_edge_weight);
         
         double edge_log_likelihood_ratio (const state_edge&, const state_type&) const;
@@ -183,6 +182,8 @@ namespace slam {
         
         void set_initialiser (const decltype(initialiser)& init) { initialiser = init; }
         
+        bool update ();
+
         // Overridden virtual member functions of slam::slam_result
         
         virtual void timestep (timestep_type) override;        
@@ -480,7 +481,8 @@ slam::mcmc_slam<ControlModel, ObservationModel>
 ::mcmc_slam (boost::shared_ptr<const slam_data<ControlModel, ObservationModel>> data,
              boost::program_options::variables_map& options, unsigned int seed)
 : data      (data),
-random      (remember_option (options, "mcmc-slam-seed", seed)),
+//random      (remember_option (options, "mcmc-slam-seed", seed)),
+random      (seed),
 state_dim   (options["control-edge-importance"].as<double>()),
 feature_dim (options["observation-edge-importance"].as<double>())
 {

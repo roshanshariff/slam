@@ -19,6 +19,8 @@
 #include "utility/listeners.hpp"
 #include "utility/utility.hpp"
 
+#include "main.hpp"
+
 
 template <class Controller, class Sensor>
 class simulator
@@ -177,6 +179,9 @@ simulator<Controller, Sensor>::program_options() {
     ("sensor-skip", po::value<unsigned int>()->default_value(8), "Take sensor readings every n time steps");
     return options;
 }
+
+
+extern template class simulator<controller_type, sensor_type>;
 
 
 #endif //_SIMULATOR_HPP

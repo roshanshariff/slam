@@ -16,6 +16,7 @@
 #include "planar_robot/landmark_sensor.hpp"
 #include "planar_robot/rms_error.hpp"
 #include "slam/mcmc_slam.hpp"
+#include "slam/multi_mcmc.hpp"
 #include "slam/fastslam.hpp"
 #include "slam/fastslam_mcmc.hpp"
 #include "slam/g2o_slam.hpp"
@@ -38,6 +39,7 @@ struct sim_types {
     typedef simulator_type::observation_model_type observation_model_type;
     
     typedef slam::mcmc_slam<control_model_type, observation_model_type> mcmc_slam_type;
+    typedef slam::multi_mcmc<control_model_type, observation_model_type> multi_mcmc_type;
     typedef slam::fastslam<control_model_type, observation_model_type> fastslam_type;
     typedef slam::fastslam_mcmc<control_model_type, observation_model_type> fastslam_mcmc_type;
     typedef slam::g2o_slam<control_model_type, observation_model_type> g2o_slam_type;
@@ -60,6 +62,7 @@ int main (int argc, char* argv[]) {
     
     unsigned int sim_seed = random();
     unsigned int mcmc_slam_seed = random();
+    unsigned int multi_mcmc_seed = random();
     unsigned int fastslam_seed = random();
     
     boost::shared_ptr<sim_types::simulator_type> sim
@@ -70,6 +73,13 @@ int main (int argc, char* argv[]) {
         mcmc_slam = boost::make_shared<sim_types::mcmc_slam_type> (sim->get_slam_data(),
                                                                    boost::ref(options), mcmc_slam_seed);
         //sim->add_timestep_listener (mcmc_slam);
+    }
+    
+    boost::shared_ptr<sim_types::multi_mcmc_type> multi_mcmc;
+    if (options.count ("multi-mcmc")) {
+        multi_mcmc = boost::make_shared<sim_types::multi_mcmc_type> (sim->get_slam_data(),
+                                                                     boost::ref(options), multi_mcmc_seed);
+        sim->add_timestep_listener (multi_mcmc);
     }
     
     boost::shared_ptr<sim_types::fastslam_type> fastslam;
@@ -169,8 +179,32 @@ int main (int argc, char* argv[]) {
         << "MCMC-SLAM Map RMSE: "
         << planar_robot::map_rmse (sim->get_feature_map(), mcmc_slam->get_feature_map()) << '\n'
         << "MCMC-SLAM log likelihood ratio: "
-        << slam::slam_log_likelihood (*sim->get_slam_data(), *mcmc_slam) - sim->get_log_likelihood()
+        << mcmc_slam->get_log_likelihood() - sim->get_log_likelihood()
         << "\n\n";
+    }
+    
+    if (multi_mcmc) {
+        std::cout
+        << "Multi-MCMC-SLAM Chains: "
+        << multi_mcmc->num_chains() << '\n'
+        << "Multi-MCMC-SLAM Trajectory RMSE: "
+        << planar_robot::trajectory_rmse (sim->get_trajectory(), multi_mcmc->get_trajectory()) << '\n'
+        << "Multi-MCMC-SLAM Map RMSE: "
+        << planar_robot::map_rmse (sim->get_feature_map(), multi_mcmc->get_feature_map()) << '\n'
+        << "Multi-MCMC-SLAM log likelihood ratio: "
+        << multi_mcmc->get_log_likelihood() - sim->get_log_likelihood()
+        << "\n\n";
+        
+        auto average = multi_mcmc->get_average();
+        std::cout
+        << "Multi-MCMC-SLAM Averaged Trajectory RMSE: "
+        << planar_robot::trajectory_rmse (sim->get_trajectory(), average->get_trajectory()) << '\n'
+        << "Multi-MCMC-SLAM Averaged Map RMSE: "
+        << planar_robot::map_rmse (sim->get_feature_map(), average->get_feature_map()) << '\n'
+        << "Multi-MCMC-SLAM log likelihood ratio: "
+        << slam::slam_log_likelihood (*sim->get_slam_data(), *average) - sim->get_log_likelihood()
+        << "\n\n";
+        
     }
     
     if (g2o_slam) {
@@ -200,8 +234,9 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     ("controller-help", "controller options")
     ("sensor-help", "sensor options")
     ("mcmc-slam-help", "MCMC-SLAM options")
+    ("multi-mcmc-help", "Multi MCMC options")
     ("fastslam-help", "FastSLAM 2.0 options")
-    ("fastslam-mcmc-help", "FastSLAM 2.0 options")
+    ("fastslam-mcmc-help", "FastSLAM-MCMC options")
     ("g2o-slam-help", "G2O-SLAM options")
     ("slam-plot-help", "SLAM plotting options")
     ("config-file,f", po::value<std::vector<std::string> >()->composing(), "configuration files");
@@ -212,6 +247,7 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
      "directory for simulation output files")
     ("log", "produce detailed simulation logs")
     ("mcmc-slam", "enable MCMC-SLAM")
+    ("multi-mcmc", "enable Multi-MCMC-SLAM")
     ("fastslam", "enable FastSLAM 2.0")
     ("g2o", "enable offline SLAM using G2O")
     ("mcmc-init", "initialise MCMC estimate from FastSLAM")
@@ -223,6 +259,7 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     po::options_description controller_options = sim_types::controller_type::program_options();
     po::options_description sensor_options = sim_types::sensor_type::program_options();
     po::options_description mcmc_slam_options = sim_types::mcmc_slam_type::program_options();
+    po::options_description multi_mcmc_options = sim_types::multi_mcmc_type::program_options();
     po::options_description fastslam_options = sim_types::fastslam_type::program_options();
     po::options_description fastslam_mcmc_options = sim_types::fastslam_mcmc_type::program_options();
     po::options_description g2o_slam_options = sim_types::g2o_slam_type::program_options();
@@ -231,8 +268,8 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     po::options_description config_options;
     config_options
     .add(general_options).add(simulator_options).add(controller_options).add(sensor_options)
-    .add(mcmc_slam_options).add(fastslam_options).add(fastslam_mcmc_options).add(g2o_slam_options)
-    .add(slam_plot_options);
+    .add(mcmc_slam_options).add(multi_mcmc_options).add(fastslam_options).add(fastslam_mcmc_options)
+    .add(g2o_slam_options).add(slam_plot_options);
     
     po::options_description all_options;
     all_options.add(command_line_options).add(config_options);
@@ -266,6 +303,11 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     
     if (values.count("mcmc-slam-help")) {
         help_options.add(mcmc_slam_options);
+        help_requested = true;
+    }
+    
+    if (values.count("multi-mcmc-help")) {
+        help_options.add(multi_mcmc_options);
         help_requested = true;
     }
     
