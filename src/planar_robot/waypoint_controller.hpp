@@ -19,7 +19,7 @@ namespace planar_robot {
         
     public:
         
-        using model_type = vector_model_adapter<velocity_model>;
+        using model_type = velocity_model;
         
         waypoint_controller (const boost::program_options::variables_map&);
         
@@ -62,7 +62,7 @@ namespace planar_robot {
             return waypoint >= waypoints.size() * repetitions;
         }
         
-        double dt () const { return model_builder.vector_builder.dt(); }
+        double dt () const { return model_builder.dt(); }
         
     };
     

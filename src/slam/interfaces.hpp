@@ -80,8 +80,7 @@ namespace slam {
     };
     
     template <class ControlModel, class ObsModel>
-    using slam_result_of = slam_result<typename ControlModel::result_type, typename ObsModel::result_type>;
-    
+    using slam_result_of = slam_result<typename ControlModel::associated_type, typename ObsModel::associated_type>;
     
 }
 

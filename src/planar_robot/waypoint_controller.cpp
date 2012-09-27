@@ -47,8 +47,7 @@ auto waypoint_controller::control (const pose& state) -> model_type {
         steering = (steering < 0 ? -1 : 1) * max_steering;
     }
     
-    return model_builder.vector_builder
-    (model_type::vector_type (speed, (old_steering+steering)/2, 0));
+    return model_builder ({ speed, (old_steering+steering)/2, 0 });
 }
 
 

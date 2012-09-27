@@ -33,7 +33,7 @@ namespace slam {
         const auto& feature_map = estimate.get_feature_map();
         
         for (timestep_type t; t < trajectory.size(); ++t) {
-            log_likelihood += data.control(t).log_likelihood (trajectory[t]);
+            log_likelihood += data.control(t).log_likelihood (ControlModel::observe (trajectory[t]));
         }
         
         for (const auto& feature : feature_map) {
@@ -51,7 +51,7 @@ namespace slam {
                 timestep = obs.first;
                 const ObservationModel& distribution = obs.second;
                 
-                log_likelihood += distribution.log_likelihood (observation);
+                log_likelihood += distribution.log_likelihood (ObservationModel::observe (observation));
             }
         }
         

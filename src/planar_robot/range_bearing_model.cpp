@@ -8,8 +8,6 @@
 
 #include "planar_robot/range_bearing_model.hpp"
 
-#include <boost/math/constants/constants.hpp>
-
 namespace po = boost::program_options;
 
 using namespace planar_robot;
@@ -50,27 +48,3 @@ auto range_only_model::builder::program_options () -> po::options_description {
 range_only_model::builder::builder (const po::variables_map& options)
 : builder (options["sensor-range-stddev"].as<double>())
 { }
-
-
-auto range_only_model::operator() (random_source& random) const -> vector_type {
-    vector_type result;
-    result(0) = stddev()(0)*random.normal() + mean()(0);
-    result(1) = (2*random.uniform() - 1) * boost::math::constants::pi<double>();
-    return result;
-}
-
-
-auto range_only_model::likelihood (const vector_type& x) const -> double {
-    const double bearing_likelihood = 1 / (2 * boost::math::constants::pi<double>());
-    const double root_two_pi = boost::math::constants::root_two_pi<double>();
-    const double std_range = (x(0) - mean()(0)) / stddev()(0);
-    return bearing_likelihood * std::exp(-0.5*std_range*std_range) / (root_two_pi*stddev()(0));
-}
-
-
-auto range_only_model::log_likelihood (const vector_type& x) const -> double {
-    const double log_two_pi = std::log(2*boost::math::constants::pi<double>());
-    const double std_range = (x(0) - mean()(0)) / stddev()(0);
-    return -1.5*log_two_pi - 0.5*std_range*std_range - std::log(stddev()(0));
-}
-

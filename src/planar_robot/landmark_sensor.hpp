@@ -100,10 +100,11 @@ template <class Observer>
 void planar_robot::landmark_sensor<ObservationModel>
 ::sense (const pose& state, random_source& random, Observer observer) const {
     for (size_t i = 0; i < landmarks.size(); ++i) {
-        position observation = -state + landmarks[i];
-        auto model = model_builder (model_builder(observation)(random));
-        if (min_range < model.mean().distance() && model.mean().distance() < max_range) {
+        auto rel_pos = -state + landmarks[i];
+        if (min_range < rel_pos.distance() && rel_pos.distance() < max_range) {
             ++hits;
+            auto observation = ObservationModel::observe (rel_pos);
+            auto model = model_builder (model_builder(observation)(random));
             observer (slam::featureid_type(i), model);
             log_likelihood += model.log_likelihood (observation);
         }

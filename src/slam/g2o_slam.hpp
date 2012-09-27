@@ -28,6 +28,7 @@
 #include "slam/interfaces.hpp"
 #include "slam/slam_data.hpp"
 #include "utility/bitree.hpp"
+#include "utility/random.hpp"
 
 #include "main.hpp"
 
@@ -40,8 +41,10 @@ namespace slam {
     public slam_data<ControlModel, ObservationModel>::listener
     {
         
-        using state_type = typename ControlModel::result_type;
-        using feature_type = typename ObservationModel::result_type;
+        using state_type = typename ControlModel::associated_type;
+        using feature_type = typename ObservationModel::associated_type;
+        using control_type = typename ControlModel::vector_type;
+        using observation_type = typename ObservationModel::vector_type;
         
         using slam_data_type = slam_data<ControlModel, ObservationModel>;
         
@@ -64,12 +67,12 @@ namespace slam {
         protected:
             
             virtual void setToOriginImpl () override {
-                this->_estimate = state_type();
+                this->setEstimate (state_type());
             }
             
             virtual void oplusImpl (const double* update) override {
                 using map_type = Eigen::Map<const typename state_type::vector_type>;
-                this->_estimate += state_type::from_vector (map_type (update));
+                this->setEstimate(this->estimate() + state_type::from_vector (map_type (update)));
             }
         };
         
@@ -91,22 +94,22 @@ namespace slam {
         protected:
             
             virtual void setToOriginImpl () override {
-                this->_estimate = feature_type();
+                this->setEstimate (feature_type());
             }
             
             virtual void oplusImpl (const double* update) override {
                 using map_type = Eigen::Map<const typename feature_type::vector_type>;
-                this->_estimate = feature_type::from_vector (this->_estimate.to_vector() + map_type(update));
+                this->setEstimate (feature_type::from_vector (this->estimate().to_vector() + map_type(update)));
             }
         };
         
         
         struct edge_control
-        : public g2o::BaseBinaryEdge<ControlModel::vector_dim, state_type, vertex_state, vertex_state> {
+        : public g2o::BaseBinaryEdge<ControlModel::vector_dim, control_type, vertex_state, vertex_state> {
             
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-            edge_control (vertex_state* v0, vertex_state* v1, const state_type& m) {
+            edge_control (vertex_state* v0, vertex_state* v1, const control_type& m) {
                 this->setVertex (0, v0);
                 this->setVertex (1, v1);
                 this->setMeasurement (m);
@@ -120,19 +123,18 @@ namespace slam {
             void computeError () override {
                 const vertex_state* v1 = static_cast<const vertex_state*> (this->vertex(0));
                 const vertex_state* v2 = static_cast<const vertex_state*> (this->vertex(1));
-                state_type delta = -v1->estimate() + v2->estimate();
-                this->_error = ControlModel::subtract (ControlModel::to_vector (delta),
-                                                       ControlModel::to_vector (this->_measurement));
+                this->error() = ControlModel::subtract (ControlModel::observe (-v1->estimate() + v2->estimate()),
+                                                        this->measurement());
             }
         };
         
         
         struct edge_obs
-        : public g2o::BaseBinaryEdge<ObservationModel::vector_dim, feature_type, vertex_state, vertex_landmark> {
+        : public g2o::BaseBinaryEdge<ObservationModel::vector_dim, observation_type, vertex_state, vertex_landmark> {
           
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
             
-            edge_obs (vertex_state* v0, vertex_landmark* v1, const feature_type& m) {
+            edge_obs (vertex_state* v0, vertex_landmark* v1, const observation_type& m) {
                 this->setVertex (0, v0);
                 this->setVertex (1, v1);
                 this->setMeasurement (m);
@@ -147,13 +149,15 @@ namespace slam {
                 const vertex_state* v1 = static_cast<const vertex_state*> (this->vertex(0));
                 const vertex_landmark* v2 = static_cast<const vertex_landmark*> (this->vertex(1));
                 feature_type predicted = -v1->estimate() + v2->estimate();
-                this->_error = ObservationModel::subtract (ObservationModel::to_vector (predicted),
-                                                           ObservationModel::to_vector (this->_measurement));
+                this->error() = ObservationModel::subtract (ObservationModel::observe (-v1->estimate() + v2->estimate()),
+                                                            this->measurement());
             }
         };
                 
         
         /** Private data members */
+        
+        random_source random;
         
         unsigned int g2o_steps;
         unsigned int g2o_end_steps;
@@ -172,7 +176,7 @@ namespace slam {
         
     public:
         
-        g2o_slam (boost::program_options::variables_map& options);
+        g2o_slam (boost::program_options::variables_map&, unsigned int seed);
         static boost::program_options::options_description program_options ();
         
         // Overridden virtual member functions of slam::slam_data::listener
@@ -216,14 +220,15 @@ void slam::g2o_slam<ControlModel, ObservationModel>
     
     vertex_state* v0 = state_vertices.back();
     
-    std::unique_ptr<vertex_state> v1 (new vertex_state (next_vertex_id++, v0->estimate() + control.mean()));
+    state_type initial_estimate = v0->estimate() + control.proposal().initial_value(random);
+    std::unique_ptr<vertex_state> v1 (new vertex_state (next_vertex_id++, initial_estimate));
     state_vertices.push_back (v1.get());
     
     std::unique_ptr<edge_control> e (new edge_control (v0, v1.get(), control.mean()));
     
     typename ControlModel::matrix_type chol_cov_inv;
     chol_cov_inv.setIdentity();
-    control.vector_model().chol_cov().template triangularView<Eigen::Lower>().solveInPlace(chol_cov_inv);
+    control.chol_cov().template triangularView<Eigen::Lower>().solveInPlace(chol_cov_inv);
     e->setInformation (chol_cov_inv.transpose() * chol_cov_inv);
     
     optimizer.addVertex (v1.release());
@@ -245,7 +250,8 @@ void slam::g2o_slam<ControlModel, ObservationModel>
     
     if (obs.index() == 0) {
         
-        std::unique_ptr<vertex_landmark> v (new vertex_landmark (next_vertex_id++, v0->estimate() + obs.observation().mean()));
+        feature_type initial_estimate = v0->estimate() + obs.observation().proposal().initial_value (random);
+        std::unique_ptr<vertex_landmark> v (new vertex_landmark (next_vertex_id++, initial_estimate));
         feature_vertices[obs.id()] = v.get();
         
         v1 = v.get();
@@ -256,7 +262,7 @@ void slam::g2o_slam<ControlModel, ObservationModel>
     
     typename ObservationModel::matrix_type chol_cov_inv;
     chol_cov_inv.setIdentity();
-    obs.observation().vector_model().chol_cov().template triangularView<Eigen::Lower>().solveInPlace(chol_cov_inv);
+    obs.observation().chol_cov().template triangularView<Eigen::Lower>().solveInPlace(chol_cov_inv);
     e->setInformation (chol_cov_inv.transpose() * chol_cov_inv);
     
     optimizer.addEdge (e.release());
@@ -358,8 +364,9 @@ auto slam::g2o_slam<ControlModel, ObservationModel>
 
 template <class ControlModel, class ObservationModel>
 slam::g2o_slam<ControlModel, ObservationModel>
-::g2o_slam (boost::program_options::variables_map& options)
-: g2o_steps (options["g2o-steps"].as<unsigned int>()),
+::g2o_slam (boost::program_options::variables_map& options, unsigned int seed)
+: random (seed),
+g2o_steps (options["g2o-steps"].as<unsigned int>()),
 g2o_end_steps (options["g2o-end-steps"].as<unsigned int>())
 {
     

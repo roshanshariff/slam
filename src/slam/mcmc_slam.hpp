@@ -9,7 +9,6 @@
 
 #include <boost/shared_ptr.hpp>
 #include <boost/program_options.hpp>
-#include <boost/math/special_functions/fpclassify.hpp>
 
 #include "slam/interfaces.hpp"
 #include "slam/slam_data.hpp"
@@ -44,8 +43,8 @@ namespace slam {
          form a group, with the binary + operator and unary - to form inverses. Additionally, this
          group must act on feature_type by the operation state + feature. */
 
-        using state_type = typename ControlModel::result_type;
-        using feature_type = typename ObservationModel::result_type;
+        using state_type = typename ControlModel::associated_type;
+        using feature_type = typename ObservationModel::associated_type;
         
         /** For each observed feature, store a pointer to the feature's observations, the time
          step relative to which the feature estimate is stored, and the estimate itself. */
@@ -218,18 +217,15 @@ void slam::mcmc_slam<ControlModel, ObservationModel>
 ::add_state_edge () {
     
     const ControlModel& control = data->control (current_timestep());
+    const auto& proposal = control.proposal();
     
-    const state_type estimate =
-    initialiser_available (current_timestep()+1)
+    const state_type estimate = initialiser_available (current_timestep()+1)
     ? -initialiser->get_state(current_timestep()) + initialiser->get_state(current_timestep()+1)
-    : control.mean();
-    
-    const double edge_log_likelihood = control.log_likelihood (estimate);
-    const double edge_weight = std::exp (edge_log_weight (edge_log_likelihood, state_dim));
+    : proposal.initial_value (random);
     
     state_estimates.push_back (estimate);
-    state_weights.push_back (edge_weight);
-    log_likelihood += edge_log_likelihood;
+    state_weights.push_back (std::exp (edge_log_weight (proposal.log_likelihood (estimate), state_dim)));
+    log_likelihood += control.log_likelihood (ControlModel::observe (estimate));
     
     assert (state_estimates.size() == state_weights.size());
 }
@@ -239,16 +235,16 @@ template <class ControlModel, class ObservationModel>
 void slam::mcmc_slam<ControlModel, ObservationModel>
 ::add_feature_edge (const typename slam_data_type::observation_info& obs) {
     
+    const ObservationModel& observation = obs.observation();
+    const auto& proposal = observation.proposal();
+    
     const feature_type estimate = initialiser_available (current_timestep())
     ? -initialiser->get_state(current_timestep()) + initialiser->get_feature(obs.id())
-    : obs.observation().mean();
-    
-    const double edge_log_likelihood = obs.observation().log_likelihood (estimate);
-    const double edge_weight = std::exp (edge_log_weight (edge_log_likelihood, feature_dim));
+    : proposal.initial_value (random);
     
     feature_estimates.emplace_back (obs.iterator(), current_timestep(), estimate);
-    feature_weights.push_back (edge_weight);
-    log_likelihood += edge_log_likelihood;
+    feature_weights.push_back (std::exp (edge_log_weight (proposal.log_likelihood (estimate), feature_dim)));
+    log_likelihood += observation.log_likelihood (ObservationModel::observe (estimate));
     
     assert (feature_estimates.size() == feature_weights.size());
 }
@@ -278,8 +274,8 @@ void slam::mcmc_slam<ControlModel, ObservationModel>
             }
             else {
                 const feature_estimate& f = feature_estimates[insertion.first->second];
-                log_likelihood += obs.observation().log_likelihood
-                (state_estimates.accumulate(next_timestep, f.parent_timestep()) + f.estimate());
+                const feature_type estimate = state_estimates.accumulate(next_timestep, f.parent_timestep()) + f.estimate();
+                log_likelihood += obs.observation().log_likelihood (ObservationModel::observe (estimate));
             }
         }
         
@@ -332,38 +328,42 @@ template <class EdgeType>
 auto slam::mcmc_slam<ControlModel, ObservationModel>
 ::update (EdgeType&& edge, bool use_edge_weight) -> bool {
     
-    const auto proposed = edge.distribution(random);
+    const auto& proposal = edge.distribution.proposal();    
+    const auto proposed = proposal(random);
+    
+    const double new_proposal_log_likelihood = proposal.log_likelihood (proposed);
+    const double old_proposal_log_likelihood = proposal.log_likelihood (edge.estimate);
+    const double proposal_log_ratio = new_proposal_log_likelihood - old_proposal_log_likelihood;
+    assert (std::isfinite (proposal_log_ratio));
+    
     const double log_ratio = edge_log_likelihood_ratio (edge, proposed);
-    assert (boost::math::isfinite (log_ratio));
+    assert (std::isfinite (log_ratio));
     
-    const double old_log_likelihood = edge.distribution.log_likelihood (edge.estimate);
-    const double new_log_likelihood = edge.distribution.log_likelihood (proposed);
-
-    const double new_log_weight = edge_log_weight (new_log_likelihood, edge);
+    const double new_log_weight = edge_log_weight (new_proposal_log_likelihood, edge);
     const double new_weight = std::exp (new_log_weight);
-    assert (boost::math::isfinite (new_weight));
+    assert (std::isfinite (new_weight));
     
-    bool accept;
+    double normaliser = 1.0;
+    double accept_log_ratio = log_ratio - proposal_log_ratio;
     
     if (use_edge_weight) {
-        const double old_log_weight = edge_log_weight (old_log_likelihood, edge);
+        const double old_log_weight = edge_log_weight (old_proposal_log_likelihood, edge);
         const double old_weight = std::exp (old_log_weight);
         const double weight_sum = state_weights.accumulate() + feature_weights.accumulate();
-        const double normaliser = 1 + (new_weight - old_weight)/weight_sum;
-        accept = normaliser*random.uniform() < std::exp (log_ratio + new_log_weight - old_log_weight);
-    }
-    else {
-        accept = random.uniform() < std::exp (log_ratio);
+        normaliser += (new_weight - old_weight)/weight_sum;
+        accept_log_ratio += new_log_weight - old_log_weight;
     }
     
-    if (accept) {
+    if (normaliser*random.uniform() < std::exp (accept_log_ratio)) {
         edge.estimate = proposed;
         edge.weight = new_weight;
-        log_likelihood += log_ratio + new_log_likelihood - old_log_likelihood;
+        log_likelihood += log_ratio;
         map_estimate.clear();
+        return true;
     }
-    
-    return accept;
+    else {
+        return false;
+    }
 }
 
 
@@ -377,7 +377,9 @@ template <class ControlModel, class ObservationModel>
 auto slam::mcmc_slam<ControlModel, ObservationModel>
 ::edge_log_likelihood_ratio (const state_edge& edge, const state_type& proposed) const -> double {
     
-    double log_ratio = 0.0; // Initialise log probability to zero.
+    double log_ratio = 0.0;
+    log_ratio += edge.distribution.log_likelihood (ControlModel::observe (proposed));
+    log_ratio -= edge.distribution.log_likelihood (ControlModel::observe (edge.estimate));
     
     for (const auto& f : feature_estimates) { // iterate over all observed features.
         
@@ -426,15 +428,18 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
     
     for (Iter iter = begin; iter != end; ++iter) {
         
-        if (iter->first == feature.parent_timestep()) continue;
+//        if (iter->first == feature.parent_timestep()) continue;
         
         const state_type state_change = state_estimates.accumulate (iter->first, obs_timestep);
         new_obs = state_change + new_obs;
         old_obs = state_change + old_obs;
+        
+        const ObservationModel& obs_model = iter->second;
+        const double new_log_likelihood = obs_model.log_likelihood (ObservationModel::observe (new_obs));
+        const double old_log_likelihood = obs_model.log_likelihood (ObservationModel::observe (old_obs));
 
         obs_timestep = iter->first;
-        const ObservationModel& obs_model = iter->second;
-        log_ratio += obs_model.log_likelihood (new_obs) - obs_model.log_likelihood (old_obs);
+        log_ratio += new_log_likelihood - old_log_likelihood;
     }
     
     return log_ratio;
@@ -475,7 +480,8 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
     return options;
 }
 
-
+// TODO Rethink the seed initialisation to avoid problem where the first MCMC-SLAM instance remembers
+// its seed and all the rest use the same one.
 template <class ControlModel, class ObservationModel>
 slam::mcmc_slam<ControlModel, ObservationModel>
 ::mcmc_slam (boost::shared_ptr<const slam_data<ControlModel, ObservationModel>> data,

@@ -19,8 +19,8 @@ namespace planar_robot {
 
 template <class VectorModel> class vector_model_adapter;
 
-using control_model_type = vector_model_adapter<planar_robot::velocity_model>;
-using observation_model_type = vector_model_adapter<planar_robot::range_only_model>;
+using control_model_type = planar_robot::velocity_model;
+using observation_model_type = planar_robot::range_only_model;
 
 using controller_type = planar_robot::waypoint_controller;
 using sensor_type = planar_robot::landmark_sensor<observation_model_type>;

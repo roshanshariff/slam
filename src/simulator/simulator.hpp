@@ -31,8 +31,8 @@ public:
     typedef typename Controller::model_type control_model_type;
     typedef typename Sensor::model_type observation_model_type;
     
-    typedef typename control_model_type::result_type state_type;
-    typedef typename observation_model_type::result_type feature_type;
+    typedef typename control_model_type::associated_type state_type;
+    typedef typename observation_model_type::associated_type feature_type;
     
     typedef slam::slam_data<control_model_type, observation_model_type> slam_data_type;
     
@@ -149,10 +149,10 @@ void simulator<Controller, Sensor>::operator() () {
     while (!controller.finished()) {
         
         auto control_dist = controller.control (get_initial_state() + get_state(current_timestep()));
-        auto control = control_dist(random);
+        auto control = control_dist.proposal()(random);
         
         trajectory.push_back (control);
-        state_log_likelihood += control_dist.log_likelihood (control);
+        state_log_likelihood += control_dist.log_likelihood (control_model_type::observe (control));
         
         data->add_control (control_dist);
         

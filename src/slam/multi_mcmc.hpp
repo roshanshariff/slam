@@ -38,8 +38,8 @@ namespace slam {
         using mcmc_slam_type = mcmc_slam<ControlModel, ObservationModel>;
         using mcmc_ptr_type = std::unique_ptr<mcmc_slam_type>;
         
-        using state_type = typename ControlModel::result_type;
-        using feature_type = typename ObservationModel::result_type;
+        using state_type = typename ControlModel::associated_type;
+        using feature_type = typename ObservationModel::associated_type;
 
         using slam_result_type = slam_result<state_type, feature_type>;
 

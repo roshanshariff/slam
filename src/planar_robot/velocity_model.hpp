@@ -19,19 +19,21 @@ namespace planar_robot {
     
     struct velocity_model : public independent_normal_base<3, velocity_model> {
         
-	typedef independent_normal_base<3, velocity_model> base_type;
-	typedef base_type::vector_type vector_type;
-	typedef base_type::matrix_type matrix_type;
+	using base_type = independent_normal_base<3, velocity_model>;
+	using vector_type = base_type::vector_type;
+	using matrix_type = base_type::matrix_type;
         
-	typedef pose associated_type;
+	using associated_type = pose;
         
 	velocity_model () { }
         
 	velocity_model (const vector_type& mean, const vector_type& stddev) : base_type(mean, stddev) { }
         
-	static vector_type subtract (const vector_type& a, const vector_type& b) { return a - b; }
-        
-	static vector_type to_vector (const associated_type& dp) {
+	static auto subtract (const vector_type& a, const vector_type& b) -> vector_type {
+            return a - b;
+        }
+                
+	static auto observe (const associated_type& dp) -> vector_type {
             
             const double r = 0.5 * dp.distance_squared() / dp.y();
 
@@ -48,7 +50,7 @@ namespace planar_robot {
             }
 	}
         
-	static associated_type from_vector (const vector_type& control) {
+	static auto inv_observe (const vector_type& control) -> associated_type {
             
             const double v = control(0), w = control(1), g = control(2), r = v/w;
 
@@ -81,6 +83,26 @@ namespace planar_robot {
             double dt () const { return m_dt; }
             
 	};
+        
+        class proposal_dist {
+            
+            const velocity_model& model;
+            
+        public:
+            
+            proposal_dist (const velocity_model& model) : model(model) { }
+            
+            using result_type = associated_type;
+            
+            auto operator() (random_source& random) const -> result_type { return inv_observe (model (random)); }
+            auto likelihood (const result_type& x) const -> double { return model.likelihood (observe (x)); }
+            auto log_likelihood (const result_type& x) const -> double { return model.log_likelihood (observe (x)); }
+            auto initial_value (random_source&) const -> result_type { return inv_observe (model.mean()); }
+        };
+        
+        auto proposal () const -> proposal_dist {
+            return { *this };
+        }
         
     };
     
