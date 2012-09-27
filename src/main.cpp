@@ -15,8 +15,8 @@
 #include "planar_robot/rms_error.hpp"
 #include "slam/mcmc_slam.hpp"
 #include "slam/multi_mcmc.hpp"
-#include "slam/fastslam.hpp"
-#include "slam/fastslam_mcmc.hpp"
+//#include "slam/fastslam.hpp"
+//#include "slam/fastslam_mcmc.hpp"
 #include "slam/g2o_slam.hpp"
 #include "slam/slam_likelihood.hpp"
 #include "simulator/simulator.hpp"
@@ -34,8 +34,8 @@ namespace sim_types {
     
     typedef slam::mcmc_slam<control_model_type, observation_model_type> mcmc_slam_type;
     typedef slam::multi_mcmc<control_model_type, observation_model_type> multi_mcmc_type;
-    typedef slam::fastslam<control_model_type, observation_model_type> fastslam_type;
-    typedef slam::fastslam_mcmc<control_model_type, observation_model_type> fastslam_mcmc_type;
+//    typedef slam::fastslam<control_model_type, observation_model_type> fastslam_type;
+//    typedef slam::fastslam_mcmc<control_model_type, observation_model_type> fastslam_mcmc_type;
     typedef slam::g2o_slam<control_model_type, observation_model_type> g2o_slam_type;
     
 };
@@ -57,7 +57,8 @@ int main (int argc, char* argv[]) {
     unsigned int sim_seed = random();
     unsigned int mcmc_slam_seed = random();
     unsigned int multi_mcmc_seed = random();
-    unsigned int fastslam_seed = random();
+    unsigned int g2o_seed = random();
+    /*unsigned int fastslam_seed =*/ random();
     
     boost::shared_ptr<sim_types::simulator_type> sim
     = boost::make_shared<sim_types::simulator_type> (boost::ref(options), sim_seed);
@@ -66,7 +67,7 @@ int main (int argc, char* argv[]) {
     if (options.count ("mcmc-slam")) {
         mcmc_slam = boost::make_shared<sim_types::mcmc_slam_type> (sim->get_slam_data(),
                                                                    boost::ref(options), mcmc_slam_seed);
-        //sim->add_timestep_listener (mcmc_slam);
+        sim->add_timestep_listener (mcmc_slam);
     }
     
     boost::shared_ptr<sim_types::multi_mcmc_type> multi_mcmc;
@@ -76,23 +77,23 @@ int main (int argc, char* argv[]) {
         sim->add_timestep_listener (multi_mcmc);
     }
     
-    boost::shared_ptr<sim_types::fastslam_type> fastslam;
-    if (options.count ("fastslam")) {
-        fastslam = boost::make_shared<sim_types::fastslam_type> (boost::ref(options), fastslam_seed);
-        sim->add_data_listener (fastslam);
-        
-        if (mcmc_slam && options.count("mcmc-init")) mcmc_slam->set_initialiser (fastslam);
-    }
+//    boost::shared_ptr<sim_types::fastslam_type> fastslam;
+//    if (options.count ("fastslam")) {
+//        fastslam = boost::make_shared<sim_types::fastslam_type> (boost::ref(options), fastslam_seed);
+//        sim->add_data_listener (fastslam);
+//        
+//        if (mcmc_slam && options.count("mcmc-init")) mcmc_slam->set_initialiser (fastslam);
+//    }
     
-    boost::shared_ptr<sim_types::fastslam_mcmc_type> fastslam_mcmc;
-    fastslam_mcmc = boost::make_shared<sim_types::fastslam_mcmc_type> (boost::ref(options));
-    fastslam_mcmc->set_fastslam(fastslam);
-    fastslam_mcmc->set_mcmc_slam(mcmc_slam);
-    sim->add_timestep_listener(fastslam_mcmc);
+//    boost::shared_ptr<sim_types::fastslam_mcmc_type> fastslam_mcmc;
+//    fastslam_mcmc = boost::make_shared<sim_types::fastslam_mcmc_type> (boost::ref(options));
+//    fastslam_mcmc->set_fastslam(fastslam);
+//    fastslam_mcmc->set_mcmc_slam(mcmc_slam);
+//    sim->add_timestep_listener(fastslam_mcmc);
     
     boost::shared_ptr<sim_types::g2o_slam_type> g2o_slam;
     if (options.count ("g2o")) {
-        g2o_slam = boost::make_shared<sim_types::g2o_slam_type> (boost::ref(options));
+        g2o_slam = boost::make_shared<sim_types::g2o_slam_type> (boost::ref(options), g2o_seed);
         sim->add_data_listener (g2o_slam);
     }
     
@@ -106,12 +107,12 @@ int main (int argc, char* argv[]) {
                                     "lc rgbcolor 'black' lw 5",
                                     "size 10,20,50 filled lc rgbcolor 'black'");
         
-        if (fastslam) {
-            slam_plot->add_data_source (fastslam, false, "FastSLAM 2.0", "",
-                                        "lc rgbcolor 'blue' pt 3 ps 1",
-                                        "lc rgbcolor 'blue' lw 2",
-                                        "size 10,20,50 filled lc rgbcolor 'blue'");
-        }
+//        if (fastslam) {
+//            slam_plot->add_data_source (fastslam, false, "FastSLAM 2.0", "",
+//                                        "lc rgbcolor 'blue' pt 3 ps 1",
+//                                        "lc rgbcolor 'blue' lw 2",
+//                                        "size 10,20,50 filled lc rgbcolor 'blue'");
+//        }
         
         if (mcmc_slam) {
             slam_plot->add_data_source (mcmc_slam, false, "MCMC-SLAM", "",
@@ -142,16 +143,16 @@ int main (int argc, char* argv[]) {
             }, "MCMC-SLAM log likelihood", "lc rgbcolor 'green' lw 5");
         }
         
-        if (fastslam) {
-            
-            likelihood_plot->add_data_source ([=](slam::timestep_type) {
-                return slam::slam_log_likelihood (*sim->get_slam_data(), *fastslam) - sim->get_log_likelihood();
-            }, "FastSLAM log likelihood", "lc rgbcolor 'blue' lw 5");
-            
-            likelihood_plot->add_data_source (boost::bind (&sim_types::fastslam_type::effective_particle_ratio,
-                                                           fastslam),
-                                              "FastSLAM effective particles", "lc rgbcolor 'red' lw 5", true);
-        }
+//        if (fastslam) {
+//            
+//            likelihood_plot->add_data_source ([=](slam::timestep_type) {
+//                return slam::slam_log_likelihood (*sim->get_slam_data(), *fastslam) - sim->get_log_likelihood();
+//            }, "FastSLAM log likelihood", "lc rgbcolor 'blue' lw 5");
+//            
+//            likelihood_plot->add_data_source (boost::bind (&sim_types::fastslam_type::effective_particle_ratio,
+//                                                           fastslam),
+//                                              "FastSLAM effective particles", "lc rgbcolor 'red' lw 5", true);
+//        }
         
         sim->add_timestep_listener (likelihood_plot);
     }
@@ -254,15 +255,15 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     po::options_description sensor_options = sensor_type::program_options();
     po::options_description mcmc_slam_options = sim_types::mcmc_slam_type::program_options();
     po::options_description multi_mcmc_options = sim_types::multi_mcmc_type::program_options();
-    po::options_description fastslam_options = sim_types::fastslam_type::program_options();
-    po::options_description fastslam_mcmc_options = sim_types::fastslam_mcmc_type::program_options();
+//    po::options_description fastslam_options = sim_types::fastslam_type::program_options();
+//    po::options_description fastslam_mcmc_options = sim_types::fastslam_mcmc_type::program_options();
     po::options_description g2o_slam_options = sim_types::g2o_slam_type::program_options();
     po::options_description slam_plot_options = slam_plotter::program_options();
     
     po::options_description config_options;
     config_options
     .add(general_options).add(simulator_options).add(controller_options).add(sensor_options)
-    .add(mcmc_slam_options).add(multi_mcmc_options).add(fastslam_options).add(fastslam_mcmc_options)
+    .add(mcmc_slam_options).add(multi_mcmc_options)/*.add(fastslam_options).add(fastslam_mcmc_options)*/
     .add(g2o_slam_options).add(slam_plot_options);
     
     po::options_description all_options;
@@ -305,15 +306,15 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
         help_requested = true;
     }
     
-    if (values.count("fastslam-help")) {
-        help_options.add(fastslam_options);
-        help_requested = true;
-    }
-    
-    if (values.count("fastslam-mcmc-help")) {
-        help_options.add(fastslam_mcmc_options);
-        help_requested = true;
-    }
+//    if (values.count("fastslam-help")) {
+//        help_options.add(fastslam_options);
+//        help_requested = true;
+//    }
+//    
+//    if (values.count("fastslam-mcmc-help")) {
+//        help_options.add(fastslam_mcmc_options);
+//        help_requested = true;
+//    }
     
     if (values.count("g2o-slam-help")) {
         help_options.add(g2o_slam_options);
