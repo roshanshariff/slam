@@ -20,8 +20,6 @@ namespace planar_robot {
     struct velocity_model : public independent_normal_base<3, velocity_model> {
         
 	using base_type = independent_normal_base<3, velocity_model>;
-	using vector_type = base_type::vector_type;
-	using matrix_type = base_type::matrix_type;
         
 	using associated_type = pose;
         

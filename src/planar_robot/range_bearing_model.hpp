@@ -17,8 +17,6 @@ namespace planar_robot {
     struct range_bearing_model : public independent_normal_base<2, range_bearing_model> {
         
 	using base_type = independent_normal_base<2, range_bearing_model>;
-	using vector_type = base_type::vector_type;
-        using matrix_type = base_type::matrix_type;
         
 	using associated_type = position;
         
@@ -82,8 +80,6 @@ namespace planar_robot {
     struct range_only_model : public independent_normal_base<1, range_only_model> {
         
         using base_type = independent_normal_base<1, range_only_model>;
-        using vector_type = base_type::vector_type;
-        using matrix_type = base_type::matrix_type;
         
         using associated_type = position;
         
