@@ -7,6 +7,7 @@
 #include <utility>
 #include <algorithm>
 #include <memory>
+#include <vector>
 
 #include <boost/program_options.hpp>
 
@@ -15,7 +16,6 @@
 #include "utility/random.hpp"
 #include "utility/bitree.hpp"
 #include "utility/flat_map.hpp"
-#include "utility/vector.hpp"
 #include "utility/utility.hpp"
 
 #include "main.hpp"
@@ -119,7 +119,7 @@ namespace slam {
         utility::bitree<state_type> state_estimates;
         utility::bitree<double> state_weights;
         
-        utility::vector<feature_estimate> feature_estimates;
+        std::vector<feature_estimate> feature_estimates;
         utility::bitree<double> feature_weights;
         
         // Map feature id to index in feature_estimates

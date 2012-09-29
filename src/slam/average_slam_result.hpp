@@ -11,12 +11,12 @@
 
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include <Eigen/Core>
 
 #include "slam/interfaces.hpp"
 #include "slam/slam_result_impl.hpp"
-#include "utility/vector.hpp"
 #include "utility/utility.hpp"
 
 namespace slam {
@@ -61,7 +61,7 @@ namespace slam {
         
         using average_slam_result_details::avg_acc;
         
-        utility::vector<avg_acc<State>> state_avgs;
+        std::vector<avg_acc<State>> state_avgs;
         utility::flat_map<featureid_type, avg_acc<Feature>> feature_avgs;
         
         for (auto iter = results_begin; iter != results_end; ++iter) {

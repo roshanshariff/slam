@@ -2,10 +2,8 @@
 #define _UTILITY_RANDOM_HPP
 
 #include <cmath>
+#include <random>
 
-#include <boost/random/mersenne_twister.hpp>
-#include <boost/random/uniform_01.hpp>
-#include <boost/random/normal_distribution.hpp>
 #include <boost/math/constants/constants.hpp>
 
 #include <Eigen/Core>
@@ -14,27 +12,27 @@ class random_source {
     
 public:
     
-    typedef boost::random::mt19937 engine_type;
-    typedef engine_type::result_type result_type;
+    using engine_type = std::mt19937;
+    using result_type = engine_type::result_type;
     
 private:
     
     engine_type engine;
-    boost::random::uniform_01<> uniform_dist;
-    boost::random::normal_distribution<> normal_dist;
+    std::uniform_real_distribution<> uniform_dist;
+    std::normal_distribution<> normal_dist;
 
 public:
             
     random_source () { }    
     random_source (result_type seed) : engine(seed) { }
     
-    result_type operator()() { return engine(); }
+    auto operator()() -> result_type { return engine(); }
     void seed (result_type seed) { engine.seed(seed); uniform_dist.reset(); normal_dist.reset(); }
         
-    static result_type min() { return engine_type::min(); }
-    static result_type max() { return engine_type::max(); }
+    static auto min() -> result_type { return engine_type::min(); }
+    static auto max() -> result_type { return engine_type::max(); }
 
-    bool operator== (const random_source& r) const { return *this == r; }
+    auto operator== (const random_source& r) const -> bool { return engine == r.engine; }
     
     double uniform () { return uniform_dist(*this); }
     double normal () { return normal_dist(*this); }

@@ -18,6 +18,7 @@
 
 #include <boost/program_options.hpp>
 
+#include "slam/interfaces.hpp"
 #include "slam/mcmc_slam.hpp"
 #include "slam/average_slam_result.hpp"
 #include "utility/random.hpp"

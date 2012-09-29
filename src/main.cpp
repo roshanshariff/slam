@@ -4,8 +4,8 @@
 #include <fstream>
 #include <cstdlib>
 #include <cstdio>
-#include <ctime>
 #include <memory>
+#include <random>
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -53,7 +53,8 @@ int main (int argc, char* argv[]) {
     
     /* set up simulation objects */
     
-    random_source random (remember_option(options, "seed", (unsigned int)std::time(0)));
+    std::random_device random_dev;
+    random_source random (remember_option(options, "seed", (unsigned int)random_dev()));
     
     unsigned int sim_seed = random();
     unsigned int mcmc_slam_seed = random();

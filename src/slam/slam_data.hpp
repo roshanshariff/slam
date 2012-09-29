@@ -5,10 +5,10 @@
 #include <utility>
 #include <cassert>
 #include <memory>
+#include <vector>
+#include <map>
 
 #include "slam/interfaces.hpp"
-#include "utility/vector.hpp"
-#include "utility/map.hpp"
 #include "utility/flat_map.hpp"
 #include "utility/listeners.hpp"
 #include "utility/utility.hpp"
@@ -30,7 +30,7 @@ namespace slam {
         using feature_observations = utility::flat_map<timestep_type, ObservationModel>;
 
     private:
-        using feature_collection = utility::map<featureid_type, feature_observations>;
+        using feature_collection = std::map<featureid_type, feature_observations>;
         
     public:
         using feature_iterator = typename feature_collection::const_iterator;
@@ -64,7 +64,7 @@ namespace slam {
         feature_collection m_features;
         observation_collection m_observations;
         
-        utility::vector<ControlModel> m_controls;
+        std::vector<ControlModel> m_controls;
         utility::listeners<listener> m_listeners;
         
     public:
@@ -153,13 +153,7 @@ void slam::slam_data<ControlModel, ObservationModel>
     
     const timestep_type t = current_timestep();
     
-    auto feature_iter = m_features.find (id);
-    
-    if (feature_iter == m_features.end()) {
-        feature_iter = m_features.emplace_hint (feature_iter, id, feature_observations());
-    }
-    
-    auto& feature_obs = feature_iter->second;
+    auto& feature_obs = m_features[id];
     
     auto obs_iter = feature_obs.emplace_hint (feature_obs.end(), t, obs);
     assert (obs_iter+1 == feature_obs.end());
@@ -167,7 +161,7 @@ void slam::slam_data<ControlModel, ObservationModel>
     const std::size_t index = obs_iter - feature_obs.begin();
     
     auto obs_info_iter = m_observations.emplace_hint (m_observations.end(), t,
-                                                      observation_info (feature_iter, index));
+                                                      observation_info (m_features.find(id), index));
     assert (obs_info_iter+1 == m_observations.end());
     
     using namespace std::placeholders;

@@ -12,6 +12,7 @@
 #include <cmath>
 #include <functional>
 #include <memory>
+#include <vector>
 
 #include <boost/program_options.hpp>
 #include <boost/optional.hpp>
@@ -26,7 +27,6 @@
 #include "slam/particle_filter.hpp"
 #include "utility/random.hpp"
 #include "utility/unscented.hpp"
-#include "utility/vector.hpp"
 #include "utility/cowmap.hpp"
 #include "utility/flat_map.hpp"
 #include "utility/bitree.hpp"
@@ -85,7 +85,7 @@ namespace slam {
         /** Current timestep, current control, and observations made in the current timestep. */
         timestep_type next_timestep;
         boost::optional<ControlModel> current_control;
-        utility::vector<observed_feature_type> seen_features, new_features;
+        std::vector<observed_feature_type> seen_features, new_features;
         std::size_t num_features = 0;
         
         /** The particle filter, its target size, and the resample threshold. */
@@ -178,6 +178,8 @@ namespace slam {
 template <class ControlModel, class ObservationModel>
 void slam::fastslam<ControlModel, ObservationModel>
 ::timestep (timestep_type timestep) {
+    
+    using namespace std::placeholders;
     
     if (timestep < next_timestep) return;
     assert (timestep == next_timestep);
