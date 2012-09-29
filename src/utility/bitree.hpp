@@ -111,9 +111,8 @@ namespace utility {
         };
         
         
-        bitree () { }
-        bitree (size_type n) : elements(n) { }
-        
+        bitree () = default;
+        explicit bitree (size_type n) : elements(n) { }
         
         size_type size () const { return elements.size(); }
         size_type capacity () const { return elements.capacity(); }

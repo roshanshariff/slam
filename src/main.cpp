@@ -1,13 +1,12 @@
 #include <vector>
-#include <iostream>
 #include <string>
+#include <iostream>
 #include <fstream>
 #include <cstdlib>
 #include <cstdio>
 #include <ctime>
+#include <memory>
 
-#include <boost/make_shared.hpp>
-#include <boost/ref.hpp>
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/timer/timer.hpp>
@@ -18,6 +17,7 @@
 //#include "slam/fastslam.hpp"
 //#include "slam/fastslam_mcmc.hpp"
 #include "slam/g2o_slam.hpp"
+#include "slam/g2o_clustering.hpp"
 #include "slam/slam_likelihood.hpp"
 #include "simulator/simulator.hpp"
 #include "simulator/slam_plotter.hpp"
@@ -37,6 +37,7 @@ namespace sim_types {
 //    typedef slam::fastslam<control_model_type, observation_model_type> fastslam_type;
 //    typedef slam::fastslam_mcmc<control_model_type, observation_model_type> fastslam_mcmc_type;
     typedef slam::g2o_slam<control_model_type, observation_model_type> g2o_slam_type;
+    typedef slam::g2o_clustering<control_model_type, observation_model_type> g2o_clustering_type;
     
 };
 
@@ -60,47 +61,51 @@ int main (int argc, char* argv[]) {
     unsigned int g2o_seed = random();
     /*unsigned int fastslam_seed =*/ random();
     
-    boost::shared_ptr<sim_types::simulator_type> sim
-    = boost::make_shared<sim_types::simulator_type> (boost::ref(options), sim_seed);
+    std::shared_ptr<sim_types::simulator_type> sim
+    = std::make_shared<sim_types::simulator_type> (options, sim_seed);
     
-    boost::shared_ptr<sim_types::mcmc_slam_type> mcmc_slam;
+    std::shared_ptr<sim_types::mcmc_slam_type> mcmc_slam;
     if (options.count ("mcmc-slam")) {
-        mcmc_slam = boost::make_shared<sim_types::mcmc_slam_type> (sim->get_slam_data(),
-                                                                   boost::ref(options), mcmc_slam_seed);
+        mcmc_slam = std::make_shared<sim_types::mcmc_slam_type> (sim->get_slam_data(),
+                                                                 options, mcmc_slam_seed);
         sim->add_timestep_listener (mcmc_slam);
     }
     
-    boost::shared_ptr<sim_types::multi_mcmc_type> multi_mcmc;
+    std::shared_ptr<sim_types::multi_mcmc_type> multi_mcmc;
     if (options.count ("multi-mcmc")) {
-        multi_mcmc = boost::make_shared<sim_types::multi_mcmc_type> (sim->get_slam_data(),
-                                                                     boost::ref(options), multi_mcmc_seed);
+        multi_mcmc = std::make_shared<sim_types::multi_mcmc_type> (sim->get_slam_data(),
+                                                                   options, multi_mcmc_seed);
         sim->add_timestep_listener (multi_mcmc);
     }
     
-//    boost::shared_ptr<sim_types::fastslam_type> fastslam;
+//    std::shared_ptr<sim_types::fastslam_type> fastslam;
 //    if (options.count ("fastslam")) {
-//        fastslam = boost::make_shared<sim_types::fastslam_type> (boost::ref(options), fastslam_seed);
+//        fastslam = std::make_shared<sim_types::fastslam_type> (options, fastslam_seed);
 //        sim->add_data_listener (fastslam);
 //        
 //        if (mcmc_slam && options.count("mcmc-init")) mcmc_slam->set_initialiser (fastslam);
 //    }
     
-//    boost::shared_ptr<sim_types::fastslam_mcmc_type> fastslam_mcmc;
-//    fastslam_mcmc = boost::make_shared<sim_types::fastslam_mcmc_type> (boost::ref(options));
+//    std::shared_ptr<sim_types::fastslam_mcmc_type> fastslam_mcmc;
+//    fastslam_mcmc = std::make_shared<sim_types::fastslam_mcmc_type> (options);
 //    fastslam_mcmc->set_fastslam(fastslam);
 //    fastslam_mcmc->set_mcmc_slam(mcmc_slam);
 //    sim->add_timestep_listener(fastslam_mcmc);
     
-    boost::shared_ptr<sim_types::g2o_slam_type> g2o_slam;
+    std::shared_ptr<sim_types::g2o_slam_type> g2o_slam;
     if (options.count ("g2o")) {
-        g2o_slam = boost::make_shared<sim_types::g2o_slam_type> (boost::ref(options), g2o_seed);
+        g2o_slam = std::make_shared<sim_types::g2o_slam_type> (options, g2o_seed);
         sim->add_data_listener (g2o_slam);
     }
     
-    boost::shared_ptr<slam_plotter> slam_plot;
+    std::shared_ptr<sim_types::g2o_clustering_type> g2o_clustering;
+    g2o_clustering = std::make_shared<sim_types::g2o_clustering_type>(sim->get_slam_data());
+    sim->add_data_listener (g2o_clustering);
+    
+    std::shared_ptr<slam_plotter> slam_plot;
     if (options.count ("slam-plot")) {
         
-        slam_plot = boost::make_shared<slam_plotter> (boost::ref(options), sim->get_initial_state());
+        slam_plot = std::make_shared<slam_plotter> (options, sim->get_initial_state());
         
         slam_plot->add_data_source (sim, true, "Trajectory", "Landmarks",
                                     "lc rgbcolor 'black' pt 6 ps 1.5",
@@ -131,10 +136,10 @@ int main (int argc, char* argv[]) {
         sim->add_timestep_listener (slam_plot);
     }
     
-    boost::shared_ptr<time_series_plotter> likelihood_plot;
+    std::shared_ptr<time_series_plotter> likelihood_plot;
     if (options.count ("plot-stats")) {
         
-        likelihood_plot = boost::make_shared<time_series_plotter> (300);
+        likelihood_plot = std::make_shared<time_series_plotter> (300);
         
         if (mcmc_slam) {
 
@@ -149,8 +154,8 @@ int main (int argc, char* argv[]) {
 //                return slam::slam_log_likelihood (*sim->get_slam_data(), *fastslam) - sim->get_log_likelihood();
 //            }, "FastSLAM log likelihood", "lc rgbcolor 'blue' lw 5");
 //            
-//            likelihood_plot->add_data_source (boost::bind (&sim_types::fastslam_type::effective_particle_ratio,
-//                                                           fastslam),
+//            likelihood_plot->add_data_source (std::bind (&sim_types::fastslam_type::effective_particle_ratio,
+//                                                         fastslam),
 //                                              "FastSLAM effective particles", "lc rgbcolor 'red' lw 5", true);
 //        }
         
@@ -212,6 +217,17 @@ int main (int argc, char* argv[]) {
         << slam::slam_log_likelihood (*sim->get_slam_data(), *g2o_slam) - sim->get_log_likelihood()
         << "\n\n";
     }
+    
+//    if (mcmc_slam && g2o_clustering) {
+//        for (int i = 0; i < 10; ++i) {
+//            for (int j = 0; j < 1000; ++j) mcmc_slam->update();
+//            std::cout << "Testing candidate cluster " << (i+1) << std::endl;
+//            g2o_clustering->add (*mcmc_slam);
+//        }
+//        std::cout << "Number of clusters: "
+//        << g2o_clustering->get_clusters().size()
+//        << "\n\n";
+//    }
     
     return EXIT_SUCCESS;
     

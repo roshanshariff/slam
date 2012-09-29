@@ -17,13 +17,13 @@
 #include <fstream>
 
 #include <boost/program_options.hpp>
-#include <boost/shared_ptr.hpp>
 
 #include "slam/mcmc_slam.hpp"
 #include "slam/average_slam_result.hpp"
 #include "utility/random.hpp"
 #include "utility/bitree.hpp"
 #include "utility/flat_map.hpp"
+#include "utility/utility.hpp"
 
 #include "main.hpp"
 
@@ -36,7 +36,6 @@ namespace slam {
         using slam_data_type = slam_data<ControlModel, ObservationModel>;
 
         using mcmc_slam_type = mcmc_slam<ControlModel, ObservationModel>;
-        using mcmc_ptr_type = std::unique_ptr<mcmc_slam_type>;
         
         using state_type = typename ControlModel::associated_type;
         using feature_type = typename ObservationModel::associated_type;
@@ -46,7 +45,7 @@ namespace slam {
         using trajectory_type = utility::bitree<state_type>;
         using feature_map_type = utility::flat_map<featureid_type, feature_type>;
         
-        std::vector<mcmc_ptr_type> mcmc_chains;
+        std::vector<std::unique_ptr<mcmc_slam_type>> mcmc_chains;
         mcmc_slam_type* max_likelihood;
         
         unsigned int num_updates = 0;
@@ -56,7 +55,7 @@ namespace slam {
         
     public:
         
-        multi_mcmc (boost::shared_ptr<const slam_data_type>, boost::program_options::variables_map& options, unsigned int seed);
+        multi_mcmc (std::shared_ptr<const slam_data_type>, boost::program_options::variables_map& options, unsigned int seed);
         
         static auto program_options () -> boost::program_options::options_description;
         
@@ -71,8 +70,7 @@ namespace slam {
         }
         
         auto get_average () -> std::unique_ptr<slam_result_type> {
-            return std::unique_ptr<slam_result_type>
-            (new average_slam_result<state_type, feature_type> (mcmc_chains.begin(), mcmc_chains.end()));
+            return average_slam_result<state_type, feature_type> (mcmc_chains.begin(), mcmc_chains.end());
         }
         
         // Overridden virtual member functions of slam::slam_result
@@ -164,7 +162,7 @@ auto slam::multi_mcmc<ControlModel, ObservationModel>
 
 template <class ControlModel, class ObservationModel>
 slam::multi_mcmc<ControlModel, ObservationModel>
-::multi_mcmc (boost::shared_ptr<const slam_data<ControlModel, ObservationModel>> data,
+::multi_mcmc (std::shared_ptr<const slam_data<ControlModel, ObservationModel>> data,
               boost::program_options::variables_map& options, unsigned int seed)
 : mcmc_end_steps (options["multi-mcmc-end-steps"].as<unsigned int>())
 {
@@ -173,8 +171,7 @@ slam::multi_mcmc<ControlModel, ObservationModel>
     random_source random (remember_option (options, "multi-mcmc-seed", seed));
     
     for (unsigned int i = 0; i < num_mcmc_chains; ++i) {
-        mcmc_ptr_type instance (new mcmc_slam_type (data, std::ref(options), random()));
-        mcmc_chains.push_back (std::move (instance));
+        mcmc_chains.push_back (make_unique<mcmc_slam_type> (data, options, random()));
     }
     
     max_likelihood = mcmc_chains.front().get();

@@ -11,9 +11,8 @@
 
 #include <vector>
 #include <algorithm>
+#include <memory>
 
-#include <boost/shared_ptr.hpp>
-#include <boost/weak_ptr.hpp>
 
 namespace utility {
     
@@ -21,7 +20,7 @@ namespace utility {
     template <class Listener>
     class listeners {
         
-        mutable std::vector<boost::weak_ptr<Listener>> weak_ptrs;
+        mutable std::vector<std::weak_ptr<Listener>> weak_ptrs;
         
         template <class Functor>
         class invoke_or_remove {
@@ -32,7 +31,7 @@ namespace utility {
             
             invoke_or_remove (Functor& f) : f(f) { }
             
-            bool operator() (const boost::weak_ptr<Listener>& weak_ptr) {
+            bool operator() (const std::weak_ptr<Listener>& weak_ptr) {
                 if (auto listener = weak_ptr.lock()) {
                     f (listener.get());
                     return false;
@@ -45,7 +44,7 @@ namespace utility {
         
     public:
         
-        void add (const boost::shared_ptr<Listener>& l) { weak_ptrs.push_back (l); }
+        void add (const std::shared_ptr<Listener>& l) { weak_ptrs.push_back (l); }
         
         template <class Functor> void for_each (Functor) const;
 

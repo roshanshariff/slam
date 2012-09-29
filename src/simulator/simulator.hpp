@@ -4,13 +4,10 @@
 #include <string>
 #include <cstdio>
 #include <cassert>
+#include <memory>
+#include <functional>
 
-#include <boost/bind.hpp>
-#include <boost/ref.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/container/flat_map.hpp>
 #include <boost/program_options.hpp>
-#include <boost/utility.hpp>
 
 #include "slam/interfaces.hpp"
 #include "slam/slam_data.hpp"
@@ -18,6 +15,7 @@
 #include "utility/bitree.hpp"
 #include "utility/listeners.hpp"
 #include "utility/utility.hpp"
+#include "utility/flat_map.hpp"
 
 #include "main.hpp"
 
@@ -39,12 +37,12 @@ public:
 private:
     
     typedef utility::bitree<state_type> trajectory_type;
-    typedef boost::container::flat_map<slam::featureid_type, feature_type> feature_map_type;
+    typedef utility::flat_map<slam::featureid_type, feature_type> feature_map_type;
     
     // Data members
     
     random_source random;
-    boost::shared_ptr<slam_data_type> data;
+    std::shared_ptr<slam_data_type> data;
     
     Controller controller;
     Sensor sensor;
@@ -62,18 +60,19 @@ private:
     utility::listeners<slam::timestep_listener> listeners;
     
     void timestep () {
-        listeners.for_each (boost::bind (&slam::timestep_listener::timestep, _1, current_timestep()));
+        using namespace std::placeholders;
+        listeners.for_each (std::bind (&slam::timestep_listener::timestep, _1, current_timestep()));
     }
     
 public:
     
     simulator (boost::program_options::variables_map& options, unsigned int seed);
     
-    void add_timestep_listener (const boost::shared_ptr<slam::timestep_listener>& l) {
+    void add_timestep_listener (const std::shared_ptr<slam::timestep_listener>& l) {
         listeners.add(l);
     }
     
-    void add_data_listener (const boost::shared_ptr<typename slam_data_type::listener>& l) {
+    void add_data_listener (const std::shared_ptr<typename slam_data_type::listener>& l) {
         data->add_listener(l);
     }
     
@@ -83,7 +82,7 @@ public:
     
     state_type get_initial_state () const { return initial_state; }
     
-    boost::shared_ptr<const slam_data_type> get_slam_data () const { return data; }
+    std::shared_ptr<const slam_data_type> get_slam_data () const { return data; }
     
     double get_log_likelihood () const { return state_log_likelihood + sensor.get_log_likelihood(); }
     
@@ -124,7 +123,7 @@ public:
 template <class Controller, class Sensor>
 simulator<Controller, Sensor>::simulator (boost::program_options::variables_map& options, unsigned int seed)
 : random (remember_option (options, "sim-seed", seed)),
-data(boost::make_shared<slam_data_type>()),
+data(std::make_shared<slam_data_type>()),
 controller (options),
 sensor (options),
 initial_state (controller.initial_state()),
@@ -142,8 +141,9 @@ void simulator<Controller, Sensor>::operator() () {
     
     assert (!sim_completed);
     
+    using namespace std::placeholders;
     sensor.sense (get_initial_state() + get_state(current_timestep()), random,
-                  boost::bind (&slam_data_type::add_observation, data.get(), _1, _2));
+                  std::bind (&slam_data_type::add_observation, data.get(), _1, _2));
     timestep ();
     
     while (!controller.finished()) {
@@ -158,14 +158,14 @@ void simulator<Controller, Sensor>::operator() () {
         
         if (current_timestep() % sensor_skip == 0) {
             sensor.sense (get_initial_state() + get_state(current_timestep()), random,
-                          boost::bind (&slam_data_type::add_observation, data.get(), _1, _2));
+                          std::bind (&slam_data_type::add_observation, data.get(), _1, _2));
         }
         
         timestep ();
     }
     
     sim_completed = true;
-    listeners.for_each (boost::bind (&slam::timestep_listener::completed, _1));
+    listeners.for_each (std::bind (&slam::timestep_listener::completed, _1));
 }
 
 

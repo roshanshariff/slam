@@ -11,10 +11,7 @@
 
 #include <cassert>
 #include <utility>
-
-#include <boost/shared_ptr.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/utility.hpp>
+#include <memory>
 
 
 class cowtree {
@@ -54,9 +51,9 @@ private:
     void set_black (bool black);
     void make_unique ();
     
-    template <class T> static boost::shared_ptr<node> make_node (const T& value);
+    template <class T> static std::shared_ptr<node> make_node (const T& value);
     
-    boost::shared_ptr<node> node_ptr;
+    std::shared_ptr<node> node_ptr;
     
 };
 
@@ -82,7 +79,7 @@ public:
     cowtree left, right;
     
     virtual ~node() { }    
-    virtual boost::shared_ptr<node> clone () const = 0;
+    virtual std::shared_ptr<node> clone () const = 0;
     
     template <class T> class typed;
     
@@ -107,7 +104,7 @@ public:
     
     explicit typed (const T& value) : value(value) { }
     typed (const typed<T>& o) : node(o), value(o.value) { }
-    virtual boost::shared_ptr<node> clone () const { return boost::make_shared<typed<T> >(*this); }
+    virtual std::shared_ptr<node> clone () const { return std::make_shared<typed<T> >(*this); }
     
 private:
     
@@ -137,12 +134,12 @@ template <class T> inline T& cowtree::value () {
     return static_cast<node::typed<T>&>(get_node()).value;
 }
 
-template <class T> inline boost::shared_ptr<cowtree::node> cowtree::make_node (const T& value) {
-    return boost::make_shared<node::typed<T> >(value);
+template <class T> inline std::shared_ptr<cowtree::node> cowtree::make_node (const T& value) {
+    return std::make_shared<node::typed<T>>(value);
 }
 
 
-class cowtree::editor : boost::noncopyable {
+class cowtree::editor {
     
     editor* const parent_ptr;
     cowtree* subtree_ptr;
@@ -154,6 +151,8 @@ class cowtree::editor : boost::noncopyable {
 public:
     
     editor (root& tree);
+    editor (const editor&) = delete;
+    editor& operator= (const editor&) = delete;
     
     bool is_root () const { return parent_ptr == 0; }    
     bool is_left_child () const { return !is_root() && subtree_ptr == &parent_ptr->subtree_ptr->left(); }

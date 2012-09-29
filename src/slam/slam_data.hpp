@@ -4,10 +4,7 @@
 #include <functional>
 #include <utility>
 #include <cassert>
-
-#include <boost/shared_ptr.hpp>
-#include <boost/bind.hpp>
-#include <boost/ref.hpp>
+#include <memory>
 
 #include "slam/interfaces.hpp"
 #include "utility/vector.hpp"
@@ -86,11 +83,13 @@ namespace slam {
         
         virtual void timestep (timestep_type timestep) override {
             assert (timestep == current_timestep());
-            m_listeners.for_each (boost::bind (&listener::timestep, _1, timestep));
+            using namespace std::placeholders;
+            m_listeners.for_each (std::bind (&listener::timestep, _1, timestep));
         }
         
         virtual void completed () override {
-            m_listeners.for_each (boost::bind (&listener::completed, _1));
+            using namespace std::placeholders;
+            m_listeners.for_each (std::bind (&listener::completed, _1));
         }
         
         /** Retrieve controls. */
@@ -129,7 +128,7 @@ namespace slam {
         
         /** Add new listener */
         
-        void add_listener (const boost::shared_ptr<listener>& l) { m_listeners.add(l); }
+        void add_listener (const std::shared_ptr<listener>& l) { m_listeners.add(l); }
         
     };
     
@@ -141,9 +140,10 @@ void slam::slam_data<ControlModel, ObservationModel>
 ::add_control (const ControlModel& control) {
     
     timestep_type t = current_timestep();
-    
     m_controls.push_back (control);
-    m_listeners.for_each (boost::bind (&listener::control, _1, t, boost::cref(control)));
+
+    using namespace std::placeholders;
+    m_listeners.for_each (std::bind (&listener::control, _1, t, std::cref(control)));
 }
 
 
@@ -170,7 +170,8 @@ void slam::slam_data<ControlModel, ObservationModel>
                                                       observation_info (feature_iter, index));
     assert (obs_info_iter+1 == m_observations.end());
     
-    m_listeners.for_each (boost::bind (&listener::observation, _1, t, boost::cref(obs_info_iter->second)));
+    using namespace std::placeholders;
+    m_listeners.for_each (std::bind (&listener::observation, _1, t, std::cref(obs_info_iter->second)));
 }
 
 

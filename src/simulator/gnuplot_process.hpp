@@ -12,10 +12,8 @@
 #include <cstdio>
 #include <vector>
 
-#include <boost/utility.hpp>
 
-
-class gnuplot_process : boost::noncopyable {
+class gnuplot_process {
     
     FILE* fh;
     std::vector<float> buffer;
@@ -27,7 +25,10 @@ class gnuplot_process : boost::noncopyable {
 public:
     
     gnuplot_process (bool debug = false);
+    gnuplot_process (const gnuplot_process&) = delete;
+    gnuplot_process& operator= (const gnuplot_process&) = delete;
     virtual ~gnuplot_process ();
+    
     FILE* handle () { return fh; }
     
     gnuplot_process& operator<< (float x) { buffer.push_back(x); return *this; }

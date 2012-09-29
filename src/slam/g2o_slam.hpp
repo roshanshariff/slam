@@ -29,6 +29,7 @@
 #include "slam/slam_data.hpp"
 #include "utility/bitree.hpp"
 #include "utility/random.hpp"
+#include "utility/utility.hpp"
 
 #include "main.hpp"
 
@@ -46,6 +47,7 @@ namespace slam {
         using control_type = typename ControlModel::vector_type;
         using observation_type = typename ObservationModel::vector_type;
         
+        using slam_result_type = slam_result<state_type, feature_type>;
         using slam_data_type = slam_data<ControlModel, ObservationModel>;
         
         /** Nested types */
@@ -159,8 +161,8 @@ namespace slam {
         
         random_source random;
         
-        unsigned int g2o_steps;
-        unsigned int g2o_end_steps;
+        unsigned int g2o_steps = 0;
+        unsigned int g2o_end_steps = 0;
         bool need_init = false;
         
         g2o::SparseOptimizer optimizer;
@@ -176,8 +178,13 @@ namespace slam {
         
     public:
         
+        explicit g2o_slam (unsigned int seed);
         g2o_slam (boost::program_options::variables_map&, unsigned int seed);
         static boost::program_options::options_description program_options ();
+        
+        void reinitialise (const slam_result_type&);
+        
+        void optimise (unsigned int iterations);
         
         // Overridden virtual member functions of slam::slam_data::listener
 
@@ -213,6 +220,42 @@ namespace slam {
 
 template <class ControlModel, class ObservationModel>
 void slam::g2o_slam<ControlModel, ObservationModel>
+::reinitialise (const slam_result_type& initialiser) {
+    
+    const auto& trajectory = initialiser.get_trajectory();
+    
+    for (timestep_type t (1); t <= trajectory.size(); ++t) {
+        state_vertices.at(t)->setEstimate (trajectory.accumulate (t));
+    }
+    
+    for (const auto& feature : initialiser.get_feature_map()) {
+        feature_vertices.at(feature.first)->setEstimate (feature.second);
+    }
+    
+    need_init = true;
+}
+
+
+template <class ControlModel, class ObservationModel>
+void slam::g2o_slam<ControlModel, ObservationModel>
+::optimise (unsigned int iterations) {
+
+    if (iterations > 0) {
+        
+        if (need_init) {
+            optimizer.initializeOptimization();
+            need_init = false;
+        }
+        optimizer.optimize(iterations);
+        
+        trajectory_estimate.clear();
+        map_estimate.clear();
+    }
+}
+
+
+template <class ControlModel, class ObservationModel>
+void slam::g2o_slam<ControlModel, ObservationModel>
 ::control (timestep_type t, const ControlModel& control) {
     
     assert (t == current_timestep());
@@ -221,10 +264,10 @@ void slam::g2o_slam<ControlModel, ObservationModel>
     vertex_state* v0 = state_vertices.back();
     
     state_type initial_estimate = v0->estimate() + control.proposal().initial_value(random);
-    std::unique_ptr<vertex_state> v1 (new vertex_state (next_vertex_id++, initial_estimate));
+    auto v1 = make_unique<vertex_state>(next_vertex_id++, initial_estimate);
     state_vertices.push_back (v1.get());
     
-    std::unique_ptr<edge_control> e (new edge_control (v0, v1.get(), control.mean()));
+    auto e = make_unique<edge_control>(v0, v1.get(), control.mean());
     
     typename ControlModel::matrix_type chol_cov_inv;
     chol_cov_inv.setIdentity();
@@ -251,14 +294,14 @@ void slam::g2o_slam<ControlModel, ObservationModel>
     if (obs.index() == 0) {
         
         feature_type initial_estimate = v0->estimate() + obs.observation().proposal().initial_value (random);
-        std::unique_ptr<vertex_landmark> v (new vertex_landmark (next_vertex_id++, initial_estimate));
+        auto v = make_unique<vertex_landmark>(next_vertex_id++, initial_estimate);
         feature_vertices[obs.id()] = v.get();
         
         v1 = v.get();
         optimizer.addVertex (v.release());
     }
     
-    std::unique_ptr<edge_obs> e (new edge_obs (v0, v1, obs.observation().mean()));
+    auto e = make_unique<edge_obs>(v0, v1, obs.observation().mean());
     
     typename ObservationModel::matrix_type chol_cov_inv;
     chol_cov_inv.setIdentity();
@@ -278,17 +321,7 @@ void slam::g2o_slam<ControlModel, ObservationModel>
     if (t < next_timestep) return;
     assert (t == next_timestep);
     
-    if (t > 0 && g2o_steps > 0) {
-        
-        if (need_init) {
-            optimizer.initializeOptimization();
-            need_init = false;
-        }
-        optimizer.optimize(g2o_steps);
-        
-        trajectory_estimate.clear();
-        map_estimate.clear();
-    }
+    if (t > 0) optimise (g2o_steps);
     
     ++next_timestep;    
 }
@@ -298,17 +331,7 @@ template <class ControlModel, class ObservationModel>
 void slam::g2o_slam<ControlModel, ObservationModel>
 ::completed () {
     
-    if (g2o_end_steps > 0) {
-        
-        if (need_init) {
-            optimizer.initializeOptimization();
-            need_init = false;
-        }
-        optimizer.optimize(g2o_end_steps);
-        
-        trajectory_estimate.clear();
-        map_estimate.clear();
-    }
+    optimise (g2o_end_steps);
 }
 
 
@@ -364,29 +387,35 @@ auto slam::g2o_slam<ControlModel, ObservationModel>
 
 template <class ControlModel, class ObservationModel>
 slam::g2o_slam<ControlModel, ObservationModel>
-::g2o_slam (boost::program_options::variables_map& options, unsigned int seed)
-: random (seed),
-g2o_steps (options["g2o-steps"].as<unsigned int>()),
-g2o_end_steps (options["g2o-end-steps"].as<unsigned int>())
+::g2o_slam (unsigned int seed) : random (seed)
 {
     
     using SlamBlockSolver = g2o::BlockSolver<g2o::BlockSolverTraits<-1, -1>>;
     using SlamLinearSolver = g2o::LinearSolverCSparse<SlamBlockSolver::PoseMatrixType>;
     using OptimizationAlgorithm = g2o::OptimizationAlgorithmGaussNewton;
     
-    std::unique_ptr<SlamLinearSolver> linearSolver (new SlamLinearSolver);
+    auto linearSolver = make_unique<SlamLinearSolver>();
     linearSolver->setBlockOrdering(false);
     
-    std::unique_ptr<SlamBlockSolver> blockSolver (new SlamBlockSolver (linearSolver.release()));
+    auto blockSolver = make_unique<SlamBlockSolver>(linearSolver.release());
     
-    std::unique_ptr<OptimizationAlgorithm> solver (new OptimizationAlgorithm (blockSolver.release()));
+    auto solver = make_unique<OptimizationAlgorithm>(blockSolver.release());
     optimizer.setAlgorithm(solver.release());
     
-    std::unique_ptr<vertex_state> v (new vertex_state (next_vertex_id++, state_type()));
+    auto v = make_unique<vertex_state>(next_vertex_id++, state_type());
     v->setFixed (true);
     
     state_vertices.push_back (v.get());
     optimizer.addVertex (v.release());
+}
+
+
+template <class ControlModel, class ObservationModel>
+slam::g2o_slam<ControlModel, ObservationModel>
+::g2o_slam (boost::program_options::variables_map& options, unsigned int seed) : g2o_slam (seed)
+{
+    g2o_steps = options["g2o-steps"].as<unsigned int>();
+    g2o_end_steps = options["g2o-end-steps"].as<unsigned int>();
 }
 
 

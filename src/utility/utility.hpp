@@ -12,14 +12,14 @@
 #include <cstdio>
 #include <string>
 #include <utility>
+#include <memory>
 
-#include <boost/shared_ptr.hpp>
 #include <boost/program_options.hpp>
 
 
-boost::shared_ptr<FILE> open_file (const char* filename, const char* mode);
+std::shared_ptr<FILE> open_file (const char* filename, const char* mode);
 
-boost::shared_ptr<FILE> open_process (const char* command, const char* mode);
+std::shared_ptr<FILE> open_process (const char* command, const char* mode);
 
 
 template <class T>
@@ -48,5 +48,9 @@ inline iter_pair_range<Iter> as_range (std::pair<Iter,Iter> const& range) { retu
 template <class Iter>
 inline iter_pair_range<Iter> as_range (Iter begin, Iter end) { return iter_pair_range<Iter>(begin, end); }
 
+template <class T, class... Args>
+auto make_unique (Args&&... args) -> std::unique_ptr<T> {
+    return std::unique_ptr<T> (new T (std::forward<Args>(args)...));
+}
 
 #endif

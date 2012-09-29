@@ -10,10 +10,10 @@
 #define slam_fastslam_mcmc_hpp
 
 #include <iostream>
+#include <memory>
+#include <functional>
 
 #include <boost/program_options.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/bind.hpp>
 
 #include <Eigen/Eigen>
 
@@ -32,8 +32,8 @@ namespace slam {
         using fastslam_type = fastslam<ControlModel, ObservationModel>;
         using mcmc_slam_type = mcmc_slam<ControlModel, ObservationModel>;
         
-        boost::shared_ptr<fastslam_type> m_fastslam;
-        boost::shared_ptr<mcmc_slam_type> m_mcmc_slam;
+        std::shared_ptr<fastslam_type> m_fastslam;
+        std::shared_ptr<mcmc_slam_type> m_mcmc_slam;
         
         typename fastslam_type::particle_type sample_particle () const;
         
@@ -93,7 +93,7 @@ void slam::fastslam_mcmc<ControlModel, ObservationModel>
         m_mcmc_slam->timestep(t);
         std::cout << "Reinitialising FastSLAM... ";
         m_fastslam->particles.reinitialize (m_fastslam->num_particles,
-                                          boost::bind(&fastslam_mcmc::sample_particle, this));
+                                          std::bind(&fastslam_mcmc::sample_particle, this));
         std::cout <<"done\n";
         resample_required = false;
     }
@@ -127,7 +127,7 @@ auto slam::fastslam_mcmc<ControlModel, ObservationModel>
     typename fastslam_type::particle_type particle;
     
     for (std::size_t i = 0; i < m_mcmc_slam->get_trajectory().size(); ++i) {
-        particle.trajectory.previous = boost::make_shared<decltype(particle.trajectory)>(particle.trajectory);
+        particle.trajectory.previous = std::make_shared<decltype(particle.trajectory)>(particle.trajectory);
         particle.trajectory.state += m_mcmc_slam->get_trajectory()[i];
     }
     

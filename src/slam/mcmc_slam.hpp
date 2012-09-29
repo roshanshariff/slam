@@ -6,8 +6,8 @@
 #include <cmath>
 #include <utility>
 #include <algorithm>
+#include <memory>
 
-#include <boost/shared_ptr.hpp>
 #include <boost/program_options.hpp>
 
 #include "slam/interfaces.hpp"
@@ -111,8 +111,8 @@ namespace slam {
         
         /** Private data members */
         
-        const boost::shared_ptr<const slam_data_type> data;
-        boost::shared_ptr<slam_result<state_type, feature_type>> initialiser;
+        const std::shared_ptr<const slam_data_type> data;
+        std::shared_ptr<slam_result<state_type, feature_type>> initialiser;
         
         random_source random;
         
@@ -173,7 +173,7 @@ namespace slam {
         mcmc_slam (const mcmc_slam&) = delete;
         mcmc_slam& operator= (const mcmc_slam&) = delete;
         
-        mcmc_slam (boost::shared_ptr<const slam_data_type>, boost::program_options::variables_map& options, unsigned int seed);
+        mcmc_slam (std::shared_ptr<const slam_data_type>, boost::program_options::variables_map& options, unsigned int seed);
         
         static boost::program_options::options_description program_options ();
         
@@ -484,7 +484,7 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
 // its seed and all the rest use the same one.
 template <class ControlModel, class ObservationModel>
 slam::mcmc_slam<ControlModel, ObservationModel>
-::mcmc_slam (boost::shared_ptr<const slam_data<ControlModel, ObservationModel>> data,
+::mcmc_slam (std::shared_ptr<const slam_data<ControlModel, ObservationModel>> data,
              boost::program_options::variables_map& options, unsigned int seed)
 : data      (data),
 //random      (remember_option (options, "mcmc-slam-seed", seed)),

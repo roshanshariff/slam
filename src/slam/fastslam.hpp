@@ -11,10 +11,9 @@
 
 #include <cmath>
 #include <functional>
+#include <memory>
 
 #include <boost/program_options.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/make_shared.hpp>
 #include <boost/optional.hpp>
 #include <boost/none.hpp>
 
@@ -65,7 +64,7 @@ namespace slam {
         struct particle_type {
             struct state_list {
                 state_type state;
-                boost::shared_ptr<const state_list> previous;
+                std::shared_ptr<const state_list> previous;
             } trajectory;
             cowmap<featureid_type, feature_dist> features;
         };
@@ -190,7 +189,7 @@ void slam::fastslam<ControlModel, ObservationModel>
         if (resample_required()) particles.resample (random, num_particles);
         
         assert (current_control);
-        particles.update (boost::bind (&fastslam::particle_state_update, this, _1));
+        particles.update (std::bind (&fastslam::particle_state_update, this, _1));
         current_control = boost::none;
         
         const state_type& state_estimate = particles.max_weight_particle().trajectory.state;
@@ -275,7 +274,7 @@ auto slam::fastslam<ControlModel, ObservationModel>
     }
     
     if (!discard_history) {
-        particle.trajectory.previous = boost::make_shared<typename particle_type::state_list> (particle.trajectory);
+        particle.trajectory.previous = std::make_shared<typename particle_type::state_list> (particle.trajectory);
     }
     
     particle.trajectory.state = state_proposal (random);

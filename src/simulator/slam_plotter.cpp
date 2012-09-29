@@ -12,17 +12,16 @@
 #include <sstream>
 #include <iomanip>
 
-#include <boost/container/flat_map.hpp>
-
 #include "simulator/slam_plotter.hpp"
 #include "utility/bitree.hpp"
+#include "utility/flat_map.hpp"
 #include "utility/utility.hpp"
 
 
-void slam_plotter::add_data_source (boost::shared_ptr<slam_result_type> source, bool autoscale_map,
-                               std::string trajectory_title, std::string landmark_title,
-                               std::string feature_point_style, std::string trajectory_line_style,
-                               std::string state_arrow_style)
+void slam_plotter::add_data_source (std::shared_ptr<slam_result_type> source, bool autoscale_map,
+                                    std::string trajectory_title, std::string landmark_title,
+                                    std::string feature_point_style, std::string trajectory_line_style,
+                                    std::string state_arrow_style)
 {
     data_source source_info = {
         source, autoscale_map, trajectory_title, landmark_title,

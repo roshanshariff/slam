@@ -13,9 +13,9 @@
 
 void time_series_plotter::timestep (slam::timestep_type timestep) {
     
-    const int xmax = timestep;
-    const int xmin = xmax + 1 - history_capacity;
-    std::fprintf (gnuplot.handle(), "set xrange [%d:%d]\n", xmin, xmax);
+    long xmax = long(timestep);
+    long xmin = xmax + 1 - long(history_capacity);
+    std::fprintf (gnuplot.handle(), "set xrange [%ld:%ld]\n", xmin, xmax);
     
     bool use_y2 = false;
     
@@ -36,7 +36,7 @@ void time_series_plotter::timestep (slam::timestep_type timestep) {
     
     for (auto& source : data_sources) {
         
-        int t = int(timestep) - source.history.size();
+        long t = size_t(timestep) - source.history.size();
         for (const auto& value : source.history) gnuplot << (++t) << value;
 
         gnuplot.plot (2);

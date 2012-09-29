@@ -37,7 +37,7 @@ namespace planar_robot {
             
             const double r = 0.5 * dp.distance_squared() / dp.y();
 
-            if (boost::math::isfinite(r)) {
+            if (std::isfinite(r)) {
 
                 const double theta = r >= 0
                 ? std::atan2 (dp.x(), r - dp.y())
@@ -54,7 +54,7 @@ namespace planar_robot {
             
             const double v = control(0), w = control(1), g = control(2), r = v/w;
 
-            if (boost::math::isfinite(r)) {
+            if (std::isfinite(r)) {
                 return pose::cartesian (r*std::sin(w), r-r*std::cos(w), w+g);
             }
             else {

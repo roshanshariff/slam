@@ -13,8 +13,8 @@
 #include <string>
 #include <cstddef>
 #include <utility>
+#include <functional>
 
-#include <boost/function.hpp>
 #include <boost/circular_buffer.hpp>
 
 #include "slam/interfaces.hpp"
@@ -25,7 +25,7 @@ class time_series_plotter : public slam::timestep_listener {
     
 public:
     
-    using function_type = boost::function<float(slam::timestep_type)>;
+    using function_type = std::function<float(slam::timestep_type)>;
     
     struct data_source {
         

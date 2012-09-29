@@ -9,13 +9,12 @@
 #ifndef slam_particle_filter_hpp
 #define slam_particle_filter_hpp
 
+#include <vector>
 #include <cassert>
 #include <utility>
 #include <algorithm>
 #include <iterator>
-
-#include <boost/container/vector.hpp>
-#include <boost/math/special_functions/fpclassify.hpp>
+#include <cmath>
 
 #include "utility/random.hpp"
 
@@ -34,7 +33,7 @@ namespace slam {
             bool operator() (const particle& a, const particle& b) const { return a.weight > b.weight; }
         };
         
-        boost::container::vector<particle> particles;
+        std::vector<particle> particles;
         const particle* max_weight;
         
         double weight_sum;
@@ -77,7 +76,7 @@ void slam::particle_filter<Particle>::update (Updater f) {
     
     for (auto& particle : particles) {
         particle.weight *= f (static_cast<Particle&>(particle));
-        if (!boost::math::isfinite(particle.weight) || particle.weight < 0) particle.weight = 0;
+        if (!std::isfinite(particle.weight) || particle.weight < 0) particle.weight = 0;
         weight_sum += particle.weight;
         squared_weight_sum += particle.weight * particle.weight;
         if (compare_particle_weight()(particle, *max_weight)) max_weight = &particle;
@@ -89,7 +88,7 @@ void slam::particle_filter<Particle>::resample (random_source& random, size_t ne
     
     std::sort (particles.begin(), particles.end(), compare_particle_weight());
     
-    boost::container::vector<particle> new_particles;
+    std::vector<particle> new_particles;
     new_particles.reserve (new_size);
     
     const double offset = random.uniform();

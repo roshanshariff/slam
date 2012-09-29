@@ -13,9 +13,6 @@
 #include <cmath>
 #include <utility>
 
-#include <boost/shared_ptr.hpp>
-#include <boost/make_shared.hpp>
-
 #include "utility/container_fwd.hpp"
 
 namespace slam {
