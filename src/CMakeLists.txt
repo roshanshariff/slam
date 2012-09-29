@@ -31,4 +31,4 @@ target_link_libraries (slam ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIBRARY} ${G2O_SOLVE
 set (CMAKE_BUILD_TYPE Release)
 
 add_definitions ("-std=c++0x -Wall -Wextra -Werror -Wno-unused-parameter")
-#add_definitions ("-std=c++0x -Wall -Werror -Wno-c++11-narrowing")
+#add_definitions ("-std=c++0x -stdlib=libc++ -Wall -Werror -Wno-c++11-narrowing")

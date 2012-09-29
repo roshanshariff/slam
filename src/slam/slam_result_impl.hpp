@@ -28,18 +28,14 @@ namespace slam {
         
         slam_result_impl () = default;
         
-        slam_result_impl (const slam_result_type& o)
+        explicit slam_result_impl (const slam_result_type& o)
         : m_trajectory (o.get_trajectory()), m_map (o.get_feature_map()) { }
-        
-//        slam_result_impl (slam_result_impl&&) = default;
         
         auto operator= (const slam_result_type& o) -> slam_result_impl& {
             m_trajectory = o.get_trajectory();
             m_map = o.get_feature_map();
             return *this;
         }
-        
-//        auto operator= (slam_result_impl&&) -> slam_result_impl& = default;
         
         virtual void timestep (timestep_type t) override {
             assert (t <= current_timestep());

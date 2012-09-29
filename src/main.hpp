@@ -11,9 +11,9 @@
 
 namespace planar_robot {
     class waypoint_controller;
-    class range_bearing_model;
-    class range_only_model;
-    class velocity_model;
+    struct range_bearing_model;
+    struct range_only_model;
+    struct velocity_model;
     template <class ObservationModel> class landmark_sensor;
 }
 
