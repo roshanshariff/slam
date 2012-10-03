@@ -28,7 +28,7 @@ find_package (G2O REQUIRED)
 include_directories (${G2O_INCLUDE_DIR})
 target_link_libraries (slam ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIBRARY} ${G2O_SOLVER_CSPARSE} ${G2O_SOLVER_CSPARSE_EXTENSION})
 
-set (CMAKE_BUILD_TYPE Release)
+set (CMAKE_BUILD_TYPE Debug)
 
 add_definitions ("-std=c++0x -Wall -Wextra -Werror -Wno-unused-parameter")
 #add_definitions ("-std=c++0x -stdlib=libc++ -Wall -Werror -Wno-c++11-narrowing")

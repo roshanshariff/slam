@@ -6,6 +6,9 @@
 #include <cstdio>
 #include <memory>
 #include <random>
+#include <utility>
+#include <algorithm>
+#include <cctype>
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -28,19 +31,13 @@
 #include "main.hpp"
 
 
-namespace sim_types {
-    
-    typedef simulator<controller_type, sensor_type> simulator_type;
-    
-    typedef slam::mcmc_slam<control_model_type, observation_model_type> mcmc_slam_type;
-    typedef slam::multi_mcmc<control_model_type, observation_model_type> multi_mcmc_type;
-//    typedef slam::fastslam<control_model_type, observation_model_type> fastslam_type;
-//    typedef slam::fastslam_mcmc<control_model_type, observation_model_type> fastslam_mcmc_type;
-    typedef slam::g2o_slam<control_model_type, observation_model_type> g2o_slam_type;
-    typedef slam::g2o_clustering<control_model_type, observation_model_type> g2o_clustering_type;
-    
-};
-
+using simulator_type = simulator<controller_type, sensor_type>;
+using mcmc_slam_type = slam::mcmc_slam<control_model_type, observation_model_type>;
+using multi_mcmc_type = slam::multi_mcmc<control_model_type, observation_model_type>;
+//using fastslam_type = slam::fastslam<control_model_type, observation_model_type>;
+//using fastslam_mcmc_type = slam::fastslam_mcmc<control_model_type, observation_model_type>;
+using g2o_slam_type = slam::g2o_slam<control_model_type, observation_model_type>;
+using g2o_clustering_type = slam::g2o_clustering<control_model_type, observation_model_type>;
 
 boost::program_options::variables_map parse_options (int argc, char* argv[]);
 
@@ -62,45 +59,45 @@ int main (int argc, char* argv[]) {
     unsigned int g2o_seed = random();
     /*unsigned int fastslam_seed =*/ random();
     
-    std::shared_ptr<sim_types::simulator_type> sim
-    = std::make_shared<sim_types::simulator_type> (options, sim_seed);
+    std::shared_ptr<simulator_type> sim
+    = std::make_shared<simulator_type> (options, sim_seed);
     
-    std::shared_ptr<sim_types::mcmc_slam_type> mcmc_slam;
+    std::shared_ptr<mcmc_slam_type> mcmc_slam;
     if (options.count ("mcmc-slam")) {
-        mcmc_slam = std::make_shared<sim_types::mcmc_slam_type> (sim->get_slam_data(),
+        mcmc_slam = std::make_shared<mcmc_slam_type> (sim->get_slam_data(),
                                                                  options, mcmc_slam_seed);
         sim->add_timestep_listener (mcmc_slam);
     }
     
-    std::shared_ptr<sim_types::multi_mcmc_type> multi_mcmc;
+    std::shared_ptr<multi_mcmc_type> multi_mcmc;
     if (options.count ("multi-mcmc")) {
-        multi_mcmc = std::make_shared<sim_types::multi_mcmc_type> (sim->get_slam_data(),
+        multi_mcmc = std::make_shared<multi_mcmc_type> (sim->get_slam_data(),
                                                                    options, multi_mcmc_seed);
         sim->add_timestep_listener (multi_mcmc);
     }
     
-//    std::shared_ptr<sim_types::fastslam_type> fastslam;
+//    std::shared_ptr<fastslam_type> fastslam;
 //    if (options.count ("fastslam")) {
-//        fastslam = std::make_shared<sim_types::fastslam_type> (options, fastslam_seed);
+//        fastslam = std::make_shared<fastslam_type> (options, fastslam_seed);
 //        sim->add_data_listener (fastslam);
 //        
 //        if (mcmc_slam && options.count("mcmc-init")) mcmc_slam->set_initialiser (fastslam);
 //    }
     
-//    std::shared_ptr<sim_types::fastslam_mcmc_type> fastslam_mcmc;
-//    fastslam_mcmc = std::make_shared<sim_types::fastslam_mcmc_type> (options);
+//    std::shared_ptr<fastslam_mcmc_type> fastslam_mcmc;
+//    fastslam_mcmc = std::make_shared<fastslam_mcmc_type> (options);
 //    fastslam_mcmc->set_fastslam(fastslam);
 //    fastslam_mcmc->set_mcmc_slam(mcmc_slam);
 //    sim->add_timestep_listener(fastslam_mcmc);
     
-    std::shared_ptr<sim_types::g2o_slam_type> g2o_slam;
+    std::shared_ptr<g2o_slam_type> g2o_slam;
     if (options.count ("g2o")) {
-        g2o_slam = std::make_shared<sim_types::g2o_slam_type> (options, g2o_seed);
+        g2o_slam = std::make_shared<g2o_slam_type> (options, g2o_seed);
         sim->add_data_listener (g2o_slam);
     }
     
-    std::shared_ptr<sim_types::g2o_clustering_type> g2o_clustering;
-    g2o_clustering = std::make_shared<sim_types::g2o_clustering_type>(sim->get_slam_data());
+    std::shared_ptr<g2o_clustering_type> g2o_clustering;
+    g2o_clustering = std::make_shared<g2o_clustering_type>(sim->get_slam_data());
     sim->add_data_listener (g2o_clustering);
     
     std::shared_ptr<slam_plotter> slam_plot;
@@ -155,7 +152,7 @@ int main (int argc, char* argv[]) {
 //                return slam::slam_log_likelihood (*sim->get_slam_data(), *fastslam) - sim->get_log_likelihood();
 //            }, "FastSLAM log likelihood", "lc rgbcolor 'blue' lw 5");
 //            
-//            likelihood_plot->add_data_source (std::bind (&sim_types::fastslam_type::effective_particle_ratio,
+//            likelihood_plot->add_data_source (std::bind (&fastslam_type::effective_particle_ratio,
 //                                                         fastslam),
 //                                              "FastSLAM effective particles", "lc rgbcolor 'red' lw 5", true);
 //        }
@@ -242,15 +239,6 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     po::options_description command_line_options ("Command Line Options");
     command_line_options.add_options()
     ("help,h", "usage information")
-    ("simulator-help", "simulator options")
-    ("controller-help", "controller options")
-    ("sensor-help", "sensor options")
-    ("mcmc-slam-help", "MCMC-SLAM options")
-    ("multi-mcmc-help", "Multi MCMC options")
-    ("fastslam-help", "FastSLAM 2.0 options")
-    ("fastslam-mcmc-help", "FastSLAM-MCMC options")
-    ("g2o-slam-help", "G2O-SLAM options")
-    ("slam-plot-help", "SLAM plotting options")
     ("config-file,f", po::value<std::vector<std::string> >()->composing(), "configuration files");
     
     po::options_description general_options ("General Options");
@@ -267,21 +255,33 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     ("plot-stats", "produce plots of various summary statistics")
     ("seed", po::value<unsigned int>(), "seed for global random number generator");
     
-    po::options_description simulator_options = sim_types::simulator_type::program_options();
-    po::options_description controller_options = controller_type::program_options();
-    po::options_description sensor_options = sensor_type::program_options();
-    po::options_description mcmc_slam_options = sim_types::mcmc_slam_type::program_options();
-    po::options_description multi_mcmc_options = sim_types::multi_mcmc_type::program_options();
-//    po::options_description fastslam_options = sim_types::fastslam_type::program_options();
-//    po::options_description fastslam_mcmc_options = sim_types::fastslam_mcmc_type::program_options();
-    po::options_description g2o_slam_options = sim_types::g2o_slam_type::program_options();
-    po::options_description slam_plot_options = slam_plotter::program_options();
+    const std::vector<std::pair<std::string, po::options_description>> module_options {
+        { "Simulator", simulator_type::program_options() },
+        { "Controller", controller_type::program_options() },
+        { "Sensor", sensor_type::program_options() },
+        { "MCMC-SLAM", mcmc_slam_type::program_options() },
+        { "Multi-MCMC", multi_mcmc_type::program_options() },
+        { "G2O-SLAM", g2o_slam_type::program_options() },
+//        { "FastSLAM", fastslam_type::program_options() },
+//        { "FastSLAM-MCMC", fastslam_mcmc_type::program_options() },
+        { "SLAM plot", slam_plotter::program_options() }
+    };
+    
+    auto module_option_desc = [](const std::string& name) -> std::pair<std::string, std::string> {
+        std::string option_help (name);
+        std::replace (option_help.begin(), option_help.end(), ' ', '-');
+        std::transform (option_help.begin(), option_help.end(), option_help.begin(), (int (*)(int))std::tolower);
+        return { option_help+"-help", name+" options" };
+    };
     
     po::options_description config_options;
-    config_options
-    .add(general_options).add(simulator_options).add(controller_options).add(sensor_options)
-    .add(mcmc_slam_options).add(multi_mcmc_options)/*.add(fastslam_options).add(fastslam_mcmc_options)*/
-    .add(g2o_slam_options).add(slam_plot_options);
+    config_options.add(general_options);
+    
+    for (const auto& module : module_options) {
+        const auto& option_desc = module_option_desc (module.first);
+        command_line_options.add_options()(option_desc.first.c_str(), option_desc.second.c_str());
+        config_options.add (module.second);
+    }
     
     po::options_description all_options;
     all_options.add(command_line_options).add(config_options);
@@ -298,49 +298,11 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
         help_requested = true;
     }
     
-    if (values.count("simulator-help")) {
-        help_options.add(simulator_options);
-        help_requested = true;
-    }
-    
-    if (values.count("controller-help")) {
-        help_options.add(controller_options);
-        help_requested = true;
-    }
-    
-    if (values.count("sensor-help")) {
-        help_options.add(sensor_options);
-        help_requested = true;
-    }
-    
-    if (values.count("mcmc-slam-help")) {
-        help_options.add(mcmc_slam_options);
-        help_requested = true;
-    }
-    
-    if (values.count("multi-mcmc-help")) {
-        help_options.add(multi_mcmc_options);
-        help_requested = true;
-    }
-    
-//    if (values.count("fastslam-help")) {
-//        help_options.add(fastslam_options);
-//        help_requested = true;
-//    }
-//    
-//    if (values.count("fastslam-mcmc-help")) {
-//        help_options.add(fastslam_mcmc_options);
-//        help_requested = true;
-//    }
-    
-    if (values.count("g2o-slam-help")) {
-        help_options.add(g2o_slam_options);
-        help_requested = true;
-    }
-    
-    if (values.count("slam-plot-help")) {
-        help_options.add(slam_plot_options);
-        help_requested = true;
+    for (const auto& module : module_options) {
+        if (values.count (module_option_desc (module.first).first)) {
+            help_options.add (module.second);
+            help_requested = true;
+        }
     }
     
     if (help_requested) {

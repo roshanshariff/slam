@@ -83,7 +83,7 @@ namespace planar_robot {
         
         using associated_type = position;
         
-        range_only_model () = default;
+        range_only_model () { };
         
         range_only_model (const vector_type& mean, const vector_type& stddev) : base_type(mean, stddev) { }
         
@@ -99,11 +99,11 @@ namespace planar_robot {
         
         class builder : public std::unary_function<vector_type, range_only_model> {
             
-            const vector_type stddev;
+            vector_type stddev;
             
         public:
             
-            builder (double range_stddev) : stddev(range_stddev) { }
+            builder (double range_stddev) { stddev(0) = range_stddev; }
             
             builder (const boost::program_options::variables_map&);
             
@@ -126,7 +126,8 @@ namespace planar_robot {
             using result_type = associated_type;
             
             auto operator() (random_source& random) const -> result_type {
-                return position::polar (model(random)(0), random.uniform()*2*boost::math::constants::pi<double>());
+                using namespace boost::math::constants;
+                return position::polar (model(random)(0), random.uniform()*2*pi<double>());
             }
             
             auto likelihood (const result_type& x) const -> double {

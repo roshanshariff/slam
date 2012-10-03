@@ -69,7 +69,7 @@ namespace slam {
         
     public:
         
-        slam_data () = default;
+        slam_data () { }
         
         /** Noncopyable */
         slam_data (const slam_data&) = delete;

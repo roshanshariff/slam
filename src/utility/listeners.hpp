@@ -22,26 +22,6 @@ namespace utility {
         
         mutable std::vector<std::weak_ptr<Listener>> weak_ptrs;
         
-        template <class Functor>
-        class invoke_or_remove {
-            
-            Functor& f;
-            
-        public:
-            
-            invoke_or_remove (Functor& f) : f(f) { }
-            
-            bool operator() (const std::weak_ptr<Listener>& weak_ptr) {
-                if (auto listener = weak_ptr.lock()) {
-                    f (listener.get());
-                    return false;
-                }
-                else {
-                    return true;
-                }
-            }
-        };
-        
     public:
         
         void add (const std::shared_ptr<Listener>& l) { weak_ptrs.push_back (l); }
@@ -53,8 +33,18 @@ namespace utility {
     
     template <class Listener> template <class Functor>
     void listeners<Listener>::for_each (Functor f) const {
+        
+        auto invoke_or_remove = [&f](const std::weak_ptr<Listener>& weak_ptr) -> bool {
+            if (auto listener = weak_ptr.lock()) {
+                f (listener.get());
+                return false;
+            }
+            else {
+                return true;
+            }
+        };
 
-        weak_ptrs.erase (std::remove_if (weak_ptrs.begin(), weak_ptrs.end(), invoke_or_remove<Functor>(f)),
+        weak_ptrs.erase (std::remove_if (weak_ptrs.begin(), weak_ptrs.end(), invoke_or_remove),
                          weak_ptrs.end());
     }
 

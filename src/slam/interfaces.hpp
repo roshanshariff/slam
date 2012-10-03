@@ -66,8 +66,11 @@ namespace slam {
     template <class State, class Feature>
     struct slam_result : public data_source {
         
-        using trajectory_type = utility::bitree<State>;
-        using feature_map_type = utility::flat_map<featureid_type, Feature>;
+        using state_type = State;
+        using feature_type = Feature;
+        
+        using trajectory_type = utility::bitree<state_type>;
+        using feature_map_type = utility::flat_map<featureid_type, feature_type>;
         
         virtual State get_state (timestep_type) const = 0;
         virtual Feature get_feature (featureid_type) const = 0;

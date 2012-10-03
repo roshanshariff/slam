@@ -37,14 +37,17 @@ namespace slam {
         
         friend class fastslam_mcmc<ControlModel, ObservationModel>;
 
+        using slam_result_type = slam_result_of<ControlModel, ObservationModel>;
         using slam_data_type = slam_data<ControlModel, ObservationModel>;
         
         /** The types of labels for state and feature edges, respectively. State edge labels must
          form a group, with the binary + operator and unary - to form inverses. Additionally, this
          group must act on feature_type by the operation state + feature. */
 
-        using state_type = typename ControlModel::associated_type;
-        using feature_type = typename ObservationModel::associated_type;
+        using state_type = typename slam_result_type::state_type;
+        using feature_type = typename slam_result_type::feature_type;
+        using trajectory_type = typename slam_result_type::trajectory_type;
+        using feature_map_type = typename slam_result_type::feature_map_type;
         
         /** For each observed feature, store a pointer to the feature's observations, the time
          step relative to which the feature estimate is stored, and the estimate itself. */
@@ -112,11 +115,11 @@ namespace slam {
         /** Private data members */
         
         const std::shared_ptr<const slam_data_type> data;
-        std::shared_ptr<slam_result<state_type, feature_type>> initialiser;
+        std::shared_ptr<slam_result_type> initialiser;
         
         random_source random;
         
-        utility::bitree<state_type> state_estimates;
+        trajectory_type state_estimates;
         utility::bitree<double> state_weights;
         
         std::vector<feature_estimate> feature_estimates;
@@ -126,11 +129,8 @@ namespace slam {
         std::map<featureid_type, std::size_t> feature_index;
         
         // Cache of map estimate in the form required by get_feature_map()
-        mutable utility::flat_map<featureid_type, feature_type> map_estimate;
+        mutable feature_map_type map_estimate;
 
-        const double state_dim, feature_dim;
-        //unsigned int mcmc_updates_per_edge = 1;
-        
         // The next value expected by timestep
         timestep_type next_timestep;
         
@@ -156,16 +156,16 @@ namespace slam {
             return initialiser && (initialiser->timestep(t), true);
         }
                 
-        double edge_log_weight (double edge_log_likelihood, double edge_dim) const {
+        double edge_log_weight_impl (double edge_log_likelihood, double edge_dim) const {
             return std::log(edge_dim) - edge_log_likelihood/edge_dim;
         }
         
-        double edge_log_weight (double edge_log_likelihood, const state_edge&) {
-            return edge_log_weight (edge_log_likelihood, state_dim);
+        double edge_log_weight (double edge_log_likelihood, const state_type&) {
+            return edge_log_weight_impl (edge_log_likelihood, state_type::vector_dim);
         }
         
-        double edge_log_weight (double edge_log_likelihood, const feature_edge&) {
-            return edge_log_weight (edge_log_likelihood, feature_dim);
+        double edge_log_weight (double edge_log_likelihood, const feature_type&) {
+            return edge_log_weight_impl (edge_log_likelihood, feature_type::vector_dim);
         }
         
     public:
@@ -201,11 +201,11 @@ namespace slam {
             return get_state(f.parent_timestep()) + f.estimate();
         }
         
-        virtual const decltype(state_estimates)& get_trajectory () const override {
+        virtual const trajectory_type& get_trajectory () const override {
             return state_estimates;
         }
         
-        virtual const decltype(map_estimate)& get_feature_map () const override;
+        virtual const feature_map_type& get_feature_map () const override;
         
     };
     
@@ -224,8 +224,9 @@ void slam::mcmc_slam<ControlModel, ObservationModel>
     : proposal.initial_value (random);
     
     state_estimates.push_back (estimate);
-    state_weights.push_back (std::exp (edge_log_weight (proposal.log_likelihood (estimate), state_dim)));
+    state_weights.push_back (std::exp (edge_log_weight (proposal.log_likelihood (estimate), estimate)));
     log_likelihood += control.log_likelihood (ControlModel::observe (estimate));
+    assert (std::isfinite (log_likelihood));
     
     assert (state_estimates.size() == state_weights.size());
 }
@@ -243,8 +244,9 @@ void slam::mcmc_slam<ControlModel, ObservationModel>
     : proposal.initial_value (random);
     
     feature_estimates.emplace_back (obs.iterator(), current_timestep(), estimate);
-    feature_weights.push_back (std::exp (edge_log_weight (proposal.log_likelihood (estimate), feature_dim)));
+    feature_weights.push_back (std::exp (edge_log_weight (proposal.log_likelihood (estimate), estimate)));
     log_likelihood += observation.log_likelihood (ObservationModel::observe (estimate));
+    assert (std::isfinite (log_likelihood));
     
     assert (feature_estimates.size() == feature_weights.size());
 }
@@ -264,18 +266,19 @@ void slam::mcmc_slam<ControlModel, ObservationModel>
         
         for (auto range = data->observations_at(next_timestep); range.first != range.second; ++range.first) {
             
-            const auto& obs = range.first->second;
+            const auto& obs_info = range.first->second;
             // TODO: use emplace when C++11 standard library is available
-            auto insertion = feature_index.insert (std::make_pair(obs.id(), feature_estimates.size()));
+            auto insertion = feature_index.insert (std::make_pair (obs_info.id(), feature_estimates.size()));
             
             if (insertion.second) {
-                add_feature_edge (obs);
+                add_feature_edge (obs_info);
                 map_estimate.clear();
             }
             else {
                 const feature_estimate& f = feature_estimates[insertion.first->second];
                 const feature_type estimate = state_estimates.accumulate(next_timestep, f.parent_timestep()) + f.estimate();
-                log_likelihood += obs.observation().log_likelihood (ObservationModel::observe (estimate));
+                log_likelihood += obs_info.observation().log_likelihood (ObservationModel::observe (estimate));
+                assert (std::isfinite (log_likelihood));
             }
         }
         
@@ -339,7 +342,7 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
     const double log_ratio = edge_log_likelihood_ratio (edge, proposed);
     assert (std::isfinite (log_ratio));
     
-    const double new_log_weight = edge_log_weight (new_proposal_log_likelihood, edge);
+    const double new_log_weight = edge_log_weight (new_proposal_log_likelihood, proposed);
     const double new_weight = std::exp (new_log_weight);
     assert (std::isfinite (new_weight));
     
@@ -347,7 +350,7 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
     double accept_log_ratio = log_ratio - proposal_log_ratio;
     
     if (use_edge_weight) {
-        const double old_log_weight = edge_log_weight (old_proposal_log_likelihood, edge);
+        const double old_log_weight = edge_log_weight (old_proposal_log_likelihood, edge.estimate);
         const double old_weight = std::exp (old_log_weight);
         const double weight_sum = state_weights.accumulate() + feature_weights.accumulate();
         normaliser += (new_weight - old_weight)/weight_sum;
@@ -448,7 +451,7 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
 
 template <class ControlModel, class ObservationModel>
 auto slam::mcmc_slam<ControlModel, ObservationModel>
-:: get_feature_map () const -> const decltype(map_estimate)& {
+:: get_feature_map () const -> const feature_map_type& {
     
     if (map_estimate.size() != feature_estimates.size()) {
         
@@ -473,9 +476,6 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
     namespace po = boost::program_options;
     po::options_description options ("MCMC-SLAM Parameters");
     options.add_options()
-//    ("mcmc-steps", po::value<unsigned int>()->default_value(1), "MCMC iterations per simulation step")
-    ("control-edge-importance", po::value<double>()->default_value(ControlModel::vector_dim), "degrees of freedom for control edges")
-    ("observation-edge-importance", po::value<double>()->default_value(ObservationModel::vector_dim), "degrees of freedom for observation edges")
     ("mcmc-slam-seed", po::value<unsigned int>(), "MCMC-SLAM random seed");
     return options;
 }
@@ -488,9 +488,7 @@ slam::mcmc_slam<ControlModel, ObservationModel>
              boost::program_options::variables_map& options, unsigned int seed)
 : data      (data),
 //random      (remember_option (options, "mcmc-slam-seed", seed)),
-random      (seed),
-state_dim   (options["control-edge-importance"].as<double>()),
-feature_dim (options["observation-edge-importance"].as<double>())
+random      (seed)
 {
 //    mcmc_updates_per_step = options["mcmc-steps"].as<unsigned int>();
 }
