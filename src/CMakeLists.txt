@@ -1,11 +1,13 @@
 cmake_minimum_required (VERSION 2.8)
 project (slam CXX)
 
-set (SLAM_SRCS main.cpp planar_robot/waypoint_controller.cpp planar_robot/landmark_sensor.cpp
-    planar_robot/range_bearing_model.cpp planar_robot/rms_error.cpp simulator/simulator.cpp
-    simulator/gnuplot_process.cpp simulator/slam_plotter.cpp simulator/time_series_plotter.cpp
-    slam/slam_data.cpp slam/mcmc_slam.cpp #slam/fastslam.cpp slam/fastslam_mcmc.cpp
-    slam/multi_mcmc.cpp slam/g2o_slam.cpp utility/utility.cpp utility/cowtree.cpp)
+set (SLAM_SRCS planar_robot/waypoint_controller.cpp planar_robot/landmark_sensor.cpp
+    planar_robot/velocity_model.cpp planar_robot/range_bearing_model.cpp
+    planar_robot/rms_error.cpp simulator/simulator.cpp simulator/gnuplot_process.cpp
+    simulator/slam_plotter.cpp simulator/time_series_plotter.cpp slam/slam_data.cpp
+    slam/mcmc_slam.cpp slam/multi_mcmc.cpp slam/g2o_slam.cpp slam/g2o_clustering.cpp
+    #slam/fastslam.cpp slam/fastslam_mcmc.cpp
+    utility/utility.cpp utility/cowtree.cpp main.cpp)
 
 add_executable (slam ${SLAM_SRCS})
 
@@ -28,7 +30,7 @@ find_package (G2O REQUIRED)
 include_directories (${G2O_INCLUDE_DIR})
 target_link_libraries (slam ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIBRARY} ${G2O_SOLVER_CSPARSE} ${G2O_SOLVER_CSPARSE_EXTENSION})
 
-set (CMAKE_BUILD_TYPE Debug)
+set (CMAKE_BUILD_TYPE Release)
 
 add_definitions ("-std=c++0x -Wall -Wextra -Werror -Wno-unused-parameter")
 #add_definitions ("-std=c++0x -stdlib=libc++ -Wall -Werror -Wno-c++11-narrowing")
