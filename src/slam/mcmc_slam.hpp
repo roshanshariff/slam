@@ -156,24 +156,16 @@ namespace slam {
             return initialiser && (initialiser->timestep(t), true);
         }
                 
-        double edge_log_weight_impl (double edge_log_likelihood, double edge_dim) const {
+        static double edge_log_weight (double edge_log_likelihood, double edge_dim) {
             return std::log(edge_dim) - edge_log_likelihood/edge_dim;
-        }
-        
-        double edge_log_weight (double edge_log_likelihood, const state_type&) {
-            return edge_log_weight_impl (edge_log_likelihood, state_type::vector_dim);
-        }
-        
-        double edge_log_weight (double edge_log_likelihood, const feature_type&) {
-            return edge_log_weight_impl (edge_log_likelihood, feature_type::vector_dim);
         }
         
     public:
         
+        mcmc_slam (const decltype(data)& data, unsigned int seed) : data(data), random(seed) { }
+        
         mcmc_slam (const mcmc_slam&) = delete;
         mcmc_slam& operator= (const mcmc_slam&) = delete;
-        
-        mcmc_slam (std::shared_ptr<const slam_data_type>, boost::program_options::variables_map& options, unsigned int seed);
         
         static boost::program_options::options_description program_options ();
         
@@ -207,6 +199,29 @@ namespace slam {
         
         virtual const feature_map_type& get_feature_map () const override;
         
+        class updater : public timestep_listener {
+            
+            std::shared_ptr<mcmc_slam> instance;
+            unsigned int steps, end_steps;
+            
+        public:
+            
+            updater (const decltype(instance)& instance, unsigned int steps = 0, unsigned int end_steps = 0)
+            : instance(instance), steps(steps), end_steps(end_steps) { }
+            
+            updater (const decltype(instance)&, const boost::program_options::variables_map&);
+            
+            virtual void timestep (timestep_type t) override {
+                instance->timestep (t);
+                for (unsigned int i = 0; i < steps; ++i) instance->update();
+            }
+            
+            virtual void completed () override {
+                instance->completed();
+                for (unsigned int i = 0; i < end_steps; ++i) instance->update();
+            }
+        };
+        
     };
     
 } // namespace slam
@@ -224,7 +239,7 @@ void slam::mcmc_slam<ControlModel, ObservationModel>
     : proposal.initial_value (random);
     
     state_estimates.push_back (estimate);
-    state_weights.push_back (std::exp (edge_log_weight (proposal.log_likelihood (estimate), estimate)));
+    state_weights.push_back (std::exp (edge_log_weight (proposal.log_likelihood (estimate), proposal.vector_dim)));
     log_likelihood += control.log_likelihood (ControlModel::observe (estimate));
     assert (std::isfinite (log_likelihood));
     
@@ -244,7 +259,7 @@ void slam::mcmc_slam<ControlModel, ObservationModel>
     : proposal.initial_value (random);
     
     feature_estimates.emplace_back (obs.iterator(), current_timestep(), estimate);
-    feature_weights.push_back (std::exp (edge_log_weight (proposal.log_likelihood (estimate), estimate)));
+    feature_weights.push_back (std::exp (edge_log_weight (proposal.log_likelihood (estimate), proposal.vector_dim)));
     log_likelihood += observation.log_likelihood (ObservationModel::observe (estimate));
     assert (std::isfinite (log_likelihood));
     
@@ -342,7 +357,7 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
     const double log_ratio = edge_log_likelihood_ratio (edge, proposed);
     assert (std::isfinite (log_ratio));
     
-    const double new_log_weight = edge_log_weight (new_proposal_log_likelihood, proposed);
+    const double new_log_weight = edge_log_weight (new_proposal_log_likelihood, proposal.vector_dim);
     const double new_weight = std::exp (new_log_weight);
     assert (std::isfinite (new_weight));
     
@@ -350,7 +365,7 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
     double accept_log_ratio = log_ratio - proposal_log_ratio;
     
     if (use_edge_weight) {
-        const double old_log_weight = edge_log_weight (old_proposal_log_likelihood, edge.estimate);
+        const double old_log_weight = edge_log_weight (old_proposal_log_likelihood, proposal.vector_dim);
         const double old_weight = std::exp (old_log_weight);
         const double weight_sum = state_weights.accumulate() + feature_weights.accumulate();
         normaliser += (new_weight - old_weight)/weight_sum;
@@ -431,8 +446,6 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
     
     for (Iter iter = begin; iter != end; ++iter) {
         
-//        if (iter->first == feature.parent_timestep()) continue;
-        
         const state_type state_change = state_estimates.accumulate (iter->first, obs_timestep);
         new_obs = state_change + new_obs;
         old_obs = state_change + old_obs;
@@ -476,22 +489,18 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
     namespace po = boost::program_options;
     po::options_description options ("MCMC-SLAM Parameters");
     options.add_options()
-    ("mcmc-slam-seed", po::value<unsigned int>(), "MCMC-SLAM random seed");
+    ("mcmc-slam-seed", po::value<unsigned int>(), "MCMC-SLAM random seed")
+    ("mcmc-steps", po::value<unsigned int>()->default_value(0), "MCMC steps per time step")
+    ("mcmc-end-steps", po::value<unsigned int>()->default_value(0), "MCMC steps after simulation");
     return options;
 }
 
-// TODO Rethink the seed initialisation to avoid problem where the first MCMC-SLAM instance remembers
-// its seed and all the rest use the same one.
+
 template <class ControlModel, class ObservationModel>
-slam::mcmc_slam<ControlModel, ObservationModel>
-::mcmc_slam (std::shared_ptr<const slam_data<ControlModel, ObservationModel>> data,
-             boost::program_options::variables_map& options, unsigned int seed)
-: data      (data),
-//random      (remember_option (options, "mcmc-slam-seed", seed)),
-random      (seed)
-{
-//    mcmc_updates_per_step = options["mcmc-steps"].as<unsigned int>();
-}
+slam::mcmc_slam<ControlModel, ObservationModel>::updater
+::updater (const decltype(instance)& instance, const boost::program_options::variables_map& options)
+: updater (instance, options["mcmc-steps"].as<unsigned int>(), options["mcmc-end-steps"].as<unsigned int>())
+{ }
 
 
 extern template class slam::mcmc_slam<control_model_type, observation_model_type>;

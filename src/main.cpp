@@ -63,11 +63,13 @@ int main (int argc, char* argv[]) {
     sim->add_data_listener (init);
     
     std::shared_ptr<mcmc_slam_type> mcmc_slam;
+    std::shared_ptr<mcmc_slam_type::updater> mcmc_slam_updater;
     if (options.count ("mcmc-slam")) {
         mcmc_slam = std::make_shared<mcmc_slam_type> (sim->get_slam_data(), mcmc_slam_seed);
         mcmc_slam->set_initialiser (init);
         mcmc_slam_updater = std::make_shared<mcmc_slam_type::updater>(mcmc_slam, options);
         sim->add_timestep_listener (mcmc_slam);
+        sim->add_timestep_listener (mcmc_slam_updater);
     }
     
     std::shared_ptr<multi_mcmc_type> multi_mcmc;
@@ -92,9 +94,12 @@ int main (int argc, char* argv[]) {
 //    sim->add_timestep_listener(fastslam_mcmc);
     
     std::shared_ptr<g2o_slam_type> g2o_slam;
+    std::shared_ptr<g2o_slam_type::updater> g2o_slam_updater;
     if (options.count ("g2o")) {
-        g2o_slam = std::make_shared<g2o_slam_type> (options, g2o_seed);
+        g2o_slam = std::make_shared<g2o_slam_type> (init);
+        g2o_slam_updater = std::make_shared<g2o_slam_type::updater>(g2o_slam, options);
         sim->add_data_listener (g2o_slam);
+        sim->add_timestep_listener (g2o_slam_updater);
     }
     
     std::shared_ptr<g2o_clustering_type> g2o_clustering;

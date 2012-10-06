@@ -226,6 +226,31 @@ namespace slam {
         
         virtual const decltype(map_estimate)& get_feature_map () const override;
         
+        double objective_value () const { return optimizer.activeRobustChi2(); }
+        
+        class updater : public timestep_listener {
+            
+            std::shared_ptr<g2o_slam> instance;
+            unsigned int steps, end_steps;
+            
+        public:
+            
+            updater (const decltype(instance)& instance, unsigned int steps = 0, unsigned int end_steps = 0)
+            : instance(instance), steps(steps), end_steps(end_steps) { }
+            
+            updater (const decltype(instance)&, const boost::program_options::variables_map&);
+            
+            virtual void timestep (timestep_type t) override {
+                instance->timestep (t);
+                if (t > 0) instance->optimise (steps);
+            }
+            
+            virtual void completed () override {
+                instance->completed();
+                instance->optimise (end_steps);
+            }
+        };
+        
     };
     
 } // namespace slam
@@ -324,19 +349,8 @@ void slam::g2o_slam<ControlModel, ObservationModel>
 ::timestep (timestep_type t) {
     
     if (t < next_timestep) return;
-    assert (t == next_timestep);
-    
-    if (t > 0) optimise (g2o_steps);
-    
-    ++next_timestep;    
-}
-
-
-template <class ControlModel, class ObservationModel>
-void slam::g2o_slam<ControlModel, ObservationModel>
-::completed () {
-    
-    optimise (g2o_end_steps);
+    assert (t == next_timestep);    
+    ++next_timestep;
 }
 
 
