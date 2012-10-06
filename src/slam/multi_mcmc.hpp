@@ -155,8 +155,7 @@ auto slam::multi_mcmc<ControlModel, ObservationModel>
     po::options_description options ("Multi-MCMC Parameters");
     options.add_options()
     ("multi-mcmc-chains", po::value<unsigned int>()->default_value(100), "Number of MCMC chains")
-    ("multi-mcmc-end-steps", po::value<unsigned int>()->default_value(0), "MCMC iterations after simulation")
-    ("multi-mcmc-seed", po::value<unsigned int>(), "MCMC-SLAM random seed");
+    ("multi-mcmc-end-steps", po::value<unsigned int>()->default_value(0), "MCMC iterations after simulation");
     return options;
 }
 
@@ -168,11 +167,11 @@ slam::multi_mcmc<ControlModel, ObservationModel>
 : mcmc_end_steps (options["multi-mcmc-end-steps"].as<unsigned int>())
 {
 
-    const unsigned int num_mcmc_chains = options["multi-mcmc-chains"].as<unsigned int>();
-    random_source random (remember_option (options, "multi-mcmc-seed", seed));
+    random_source random (seed);
     
-    for (unsigned int i = 0; i < num_mcmc_chains; ++i) {
-        mcmc_chains.push_back (make_unique<mcmc_slam_type> (data, options, random()));
+    unsigned int num_mcmc_chains = options["multi-mcmc-chains"].as<unsigned int>();
+    while (num_mcmc_chains--) {
+        mcmc_chains.push_back (make_unique<mcmc_slam_type> (data, random()));
     }
     
     max_likelihood = mcmc_chains.front().get();
