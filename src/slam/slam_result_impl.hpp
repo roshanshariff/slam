@@ -26,7 +26,7 @@ namespace slam {
         
         using slam_result_type = slam_result<State, Feature>;
         
-        slam_result_impl () = default;
+        slam_result_impl () { };
         
         explicit slam_result_impl (const slam_result_type& o)
         : m_trajectory (o.get_trajectory()), m_map (o.get_feature_map()) { }
@@ -71,6 +71,10 @@ namespace slam {
         
     };
 
+    
+    template <class ControlModel, class ObsModel>
+    using slam_result_of_impl = slam_result_impl<typename ControlModel::associated_type, typename ObsModel::associated_type>;
+    
 }
 
 #endif
