@@ -91,8 +91,10 @@ int main (int argc, char* argv[]) {
     }
     
     std::shared_ptr<g2o_clustering_type> g2o_clustering;
-    g2o_clustering = std::make_shared<g2o_clustering_type>(sim->get_slam_data());
-    sim->add_data_listener (g2o_clustering);
+    if (options.count ("cluster")) {
+        g2o_clustering = std::make_shared<g2o_clustering_type>(sim->get_slam_data(), init);
+        sim->add_data_listener (g2o_clustering);
+    }
     
     std::shared_ptr<slam_plotter> slam_plot;
     if (options.count ("slam-plot")) {
@@ -226,7 +228,7 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     ("multi-mcmc", "enable Multi-MCMC-SLAM")
     ("fastslam", "enable FastSLAM 2.0")
     ("g2o", "enable offline SLAM using G2O")
-    ("mcmc-init", "initialise MCMC estimate from FastSLAM")
+    ("cluster", "try to cluster MCMC-SLAM results")
     ("slam-plot", "produce SLAM gnuplot output")
     ("plot-stats", "produce plots of various summary statistics")
     ("seed", po::value<unsigned int>(), "seed for global random number generator");
