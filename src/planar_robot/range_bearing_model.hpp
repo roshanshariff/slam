@@ -36,33 +36,16 @@ namespace planar_robot {
             return position::polar (obs(0), obs(1));
         }
         
-	class builder : public std::unary_function<vector_type, range_bearing_model> {
-            
-            const vector_type stddev;
-            
-	public:
-            
-            builder (double range_stddev, double bearing_stddev) : stddev(range_stddev, bearing_stddev) { }
-            
-            builder (const boost::program_options::variables_map&);
-            
-            static auto program_options () -> boost::program_options::options_description;
-            
-            auto operator() (const vector_type& observation) const -> range_bearing_model {
-                return range_bearing_model (observation, stddev);
-            }
-            
-	};
-        
         class proposal_dist {
             
             const range_bearing_model& model;
             
         public:
             
-            proposal_dist (const range_bearing_model& model) : model(model) { }
-            
             using result_type = associated_type;
+            static const int vector_dim = range_bearing_model::vector_dim;
+            
+            proposal_dist (const range_bearing_model& model) : model(model) { }
             
             auto operator() (random_source& random) const -> result_type { return inv_observe (model (random)); }
             auto likelihood (const result_type& x) const -> double { return model.likelihood (observe (x)); }
@@ -73,7 +56,23 @@ namespace planar_robot {
         auto proposal () const -> proposal_dist {
             return { *this };
         }
-
+        
+	class builder : public std::unary_function<vector_type, range_bearing_model> {
+            
+            const vector_type stddev;
+            
+	public:
+            
+            builder (double range_stddev, double bearing_stddev) : stddev(range_stddev, bearing_stddev) { }
+            builder (const boost::program_options::variables_map&);
+            
+            static auto program_options () -> boost::program_options::options_description;
+            
+            auto operator() (const vector_type& observation) const -> range_bearing_model {
+                return range_bearing_model (observation, stddev);
+            }
+	};
+        
     };
     
     
@@ -97,33 +96,16 @@ namespace planar_robot {
             return result;
         }
         
-        class builder : public std::unary_function<vector_type, range_only_model> {
-            
-            vector_type stddev;
-            
-        public:
-            
-            builder (double range_stddev) { stddev(0) = range_stddev; }
-            
-            builder (const boost::program_options::variables_map&);
-            
-            static auto program_options () -> boost::program_options::options_description;
-            
-            range_only_model operator() (const vector_type& observation) const {
-                return range_only_model (observation, stddev);
-            }
-            
-        };
-        
         class proposal_dist {
             
             const range_only_model& model;
             
         public:
             
-            proposal_dist (const range_only_model& model) : model(model) { }
-            
             using result_type = associated_type;
+            static const int vector_dim = range_only_model::vector_dim + 1;
+            
+            proposal_dist (const range_only_model& model) : model(model) { }
             
             auto operator() (random_source& random) const -> result_type {
                 using namespace boost::math::constants;
@@ -144,12 +126,28 @@ namespace planar_robot {
                 using namespace boost::math::constants;
                 return position::polar (model.mean()(0), random.uniform()*2*pi<double>());
             }
-            
         };
         
         auto proposal () const -> proposal_dist {
             return { *this };
         }
+        
+        class builder : public std::unary_function<vector_type, range_only_model> {
+            
+            vector_type stddev;
+            
+        public:
+            
+            builder (double range_stddev) { stddev(0) = range_stddev; }
+            
+            builder (const boost::program_options::variables_map&);
+            
+            static auto program_options () -> boost::program_options::options_description;
+            
+            range_only_model operator() (const vector_type& observation) const {
+                return range_only_model (observation, stddev);
+            }
+        };
         
     };
     

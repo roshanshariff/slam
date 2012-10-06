@@ -18,7 +18,6 @@
 #include "planar_robot/pose.hpp"
 #include "planar_robot/position.hpp"
 #include "planar_robot/range_bearing_model.hpp"
-#include "slam/vector_model.hpp"
 #include "slam/interfaces.hpp"
 #include "utility/random.hpp"
 
@@ -32,7 +31,7 @@ namespace planar_robot {
     public:
         
         using model_type = ObservationModel;
-        using model_builder_type = typename ObservationModel::builder;
+        using model_builder_type = typename model_type::builder;
         
         landmark_sensor (const boost::program_options::variables_map&);
         
@@ -46,12 +45,12 @@ namespace planar_robot {
         
     private:
         
+        model_builder_type model_builder;
+        
         double max_range, min_range;
         mutable unsigned long hits = 0;
         mutable double log_likelihood = 0;
         std::vector<position> landmarks;
-
-        model_builder_type model_builder;
 
     public:
         
@@ -61,6 +60,7 @@ namespace planar_robot {
     };
     
 }
+
 
 template <class ObservationModel>
 auto planar_robot::landmark_sensor<ObservationModel>
@@ -83,9 +83,9 @@ auto planar_robot::landmark_sensor<ObservationModel>
 template <class ObservationModel>
 planar_robot::landmark_sensor<ObservationModel>
 ::landmark_sensor (const boost::program_options::variables_map& options)
-: max_range (options["sensor-range-max"].as<double>()),
-min_range (options["sensor-range-min"].as<double>()),
-model_builder (options)
+: model_builder (options),
+max_range       (options["sensor-range-max"].as<double>()),
+min_range       (options["sensor-range-min"].as<double>())
 {
     if (options.count("landmark-file")) {
         double x, y;
