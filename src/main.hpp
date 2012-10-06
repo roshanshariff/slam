@@ -10,10 +10,11 @@
 #define slam_main_hpp
 
 namespace planar_robot {
-    class waypoint_controller;
     struct range_bearing_model;
     struct range_only_model;
+    struct velocity_slip_model;
     struct velocity_model;
+    template <class ControlModel> class waypoint_controller;
     template <class ObservationModel> class landmark_sensor;
 }
 
