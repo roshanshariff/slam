@@ -15,10 +15,11 @@
 #include <boost/timer/timer.hpp>
 
 #include "planar_robot/rms_error.hpp"
+#include "slam/interfaces.hpp"
+#include "slam/slam_result_impl.hpp"
+#include "slam/slam_initialiser.hpp"
 #include "slam/mcmc_slam.hpp"
 #include "slam/multi_mcmc.hpp"
-//#include "slam/fastslam.hpp"
-//#include "slam/fastslam_mcmc.hpp"
 #include "slam/g2o_slam.hpp"
 #include "slam/g2o_clustering.hpp"
 #include "slam/slam_likelihood.hpp"
@@ -30,12 +31,13 @@
 
 #include "main.hpp"
 
+using slam_result_type = slam::slam_result_of<control_model_type, observation_model_type>;
+using slam_result_impl_type = slam::slam_result_of_impl<control_model_type, observation_model_type>;
 
 using simulator_type = simulator<controller_type, sensor_type>;
+using slam_initialiser_type = slam::slam_initialiser<control_model_type, observation_model_type>;
 using mcmc_slam_type = slam::mcmc_slam<control_model_type, observation_model_type>;
 using multi_mcmc_type = slam::multi_mcmc<control_model_type, observation_model_type>;
-//using fastslam_type = slam::fastslam<control_model_type, observation_model_type>;
-//using fastslam_mcmc_type = slam::fastslam_mcmc<control_model_type, observation_model_type>;
 using g2o_slam_type = slam::g2o_slam<control_model_type, observation_model_type>;
 using g2o_clustering_type = slam::g2o_clustering<control_model_type, observation_model_type>;
 
@@ -79,20 +81,6 @@ int main (int argc, char* argv[]) {
         sim->add_timestep_listener (multi_mcmc);
     }
     
-//    std::shared_ptr<fastslam_type> fastslam;
-//    if (options.count ("fastslam")) {
-//        fastslam = std::make_shared<fastslam_type> (options, fastslam_seed);
-//        sim->add_data_listener (fastslam);
-//        
-//        if (mcmc_slam && options.count("mcmc-init")) mcmc_slam->set_initialiser (fastslam);
-//    }
-    
-//    std::shared_ptr<fastslam_mcmc_type> fastslam_mcmc;
-//    fastslam_mcmc = std::make_shared<fastslam_mcmc_type> (options);
-//    fastslam_mcmc->set_fastslam(fastslam);
-//    fastslam_mcmc->set_mcmc_slam(mcmc_slam);
-//    sim->add_timestep_listener(fastslam_mcmc);
-    
     std::shared_ptr<g2o_slam_type> g2o_slam;
     std::shared_ptr<g2o_slam_type::updater> g2o_slam_updater;
     if (options.count ("g2o")) {
@@ -115,13 +103,6 @@ int main (int argc, char* argv[]) {
                                     "lc rgbcolor 'black' pt 6 ps 1.5",
                                     "lc rgbcolor 'black' lw 5",
                                     "size 10,20,50 filled lc rgbcolor 'black'");
-        
-//        if (fastslam) {
-//            slam_plot->add_data_source (fastslam, false, "FastSLAM 2.0", "",
-//                                        "lc rgbcolor 'blue' pt 3 ps 1",
-//                                        "lc rgbcolor 'blue' lw 2",
-//                                        "size 10,20,50 filled lc rgbcolor 'blue'");
-//        }
         
         if (mcmc_slam) {
             slam_plot->add_data_source (mcmc_slam, false, "MCMC-SLAM", "",
@@ -151,17 +132,6 @@ int main (int argc, char* argv[]) {
                 return slam::slam_log_likelihood (*sim->get_slam_data(), *mcmc_slam) - sim->get_log_likelihood();
             }, "MCMC-SLAM log likelihood", "lc rgbcolor 'green' lw 5");
         }
-        
-//        if (fastslam) {
-//            
-//            likelihood_plot->add_data_source ([=](slam::timestep_type) {
-//                return slam::slam_log_likelihood (*sim->get_slam_data(), *fastslam) - sim->get_log_likelihood();
-//            }, "FastSLAM log likelihood", "lc rgbcolor 'blue' lw 5");
-//            
-//            likelihood_plot->add_data_source (std::bind (&fastslam_type::effective_particle_ratio,
-//                                                         fastslam),
-//                                              "FastSLAM effective particles", "lc rgbcolor 'red' lw 5", true);
-//        }
         
         sim->add_timestep_listener (likelihood_plot);
     }
@@ -268,8 +238,6 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
         { "MCMC-SLAM", mcmc_slam_type::program_options() },
         { "Multi-MCMC", multi_mcmc_type::program_options() },
         { "G2O-SLAM", g2o_slam_type::program_options() },
-//        { "FastSLAM", fastslam_type::program_options() },
-//        { "FastSLAM-MCMC", fastslam_mcmc_type::program_options() },
         { "SLAM plot", slam_plotter::program_options() }
     };
     
