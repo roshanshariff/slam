@@ -160,6 +160,7 @@ int main (int argc, char* argv[]) {
     }
     
     if (multi_mcmc) {
+        
         std::cout
         << "Multi-MCMC-SLAM Chains: "
         << multi_mcmc->num_chains() << '\n'
@@ -179,8 +180,7 @@ int main (int argc, char* argv[]) {
         << planar_robot::map_rmse (sim->get_feature_map(), average->get_feature_map()) << '\n'
         << "Multi-MCMC-SLAM log likelihood ratio: "
         << slam::slam_log_likelihood (*sim->get_slam_data(), *average) - sim->get_log_likelihood()
-        << "\n\n";
-        
+        << "\n\n";        
     }
     
     if (g2o_slam) {
@@ -194,16 +194,40 @@ int main (int argc, char* argv[]) {
         << "\n\n";
     }
     
-//    if (mcmc_slam && g2o_clustering) {
-//        for (int i = 0; i < 10; ++i) {
-//            for (int j = 0; j < 1000; ++j) mcmc_slam->update();
-//            std::cout << "Testing candidate cluster " << (i+1) << std::endl;
-//            g2o_clustering->add (*mcmc_slam);
-//        }
-//        std::cout << "Number of clusters: "
-//        << g2o_clustering->get_clusters().size()
-//        << "\n\n";
-//    }
+    if (mcmc_slam && g2o_clustering) {
+
+        for (int i = 0; i < 100; ++i) {
+            for (int j = 0; j < 10000; ++j) mcmc_slam->update();
+            std::cout << "Testing candidate cluster " << (i+1) << std::endl;
+            g2o_clustering->add (*mcmc_slam);
+        }
+        g2o_clustering->sort_clusters();
+        std::cout << "Number of clusters: " << g2o_clustering->get_clusters().size() << "\n";
+        
+        std::vector<std::string> color_names = { "red", "green", "blue", "cyan", "magenta", "yellow" };
+        
+        std::vector<std::shared_ptr<slam_result_type>> top_clusters;
+        for (const auto& cluster : g2o_clustering->get_clusters()) {
+            if (top_clusters.size() >= color_names.size()) break;
+            top_clusters.push_back (std::make_shared<slam_result_impl_type> (cluster.estimate));
+            std::cout << top_clusters.size() << ": " << (cluster.log_likelihood - sim->get_log_likelihood()) << '\n';
+        }
+        
+        auto cluster_plot = std::make_shared<slam_plotter>(options, sim->get_initial_state());
+        cluster_plot->add_data_source (sim, true, "Trajectory", "Landmarks",
+                                       "lc rgbcolor 'black' pt 6 ps 1.5",
+                                       "lc rgbcolor 'black' lw 5",
+                                       "size 10,20,50 filled lc rgbcolor 'black'");
+
+        for (size_t i = 0; i < top_clusters.size(); ++i) {
+            cluster_plot->add_data_source (top_clusters[i], false, "", "",
+                                           "lc rgbcolor '"+color_names[i]+"' pt 3 ps 1",
+                                           "lc rgbcolor '"+color_names[i]+"' lw 2",
+                                           "size 10,20,50 filled lc rgbcolor '"+color_names[i]+"'");
+        }
+
+        cluster_plot->plot();
+    }
     
     return EXIT_SUCCESS;
     
