@@ -20,7 +20,7 @@ namespace planar_robot {
 using control_model_type = planar_robot::velocity_model;
 using observation_model_type = planar_robot::range_only_model;
 
-using controller_type = planar_robot::waypoint_controller;
+using controller_type = planar_robot::waypoint_controller<control_model_type>;
 using sensor_type = planar_robot::landmark_sensor<observation_model_type>;
 
 #include "planar_robot/waypoint_controller.hpp"
