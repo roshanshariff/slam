@@ -15,12 +15,12 @@
 namespace slam {
     
 
-    template <class ControlModel, class ObservationModel>
-    double slam_log_likelihood (const slam_data<ControlModel, ObservationModel>&,
-                                const mcmc_slam<ControlModel, ObservationModel>& estimate) {
-        
-        return estimate.get_log_likelihood();
-    }
+//    template <class ControlModel, class ObservationModel>
+//    double slam_log_likelihood (const slam_data<ControlModel, ObservationModel>&,
+//                                const mcmc_slam<ControlModel, ObservationModel>& estimate) {
+//        
+//        return estimate.get_log_likelihood();
+//    }
     
 
     template <class ControlModel, class ObservationModel>
