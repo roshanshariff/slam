@@ -51,7 +51,7 @@ namespace slam {
             auto observation () const -> const ObservationModel& { return (f->second.begin()+i)->second; }
         };
         
-        struct listener : public timestep_listener {
+        struct listener : public virtual timestep_listener {
             virtual void control (timestep_type, const ControlModel&) = 0;
             virtual void observation (timestep_type, const observation_info&) = 0;
         };

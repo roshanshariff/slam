@@ -58,7 +58,7 @@ namespace slam {
     };
     
     
-    struct data_source : public timestep_listener {
+    struct data_source : public virtual timestep_listener {
         virtual timestep_type current_timestep () const = 0;
     };
     
