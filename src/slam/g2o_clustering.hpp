@@ -11,6 +11,7 @@
 
 #include <memory>
 #include <vector>
+#include <algorithm>
 
 #include "slam/interfaces.hpp"
 #include "slam/slam_data.hpp"
@@ -19,6 +20,7 @@
 #include "slam/slam_rmse.hpp"
 #include "slam/g2o_slam.hpp"
 
+#include "main.hpp"
 
 namespace slam {
     
@@ -26,11 +28,11 @@ namespace slam {
     class g2o_clustering : public g2o_slam<ControlModel, ObservationModel>
     {
         
-        using slam_data_type = slam_data<ControlModel, ObservationModel>;
         using slam_result_type = slam_result_of<ControlModel, ObservationModel>;
+        using slam_data_type = slam_data<ControlModel, ObservationModel>;
         
-        using state_type = typename ControlModel::associated_type;
-        using feature_type = typename ObservationModel::associated_type;
+        using state_type = typename slam_result_type::state_type;
+        using feature_type = typename slam_result_type::feature_type;
         
         struct cluster_type {
             
@@ -45,27 +47,28 @@ namespace slam {
         std::shared_ptr<const slam_data_type> data;
         std::vector<cluster_type> clusters;
         
-        double rmse_threshold = 1e-2;
+        double rmse_threshold = 2.5;
         
     public:
         
-        g2o_clustering(decltype(data) data) : g2o_slam<ControlModel, ObservationModel>(0), data(data) { }
+        g2o_clustering(const decltype(data)& data, const std::shared_ptr<slam_result_type>& init)
+        : g2o_slam<ControlModel, ObservationModel>(init), data(data) { }
         
         void add (const slam_result_type& candidate) {
             
             this->reinitialise (candidate);
-            this->optimise (7);
+            this->optimise ();
             
             double log_likelihood = slam_log_likelihood (*data, *this);
         
             bool new_cluster = true;
-            for (auto& cluster : clusters) {
+            for (auto cluster = clusters.rbegin(); cluster != clusters.rend(); ++cluster) {
                 
-                if (cluster.distance (*this) <= rmse_threshold) {
+                if (cluster->distance (*this) <= rmse_threshold) {
                     
-                    if (log_likelihood > cluster.log_likelihood) {
-                        cluster.estimate = *this;
-                        cluster.log_likelihood = log_likelihood;
+                    if (log_likelihood > cluster->log_likelihood) {
+                        cluster->estimate = *this;
+                        cluster->log_likelihood = log_likelihood;
                     }
                     
                     new_cluster = false;
@@ -78,11 +81,18 @@ namespace slam {
             }
         }
         
+        void sort_clusters () {
+            std::sort (clusters.begin(), clusters.end(), [](const cluster_type& a, const cluster_type& b) { return a.log_likelihood > b.log_likelihood; });
+        }
+        
         auto get_clusters () const -> const decltype(clusters)& {
             return clusters;
         }
         
     };
 }
+
+
+extern template class slam::g2o_clustering<control_model_type, observation_model_type>;
 
 #endif
