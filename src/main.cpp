@@ -148,6 +148,12 @@ int main (int argc, char* argv[]) {
         (*sim)();
     }
     
+    if (mcmc_slam && g2o_slam) {
+        g2o_slam->reinitialise (*mcmc_slam);
+        g2o_slam->optimise();
+        if (slam_plot) slam_plot->plot();
+    }
+    
     if (mcmc_slam) {
         std::cout
         << "MCMC-SLAM Trajectory RMSE: "
