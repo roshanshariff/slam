@@ -17,9 +17,9 @@ class gnuplot_process {
     
     FILE* fh;
     std::vector<float> buffer;
-    size_t buffer_queued;
+    size_t buffer_queued = 0;
     
-    bool plot_started;
+    bool plot_started = false;
     const bool debug_mode;
     
 public:

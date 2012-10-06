@@ -11,11 +11,9 @@
 
 #include "gnuplot_process.hpp"
 
-gnuplot_process::gnuplot_process (bool debug)
-: buffer_queued(0), plot_started(false), debug_mode(debug)
-{
+gnuplot_process::gnuplot_process (bool debug) : debug_mode(debug) {
     if (!debug_mode) fh = popen ("gnuplot -p", "w");
-    else fh = fopen ("debug-slam-plot.txt", "w");
+    else fh = fopen ("debug-gnuplot.txt", "w");
 }
 
 gnuplot_process::~gnuplot_process () {
@@ -28,15 +26,19 @@ gnuplot_process::~gnuplot_process () {
 void gnuplot_process::plot (size_t columns) {
 
     assert (buffer.size() >= buffer_queued);
-
-    if (!plot_started) { puts ("plot "); plot_started = true; }
-    else puts (", ");
+    assert ((buffer.size() - buffer_queued) % columns == 0);
 
     size_t records = (buffer.size() - buffer_queued) / columns;
     buffer_queued += columns * records;
 
-    if (columns > 1) std::fprintf (fh, "'-' binary record=%zu format='%%%zufloat' ", records, columns);
-    else std::fprintf (fh, "'-' binary array=%zu format='%%float' ", records);
+    if (records > 0) {
+
+        if (!plot_started) { puts ("plot "); plot_started = true; }
+        else puts (", ");        
+        
+        if (columns > 1) std::fprintf (fh, "'-' binary record=%zu format='%%%zufloat' ", records, columns);
+        else std::fprintf (fh, "'-' binary array=%zu format='%%float' ", records);
+    }
 }
 
 
@@ -63,4 +65,5 @@ void gnuplot_process::plot () {
     }
     
     buffer.clear();
+    fflush (fh);
 }
