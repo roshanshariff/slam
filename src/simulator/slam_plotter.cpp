@@ -23,23 +23,35 @@ void slam_plotter::add_data_source (std::shared_ptr<slam_result_type> source, bo
                                     std::string feature_point_style, std::string trajectory_line_style,
                                     std::string state_arrow_style)
 {
-    data_source source_info = {
+    data_sources.push_back ({
         source, autoscale_map, trajectory_title, landmark_title,
         feature_point_style, trajectory_line_style, state_arrow_style
-    };
-    data_sources.push_back (source_info);
+    });
 }
 
 
 void slam_plotter::timestep (slam::timestep_type t) {
-    
     if (output_dir) {
         std::ostringstream output_filename;
         output_filename << std::setfill('0') << std::setw(6) << std::size_t(t) << ".png";
         boost::filesystem::path output_file = (*output_dir)/output_filename.str();
         std::fprintf (gnuplot.handle(), "set output '%s'\n", output_file.c_str());
     }
+    plot();
+}
 
+
+void slam_plotter::completed () {
+    if (output_dir) {
+        boost::filesystem::path output_file = (*output_dir)/"final.png";
+        std::fprintf (gnuplot.handle(), "set output '%s'\n", output_file.c_str());
+    }
+    plot();
+}
+
+
+void slam_plotter::plot () {
+    
     if (!title.empty()) std::fprintf (gnuplot.handle(), "set title '%s'\n", title.c_str());
     else gnuplot.puts ("set title\n");
     
