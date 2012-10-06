@@ -50,22 +50,23 @@ int main (int argc, char* argv[]) {
     
     /* set up simulation objects */
     
-    std::random_device random_dev;
-    random_source random (remember_option(options, "seed", (unsigned int)random_dev()));
+    random_source random (remember_option(options, "seed", (unsigned int)std::random_device()()));
     
-    unsigned int sim_seed = random();
-    unsigned int mcmc_slam_seed = random();
-    unsigned int multi_mcmc_seed = random();
-    unsigned int g2o_seed = random();
-    /*unsigned int fastslam_seed =*/ random();
+    unsigned int sim_seed = remember_option (options, "sim-seed", random());
+    unsigned int init_seed = remember_option (options, "init-seed", random());
+    unsigned int mcmc_slam_seed = remember_option (options, "mcmc-slam-seed", random());
+    unsigned int multi_mcmc_seed = remember_option (options, "multi-mcmc-seed", random());
     
-    std::shared_ptr<simulator_type> sim
-    = std::make_shared<simulator_type> (options, sim_seed);
+    auto sim = std::make_shared<simulator_type> (options, sim_seed);
+    
+    auto init = std::make_shared<slam_initialiser_type> (init_seed);
+    sim->add_data_listener (init);
     
     std::shared_ptr<mcmc_slam_type> mcmc_slam;
     if (options.count ("mcmc-slam")) {
-        mcmc_slam = std::make_shared<mcmc_slam_type> (sim->get_slam_data(),
-                                                                 options, mcmc_slam_seed);
+        mcmc_slam = std::make_shared<mcmc_slam_type> (sim->get_slam_data(), mcmc_slam_seed);
+        mcmc_slam->set_initialiser (init);
+        mcmc_slam_updater = std::make_shared<mcmc_slam_type::updater>(mcmc_slam, options);
         sim->add_timestep_listener (mcmc_slam);
     }
     

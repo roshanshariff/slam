@@ -11,6 +11,7 @@
 
 #include <memory>
 #include <iostream>
+#include <cassert>
 
 #include <boost/program_options.hpp>
 
@@ -20,9 +21,8 @@
 #include <g2o/core/base_binary_edge.h>
 #include <g2o/core/sparse_optimizer.h>
 #include <g2o/core/block_solver.h>
-#include <g2o/core/factory.h>
-#include <g2o/core/optimization_algorithm_factory.h>
 #include <g2o/core/optimization_algorithm_gauss_newton.h>
+#include <g2o/core/optimization_algorithm_levenberg.h>
 #include <g2o/solvers/csparse/linear_solver_csparse.h>
 
 #include "slam/interfaces.hpp"
@@ -42,13 +42,16 @@ namespace slam {
     public slam_data<ControlModel, ObservationModel>::listener
     {
         
-        using state_type = typename ControlModel::associated_type;
-        using feature_type = typename ObservationModel::associated_type;
+        using slam_result_type = slam_result_of<ControlModel, ObservationModel>;
+        using slam_data_type = slam_data<ControlModel, ObservationModel>;
+        
+        using state_type = typename slam_result_type::state_type;
+        using feature_type = typename slam_result_type::feature_type;
+        using trajectory_type = typename slam_result_type::trajectory_type;
+        using feature_map_type = typename slam_result_type::feature_map_type;
+
         using control_type = typename ControlModel::vector_type;
         using observation_type = typename ObservationModel::vector_type;
-        
-        using slam_result_type = slam_result<state_type, feature_type>;
-        using slam_data_type = slam_data<ControlModel, ObservationModel>;
         
         /** Nested types */
         
@@ -111,10 +114,16 @@ namespace slam {
             
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-            edge_control (vertex_state* v0, vertex_state* v1, const control_type& m) {
+            edge_control (vertex_state* v0, vertex_state* v1, const ControlModel& control) {
+
                 this->setVertex (0, v0);
                 this->setVertex (1, v1);
-                this->setMeasurement (m);
+                this->setMeasurement (control.mean());
+
+                typename ControlModel::matrix_type chol_cov_inv;
+                chol_cov_inv.setIdentity();
+                control.chol_cov().template triangularView<Eigen::Lower>().solveInPlace(chol_cov_inv);
+                this->setInformation (chol_cov_inv.transpose() * chol_cov_inv);
             }
             
             virtual bool read (std::istream&) { return true; }
@@ -123,10 +132,10 @@ namespace slam {
         protected:
             
             void computeError () override {
-                const vertex_state* v1 = static_cast<const vertex_state*> (this->vertex(0));
-                const vertex_state* v2 = static_cast<const vertex_state*> (this->vertex(1));
-                this->error() = ControlModel::subtract (ControlModel::observe (-v1->estimate() + v2->estimate()),
-                                                        this->measurement());
+                auto v1 = static_cast<const vertex_state*> (this->vertex(0));
+                auto v2 = static_cast<const vertex_state*> (this->vertex(1));
+                control_type predicted = ControlModel::observe (-v1->estimate() + v2->estimate());
+                this->error() = ControlModel::subtract (predicted, this->measurement());
             }
         };
         
@@ -136,10 +145,16 @@ namespace slam {
           
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
             
-            edge_obs (vertex_state* v0, vertex_landmark* v1, const observation_type& m) {
+            edge_obs (vertex_state* v0, vertex_landmark* v1, const ObservationModel& obs) {
+
                 this->setVertex (0, v0);
                 this->setVertex (1, v1);
-                this->setMeasurement (m);
+                this->setMeasurement (obs.mean());
+                
+                typename ObservationModel::matrix_type chol_cov_inv;
+                chol_cov_inv.setIdentity();
+                obs.chol_cov().template triangularView<Eigen::Lower>().solveInPlace(chol_cov_inv);
+                this->setInformation (chol_cov_inv.transpose() * chol_cov_inv);
             }
             
             virtual bool read (std::istream&) { return true; }
@@ -148,18 +163,17 @@ namespace slam {
         protected:
             
             void computeError () override {
-                const vertex_state* v1 = static_cast<const vertex_state*> (this->vertex(0));
-                const vertex_landmark* v2 = static_cast<const vertex_landmark*> (this->vertex(1));
-                feature_type predicted = -v1->estimate() + v2->estimate();
-                this->error() = ObservationModel::subtract (ObservationModel::observe (-v1->estimate() + v2->estimate()),
-                                                            this->measurement());
+                auto v1 = static_cast<const vertex_state*> (this->vertex(0));
+                auto v2 = static_cast<const vertex_landmark*> (this->vertex(1));
+                observation_type predicted = ObservationModel::observe (-v1->estimate() + v2->estimate());
+                this->error() = ObservationModel::subtract (predicted, this->measurement());
             }
         };
                 
         
         /** Private data members */
         
-        random_source random;
+        std::shared_ptr<slam_result_type> initialiser;
         
         unsigned int g2o_steps = 0;
         unsigned int g2o_end_steps = 0;
@@ -171,15 +185,15 @@ namespace slam {
         std::vector<vertex_state*> state_vertices;
         std::map<featureid_type, vertex_landmark*> feature_vertices;
         
-        mutable utility::bitree<state_type> trajectory_estimate;
-        mutable utility::flat_map<featureid_type, feature_type> map_estimate;
+        mutable trajectory_type trajectory_estimate;
+        mutable feature_map_type map_estimate;
         
         timestep_type next_timestep;
         
     public:
         
-        explicit g2o_slam (unsigned int seed);
-        g2o_slam (boost::program_options::variables_map&, unsigned int seed);
+        explicit g2o_slam (const decltype(initialiser)&);
+
         static boost::program_options::options_description program_options ();
         
         void reinitialise (const slam_result_type&);
@@ -192,7 +206,6 @@ namespace slam {
         virtual void observation (timestep_type t, const typename slam_data_type::observation_info& obs) override;
         
         virtual void timestep (timestep_type) override;
-        virtual void completed () override;
         
         // Overridden virtual member functions of slam::slam_result
         
@@ -260,19 +273,15 @@ void slam::g2o_slam<ControlModel, ObservationModel>
     
     assert (t == current_timestep());
     assert (t == state_vertices.size()-1);
+    assert (initialiser);
     
-    vertex_state* v0 = state_vertices.back();
+    state_type initial_estimate = -initialiser->get_state(t) + initialiser->get_state(t+1);
     
-    state_type initial_estimate = v0->estimate() + control.proposal().initial_value(random);
-    auto v1 = make_unique<vertex_state>(next_vertex_id++, initial_estimate);
+    auto v0 = state_vertices.back();
+    auto v1 = make_unique<vertex_state>(next_vertex_id++, v0->estimate() + initial_estimate);
     state_vertices.push_back (v1.get());
     
-    auto e = make_unique<edge_control>(v0, v1.get(), control.mean());
-    
-    typename ControlModel::matrix_type chol_cov_inv;
-    chol_cov_inv.setIdentity();
-    control.chol_cov().template triangularView<Eigen::Lower>().solveInPlace(chol_cov_inv);
-    e->setInformation (chol_cov_inv.transpose() * chol_cov_inv);
+    auto e = make_unique<edge_control>(v0, v1.get(), control);
     
     optimizer.addVertex (v1.release());
     optimizer.addEdge (e.release());
@@ -287,27 +296,23 @@ void slam::g2o_slam<ControlModel, ObservationModel>
     
     assert (t == next_timestep);
     assert (t == state_vertices.size()-1);
-    
-    vertex_state* v0 = state_vertices.back();
-    vertex_landmark* v1 = feature_vertices[obs.id()];
+
+    auto v0 = state_vertices.back();
+    auto v1 = feature_vertices[obs.id()];
     
     if (obs.index() == 0) {
+    
+        assert (initialiser);
+        feature_type initial_estimate = -initialiser->get_state(t) + initialiser->get_feature (obs.id());
         
-        feature_type initial_estimate = v0->estimate() + obs.observation().proposal().initial_value (random);
-        auto v = make_unique<vertex_landmark>(next_vertex_id++, initial_estimate);
+        auto v = make_unique<vertex_landmark>(next_vertex_id++, v0->estimate() + initial_estimate);
         feature_vertices[obs.id()] = v.get();
         
         v1 = v.get();
         optimizer.addVertex (v.release());
     }
     
-    auto e = make_unique<edge_obs>(v0, v1, obs.observation().mean());
-    
-    typename ObservationModel::matrix_type chol_cov_inv;
-    chol_cov_inv.setIdentity();
-    obs.observation().chol_cov().template triangularView<Eigen::Lower>().solveInPlace(chol_cov_inv);
-    e->setInformation (chol_cov_inv.transpose() * chol_cov_inv);
-    
+    auto e = make_unique<edge_obs>(v0, v1, obs.observation());
     optimizer.addEdge (e.release());
     
     need_init = true;
@@ -373,21 +378,10 @@ auto slam::g2o_slam<ControlModel, ObservationModel>
     return map_estimate;
 }
 
-template <class ControlModel, class ObservationModel>
-auto slam::g2o_slam<ControlModel, ObservationModel>
-::program_options () -> boost::program_options::options_description {
-    namespace po = boost::program_options;
-    po::options_description options ("G2O-SLAM Parameters");
-    options.add_options()
-    ("g2o-steps", po::value<unsigned int>()->default_value(1), "MCMC iterations per graph vertex")
-    ("g2o-end-steps", po::value<unsigned int>()->default_value(0), "MCMC iterations after simulation");
-    return options;
-}
-
 
 template <class ControlModel, class ObservationModel>
 slam::g2o_slam<ControlModel, ObservationModel>
-::g2o_slam (unsigned int seed) : random (seed)
+::g2o_slam (const decltype(initialiser)& init) : initialiser(init)
 {
     
     using SlamBlockSolver = g2o::BlockSolver<g2o::BlockSolverTraits<-1, -1>>;
@@ -411,12 +405,22 @@ slam::g2o_slam<ControlModel, ObservationModel>
 
 
 template <class ControlModel, class ObservationModel>
-slam::g2o_slam<ControlModel, ObservationModel>
-::g2o_slam (boost::program_options::variables_map& options, unsigned int seed) : g2o_slam (seed)
-{
-    g2o_steps = options["g2o-steps"].as<unsigned int>();
-    g2o_end_steps = options["g2o-end-steps"].as<unsigned int>();
+auto slam::g2o_slam<ControlModel, ObservationModel>
+::program_options () -> boost::program_options::options_description {
+    namespace po = boost::program_options;
+    po::options_description options ("G2O-SLAM Parameters");
+    options.add_options()
+    ("g2o-steps", po::value<unsigned int>()->default_value(0), "G2O iterations per time step")
+    ("g2o-end-steps", po::value<unsigned int>()->default_value(0), "G2O iterations after simulation");
+    return options;
 }
+
+
+template <class ControlModel, class ObservationModel>
+slam::g2o_slam<ControlModel, ObservationModel>::updater
+::updater (const decltype(instance)& instance, const boost::program_options::variables_map& options)
+: updater (instance, options["g2o-steps"].as<unsigned int>(), options["g2o-end-steps"].as<unsigned int>())
+{ }
 
 
 extern template class slam::g2o_slam<control_model_type, observation_model_type>;
