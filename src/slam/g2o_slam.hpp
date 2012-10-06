@@ -276,15 +276,28 @@ void slam::g2o_slam<ControlModel, ObservationModel>
 
 template <class ControlModel, class ObservationModel>
 void slam::g2o_slam<ControlModel, ObservationModel>
-::optimise (unsigned int iterations) {
+::optimise (const unsigned int max_iterations = 1000) {
 
-    if (iterations > 0) {
+    if (max_iterations > 0) {
         
         if (need_init) {
             optimizer.initializeOptimization();
             need_init = false;
         }
-        optimizer.optimize(iterations);
+        
+        optimizer.optimize(1);
+        unsigned int iterations = 1;
+        double chi2 = optimizer.activeRobustChi2();
+        
+        while (iterations < max_iterations) {
+            optimizer.optimize(1, true);
+            ++iterations;
+            double old_chi2 = chi2;
+            chi2 = optimizer.activeRobustChi2();
+            if (chi2 > old_chi2 - 0.01) break;
+        }
+        
+        std::cout << iterations << " iterations\n";
         
         trajectory_estimate.clear();
         map_estimate.clear();
@@ -400,7 +413,8 @@ slam::g2o_slam<ControlModel, ObservationModel>
     
     using SlamBlockSolver = g2o::BlockSolver<g2o::BlockSolverTraits<-1, -1>>;
     using SlamLinearSolver = g2o::LinearSolverCSparse<SlamBlockSolver::PoseMatrixType>;
-    using OptimizationAlgorithm = g2o::OptimizationAlgorithmGaussNewton;
+//    using OptimizationAlgorithm = g2o::OptimizationAlgorithmGaussNewton;
+    using OptimizationAlgorithm = g2o::OptimizationAlgorithmLevenberg;
     
     auto linearSolver = make_unique<SlamLinearSolver>();
     linearSolver->setBlockOrdering(false);
