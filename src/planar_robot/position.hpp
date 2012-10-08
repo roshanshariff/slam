@@ -1,7 +1,7 @@
 #ifndef _PLANAR_ROBOT_POSITION_HPP
 #define _PLANAR_ROBOT_POSITION_HPP
 
-#include <complex>
+#include <cmath>
 
 #include <Eigen/Core>
 
@@ -14,36 +14,36 @@ namespace planar_robot {
     
     class position {
         
-	std::complex<double> pos;
+        Eigen::Vector2d pos;
         
     protected:
         
-	position (const std::complex<double>& p) : pos(p) { }
+	explicit position (const Eigen::Vector2d& p) : pos(p) { }
         
     public:
         
 	static const int vector_dim = 2;
 	using vector_type = Eigen::Vector2d;
         
-        position () : pos() { }
+        position () : position({ 0.0, 0.0 }) { }
         
 	static position cartesian (double x, double y) {
-            return position (std::complex<double> (x, y));
+            return position ({ x, y });
 	}
         
-	static position polar (double distance, double direction) {
-            return position (std::polar (distance, direction));
+	static position polar (double dist, double dir) {
+            return position ({ dist*std::cos(dir), dist*std::sin(dir) });
 	}
         
-	double x () const { return pos.real(); }
-	double y () const { return pos.imag(); }
-	double distance () const { return std::abs(pos); }
-	double direction () const { return std::arg(pos); }
-	double distance_squared () const { return std::norm(pos); }
+	double x () const { return pos(0); }
+	double y () const { return pos(1); }
+	double distance () const { return pos.norm(); }
+	double direction () const { return std::atan2 (y(), x()); }
+	double distance_squared () const { return pos.squaredNorm(); }
         
-	vector_type to_vector () const { return vector_type (x(), y()); }
+	vector_type to_vector () const { return pos; }
         
-	static position from_vector (const vector_type& v) { return cartesian (v(0), v(1)); }
+	static position from_vector (const vector_type& v) { return position (v); }
         
         static vector_type subtract (const vector_type& a, const vector_type& b) { return a - b; }
         
