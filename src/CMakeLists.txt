@@ -1,16 +1,30 @@
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 2.8.8)
 project (slam CXX)
 
-set (SLAM_SRCS planar_robot/waypoint_controller.cpp planar_robot/landmark_sensor.cpp
+add_library (lib_planar_robot OBJECT
+    planar_robot/waypoint_controller.cpp planar_robot/landmark_sensor.cpp
     planar_robot/velocity_model.cpp planar_robot/range_bearing_model.cpp
-    planar_robot/rms_error.cpp simulator/simulator.cpp simulator/gnuplot_process.cpp
-    simulator/slam_plotter.cpp simulator/time_series_plotter.cpp slam/slam_data.cpp
-    slam/mcmc_slam.cpp slam/multi_mcmc.cpp slam/g2o_slam.cpp slam/g2o_clustering.cpp
+    planar_robot/rms_error.cpp)
+    
+add_library (lib_simulator OBJECT
+    simulator/simulator.cpp simulator/gnuplot_process.cpp simulator/slam_plotter.cpp
+    simulator/time_series_plotter.cpp)
+    
+add_library (lib_slam OBJECT
+    slam/slam_data.cpp slam/mcmc_slam.cpp slam/multi_mcmc.cpp slam/g2o_slam.cpp
+    slam/g2o_clustering.cpp
     #slam/fastslam.cpp slam/fastslam_mcmc.cpp
+    )
+    
+add_library (lib_utility OBJECT
     utility/utility.cpp utility/cowtree.cpp)
 
-add_executable (slam ${SLAM_SRCS} main.cpp)
-add_executable (dataset ${SLAM_SRCS} dataset.cpp)
+add_executable (slam
+    main.cpp $<TARGET_OBJECTS:lib_planar_robot> $<TARGET_OBJECTS:lib_simulator>
+    $<TARGET_OBJECTS:lib_slam> $<TARGET_OBJECTS:lib_utility>)
+
+add_executable (dataset
+    dataset.cpp $<TARGET_OBJECTS:lib_planar_robot> $<TARGET_OBJECTS:lib_utility>)
 
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules/")
 
@@ -34,7 +48,10 @@ include_directories (${G2O_INCLUDE_DIR})
 target_link_libraries (slam ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIBRARY} ${G2O_SOLVER_CSPARSE} ${G2O_SOLVER_CSPARSE_EXTENSION})
 target_link_libraries (dataset ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIBRARY} ${G2O_SOLVER_CSPARSE} ${G2O_SOLVER_CSPARSE_EXTENSION})
 
-set (CMAKE_BUILD_TYPE Release)
+if (CMAKE_COMPILER_IS_GNUCXX)
+    add_definitions ("-std=c++11 -Werror -Wall -Wextra -march=native -mno-avx")
+endif()
 
-add_definitions ("-std=c++0x -Wall -Wextra -Werror -Wno-unused-parameter")
-#add_definitions ("-std=c++0x -stdlib=libc++ -Wall -Werror -Wno-c++11-narrowing")
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_definitions ("-std=c++11 -stdlib=libc++ -Werror -Wall -Wno-error=c++11-narrowing")
+endif()
