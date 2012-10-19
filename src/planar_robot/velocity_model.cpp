@@ -19,12 +19,12 @@ auto velocity_slip_model::builder::program_options () -> po::options_description
     
     po::options_description model_options ("Velocity-Slip Motion Model Parameters");
     model_options.add_options()
-    ("velmodel-alpha1", po::value<double>()->default_value(0.1))
+    ("velmodel-alpha1", po::value<double>()->default_value(0.01))
     ("velmodel-alpha2", po::value<double>()->default_value(0.0))
-    ("velmodel-alpha3", po::value<double>()->default_value(1.0*RAD_PER_DEG))
-    ("velmodel-alpha4", po::value<double>()->default_value(0.1))
-    ("velmodel-alpha5", po::value<double>()->default_value(0.1*RAD_PER_DEG))
-    ("velmodel-alpha6", po::value<double>()->default_value(0.01*RAD_PER_DEG));
+    ("velmodel-alpha3", po::value<double>()->default_value(1.0*RAD_PER_DEG*RAD_PER_DEG))
+    ("velmodel-alpha4", po::value<double>()->default_value(0.01))
+    ("velmodel-alpha5", po::value<double>()->default_value(0.01*RAD_PER_DEG*RAD_PER_DEG))
+    ("velmodel-alpha6", po::value<double>()->default_value(0.001*RAD_PER_DEG));
     
     return model_options;
 }
@@ -47,10 +47,10 @@ auto velocity_model::builder::program_options () -> po::options_description {
     
     po::options_description model_options ("Velocity Motion Model Parameters");
     model_options.add_options()
-    ("velmodel-alpha1", po::value<double>()->default_value(0.1))
+    ("velmodel-alpha1", po::value<double>()->default_value(0.01))
     ("velmodel-alpha2", po::value<double>()->default_value(0.0))
-    ("velmodel-alpha3", po::value<double>()->default_value(1.0*RAD_PER_DEG))
-    ("velmodel-alpha4", po::value<double>()->default_value(0.1));
+    ("velmodel-alpha3", po::value<double>()->default_value(1.0*RAD_PER_DEG*RAD_PER_DEG))
+    ("velmodel-alpha4", po::value<double>()->default_value(0.01));
 
     return model_options;
 }
