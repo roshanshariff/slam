@@ -165,7 +165,7 @@ namespace planar_robot {
                 mat_variance *= m_dt;
             }
             
-            builder (const boost::program_options::variables_map&, double dt);
+            builder (const boost::program_options::variables_map&, double dt=1.0);
             
             static auto program_options () -> boost::program_options::options_description;
 
