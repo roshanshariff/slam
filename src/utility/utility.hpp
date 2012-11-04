@@ -13,6 +13,7 @@
 #include <string>
 #include <utility>
 #include <memory>
+#include <type_traits>
 
 #include <boost/program_options.hpp>
 
@@ -48,9 +49,21 @@ inline iter_pair_range<Iter> as_range (std::pair<Iter,Iter> const& range) { retu
 template <class Iter>
 inline iter_pair_range<Iter> as_range (Iter begin, Iter end) { return iter_pair_range<Iter>(begin, end); }
 
-template <class T, class... Args>
-auto make_unique (Args&&... args) -> std::unique_ptr<T> {
+template <typename T, typename... Args>
+auto make_unique_helper (std::false_type, Args&&... args) -> std::unique_ptr<T> {
     return std::unique_ptr<T> (new T (std::forward<Args>(args)...));
+}
+
+template <typename T, typename... Args>
+auto make_unique_helper (std::true_type, Args&&... args) -> std::unique_ptr<T> {
+    static_assert (std::extent<T>::value == 0, "make_unique<T[N]>() is forbidden, please use make_unique<T>()");
+    using U = typename std::remove_extent<T>::type;
+    return std::unique_ptr<T> (new U[sizeof...(Args)] { std::forward<Args>(args)... });
+}
+
+template <typename T, typename... Args>
+auto make_unique (Args&&... args) -> std::unique_ptr<T> {
+    return make_unique_helper (std::is_array<T>(), std::forward<Args>(args)...);
 }
 
 #endif
