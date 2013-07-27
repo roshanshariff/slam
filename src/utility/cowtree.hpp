@@ -18,7 +18,7 @@ class cowtree {
     
 public:
     
-    bool empty () const { return node_ptr.get() == 0; }
+    bool empty () const { return node_ptr.get() == nullptr; }
     
     const cowtree& left () const;
     const cowtree& right () const;
@@ -27,16 +27,17 @@ public:
     class root;
     class editor;
     
-protected:
+private:
     
-    cowtree () { }
-    cowtree (const cowtree& o) : node_ptr(o.node_ptr) { }
-    cowtree& operator= (const cowtree& o) { node_ptr = o.node_ptr; return *this; }
-    void swap (cowtree& o) { node_ptr.swap(o.node_ptr); }
+    cowtree () = default;
+    cowtree (const cowtree& o) = default;
+    cowtree (cowtree&& o) = default;
+    cowtree& operator= (const cowtree& o) = default;
+    cowtree& operator= (cowtree&& o) = default;
+    
+    void swap (cowtree& o) noexcept { node_ptr.swap(o.node_ptr); }
     
     void clear () { node_ptr.reset(); }
-    
-private:
     
     class node;
 
@@ -60,38 +61,29 @@ private:
 
 class cowtree::root : public cowtree {
 public:
-    void swap (root& o) { cowtree::swap(o); }
-    void clear () { cowtree::clear(); }
+    friend void swap (root& a, root& b) noexcept { a.swap(b); }
+    using cowtree::clear;
 };
 
-
-inline void swap (cowtree::root& a, cowtree::root& b) { a.swap(b); }
-
-namespace std {
-    template<> void swap (cowtree::root& a, cowtree::root& b);
-}
 
 class cowtree::node {
     
 public:
     
-    bool black;
+    bool black = false;
     cowtree left, right;
     
-    virtual ~node() { }    
+    node& operator= (const node& o) = delete;
+    virtual ~node() = default;
     virtual std::shared_ptr<node> clone () const = 0;
     
     template <class T> class typed;
     
-protected:
-    
-    node () { }
-    node (const node& o) : black(o.black), left(o.left), right(o.right) { }
-    
 private:
     
-    node& operator= (const node& o);
-    
+    node () = default;
+    node (const node& o) = default;
+
 };
 
 
@@ -103,13 +95,11 @@ public:
     T value;
     
     explicit typed (const T& value) : value(value) { }
-    typed (const typed<T>& o) : node(o), value(o.value) { }
-    virtual std::shared_ptr<node> clone () const { return std::make_shared<typed<T> >(*this); }
+    typed (const typed& o) = default;
+    typed& operator= (const typed& o) = delete;
     
-private:
-    
-    typed& operator= (const typed& o);
-    
+    virtual std::shared_ptr<node> clone () const { return std::make_shared<typed>(*this); }
+
 };
 
 
@@ -154,7 +144,7 @@ public:
     editor (const editor&) = delete;
     editor& operator= (const editor&) = delete;
     
-    bool is_root () const { return parent_ptr == 0; }    
+    bool is_root () const { return parent_ptr == nullptr; }
     bool is_left_child () const { return !is_root() && subtree_ptr == &parent_ptr->subtree_ptr->left(); }
 
     const cowtree& subtree () const { return *subtree_ptr; }
@@ -171,17 +161,17 @@ public:
 
 
 class cowtree::editor::left : public cowtree::editor {
-    left (const left&);
-    left& operator= (const left&);
 public:
+    left (const left&) = delete;
+    left& operator= (const left&) = delete;
     left (editor& parent) : editor(parent, parent.subtree_ptr->left()) { }
 };
 
 
 class cowtree::editor::right : public cowtree::editor {
-    right (const right&);
-    right& operator= (const right&);
 public:
+    right (const right&) = delete;
+    right& operator= (const right&) = delete;
     right (editor& parent) : editor(parent, parent.subtree_ptr->right()) { }
 };
 

@@ -30,7 +30,7 @@ namespace utility {
         
         struct const_reference {
             friend class bitree;
-            friend class reference;
+            friend struct reference;
             friend struct const_iterator;
             operator value_type () const { return container->get(index); }
             const_reference& operator= (const const_reference&) = delete;
@@ -136,7 +136,12 @@ namespace utility {
         const_iterator end () const { return const_iterator((*this)[size()]); }
 
         void pop_back () { elements.pop_back(); }
-        void push_back (const value_type& value) { elements.push_back (compute_element(size(), value)); }
+        
+        void push_back (const value_type& value) {
+            elements.push_back (parent_relative_value (size(), value));
+        }
+        
+        void push_back_accumulated (const value_type& value);
         
         void resize (size_type n, const value_type& v = value_type());
         void reserve (size_type n) { elements.reserve(n); }
@@ -154,7 +159,7 @@ namespace utility {
         std::vector<value_type, allocator_type> elements;
         
         value_type accumulate_relative (size_type i, size_type ancestor) const;
-        value_type compute_element (size_type i, const value_type& value) const;
+        value_type parent_relative_value (size_type i, const value_type& value) const;
         void set (size_type i, const value_type& value);
         value_type get (size_type i) const;        
     };
@@ -162,44 +167,36 @@ namespace utility {
     
     namespace bitree_impl {
         
-        /** Clears the lowest set bit. */
+        /** Finds the parent of a node by clearing the lowest set bit. parent(0) == 0 */
         inline std::size_t parent (std::size_t i) {
-            assert (i > 0);
             return i & (i - 1);
         }
         
         /** Isolates the lowest set bit and adds resulting value to input. */
         inline std::size_t next_sibling (std::size_t i) {
-            assert (i > 0);
             return i + (i & -i);
         }
-        
-        /** Returns the immediate child of 'parent' that contains descendant 'i'. */
-        inline std::size_t child_containing (std::size_t parent, std::size_t i) {
-            assert (i > parent);
-            i -= parent;
+
+        /** Copies highest set bit in 64-bit integer to all lower bits */
+        inline std::size_t suffix_mask (std::size_t i) {
             i |= i >> 1;
             i |= i >> 2;
             i |= i >> 4;
             i |= i >> 8;
             i |= i >> 16;
             i |= i >> 32;
-            i ^= i >> 1;
-            i += parent;
             return i;
+        }
+        
+        /** Returns the immediate child of 'parent' that contains descendant 'i'. */
+        inline std::size_t child_containing (std::size_t parent, std::size_t i) {
+            assert (parent < i && (parent == 0 || i < next_sibling(parent)));
+            return i & ~(suffix_mask(parent ^ i) >> 1);
         }
         
         /** Returns the closest common ancestor of both a and b. **/
         inline std::size_t common_ancestor (std::size_t a, std::size_t b) {
-            b ^= a;
-            b |= b >> 1;
-            b |= b >> 2;
-            b |= b >> 4;
-            b |= b >> 8;
-            b |= b >> 16;
-            b |= b >> 32;
-            a &= ~b;
-            return a;
+            return a & ~(suffix_mask(a ^ b));
         }
         
     }
@@ -221,7 +218,7 @@ namespace utility {
     
     template <typename Grp, typename Alloc>
     auto bitree<Grp, Alloc>
-    ::compute_element (size_type i, const value_type& value) const -> value_type {
+    ::parent_relative_value (size_type i, const value_type& value) const -> value_type {
         using namespace bitree_impl;
         assert (i <= elements.size());
         if (i == 0) return value;
@@ -235,10 +232,10 @@ namespace utility {
         using namespace bitree_impl;
         assert (i < elements.size());
         value_type origin = elements[i];
-        elements[i] = compute_element(i, value);
+        elements[i] = parent_relative_value(i, value);
         origin += -elements[i];
         if (i > 0) {
-            size_t next = next_sibling(i);
+            std::size_t next = next_sibling(i);
             for (; next < elements.size(); i = next, next = next_sibling(i)) {
                 size_t next_parent = parent(next);
                 while ((i = parent(i)) != next_parent) {
@@ -288,6 +285,15 @@ namespace utility {
             size_type ancestor = common_ancestor(begin-1, end-1);
             return -accumulate_relative(begin-1, ancestor) + accumulate_relative(end-1, ancestor);
         }
+    }
+    
+    
+    template <typename Grp, typename Alloc>
+    void bitree<Grp, Alloc>
+    ::push_back_accumulated (const value_type& value) {
+        using namespace bitree_impl;
+        if (empty()) elements.push_back (value);
+        else elements.push_back (-accumulate(parent(size())+1) + value);
     }
     
     

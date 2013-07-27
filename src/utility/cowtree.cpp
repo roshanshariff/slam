@@ -10,28 +10,24 @@
 
 #include "utility/cowtree.hpp"
 
-template<> void std::swap (cowtree::root& a, cowtree::root& b) {
-    a.swap(b);
-}
 
 cowtree::editor::editor (editor& parent, cowtree& subtree)
 : parent_ptr(&parent), subtree_ptr(&subtree)
 {
-    assert (subtree_ptr != 0);
     subtree_ptr->make_unique();
 }
 
 
 cowtree::editor::editor (root& tree)
-: parent_ptr(0), subtree_ptr(&tree)
+: parent_ptr(nullptr), subtree_ptr(&tree)
 {
-    assert (subtree_ptr != 0);
     subtree_ptr->make_unique();
     assert (subtree_ptr->is_black());
 }
 
 
 void cowtree::editor::rotate () {
+    assert (!is_root());
     if (is_left_child()) {
         parent_ptr->subtree_ptr->swap(subtree_ptr->right());
         parent_ptr->subtree_ptr->swap(*subtree_ptr);
@@ -42,7 +38,7 @@ void cowtree::editor::rotate () {
         parent_ptr->subtree_ptr->swap(*subtree_ptr);
         subtree_ptr = &parent_ptr->subtree_ptr->left();
     }
-    assert (subtree_ptr != 0);
+    assert (subtree_ptr != nullptr);
 }
 
 

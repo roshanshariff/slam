@@ -29,8 +29,8 @@ public:
     auto operator()() -> result_type { return engine(); }
     void seed (result_type seed) { engine.seed(seed); uniform_dist.reset(); normal_dist.reset(); }
     
-    static auto min() -> result_type { return engine_type::min(); }
-    static auto max() -> result_type { return engine_type::max(); }
+    static constexpr auto min() -> result_type { return engine_type::min(); }
+    static constexpr auto max() -> result_type { return engine_type::max(); }
     
     auto operator== (const random_source& r) const -> bool { return engine == r.engine; }
     
@@ -170,7 +170,7 @@ struct multivariate_normal_dist : public multivariate_normal_dense_base<N, multi
 
 template <class Adapted>
 struct multivariate_normal_adapter
-: public multivariate_normal_dense_base<Adapted::vector_dim, multivariate_normal_adapter<Adapted> > {
+: public multivariate_normal_dense_base<Adapted::vector_dim, multivariate_normal_adapter<Adapted>> {
     
     using base_type = multivariate_normal_dense_base<Adapted::vector_dim, multivariate_normal_adapter>;
     using typename base_type::matrix_type;
@@ -180,7 +180,8 @@ struct multivariate_normal_adapter
     
     multivariate_normal_adapter () { }
     
-    multivariate_normal_adapter (const vector_type& mean, const matrix_type& chol_cov) : base_type(mean, chol_cov) { }
+    multivariate_normal_adapter (const vector_type& mean, const matrix_type& chol_cov)
+    : base_type(mean, chol_cov) { }
     
     static auto subtract (const vector_type& a, const vector_type& b) -> vector_type {
         return associated_type::subtract (a, b);

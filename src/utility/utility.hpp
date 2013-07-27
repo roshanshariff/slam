@@ -63,7 +63,7 @@ auto make_unique_helper (std::true_type, Args&&... args) -> std::unique_ptr<T> {
 
 template <typename T, typename... Args>
 auto make_unique (Args&&... args) -> std::unique_ptr<T> {
-    return make_unique_helper (std::is_array<T>(), std::forward<Args>(args)...);
+    return make_unique_helper<T> (std::is_array<T>(), std::forward<Args>(args)...);
 }
 
 #endif

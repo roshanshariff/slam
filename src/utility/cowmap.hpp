@@ -10,37 +10,38 @@
 #define slam_cowmap_hpp
 
 #include <utility>
+#include <cstddef>
 
 #include <boost/compressed_pair.hpp>
 
 #include "utility/utility.hpp"
 #include "utility/cowtree.hpp"
 
-template <class K, class V, class Compare = std::less<K> >
+template <class K, class V, class Compare = std::less<K>>
 class cowmap {
     
 public:
     
-    typedef K                       key_type;
-    typedef V                       mapped_type;
-    typedef std::pair<const K, V>   value_type;
-    typedef value_type&             reference;
-    typedef const value_type&       const_reference;
+    using key_type = K;
+    using mapped_type = V;
+    using value_type = std::pair<const K, V>;
+    using reference = value_type&;
+    using const_reference = const value_type&;
+    using size_type = std::size_t;
+    using key_compare = Compare;
     
-    typedef size_t                  size_type;
-    
-    typedef Compare                 key_compare;
-
-    struct value_compare : private key_compare {
-        value_compare (const key_compare& comp) : key_compare(comp) { }
+    struct value_compare {
+        explicit value_compare (const key_compare& cmp) : key_cmp(cmp) { }
         bool operator() (const value_type& lhs, const value_type& rhs) const {
-            return key_compare::operator()(lhs.first, rhs.first);
+            return cmp (lhs.first, rhs.first);
         }
-        const key_compare& get_key_compare() const { return *this; }
-        key_compare& get_key_compare() { return *this; }
+        const key_compare& get_key_compare() const { return key_cmp; }
+        key_compare& get_key_compare() { return key_cmp; }
+    private:
+        key_compare key_cmp;
     };
     
-    cowmap (const key_compare& pred = key_compare()) : data (cowtree::root(), key_compare(pred)) { }
+    cowmap (key_compare cmp = key_compare()) : data (cowtree::root(), value_compare(cmp)) { }
     
     const value_compare& value_comp () const { return data.second(); }
     value_compare& value_comp () { return data.second(); }
@@ -56,7 +57,8 @@ public:
         return find_subtree(key).template value<value_type>().second;
     }
     
-    template <class Functor> void for_each (Functor f) const { inorder_traverse (root(), f); }
+    template <class Functor>
+    void for_each (Functor&& f) const { inorder_traverse (root(), std::forward<Functor>(f)); }
     
     bool insert (const value_type& entry) {
         cowtree::editor editor (root());
@@ -80,7 +82,7 @@ private:
     
     bool insert (const value_type& entry, cowtree::editor& editor);
     
-    template <class Functor> void inorder_traverse (const cowtree&, Functor&) const;
+    template <class Functor> void inorder_traverse (const cowtree&, Functor&&) const;
     
     boost::compressed_pair<cowtree::root, value_compare> data;
     
@@ -125,11 +127,12 @@ bool cowmap<K, V, Compare>::insert (const value_type& entry, cowtree::editor& ed
 
 template <class K, class V, class Compare>
 template <class Functor>
-void cowmap<K, V, Compare>::inorder_traverse (const cowtree& subtree, Functor& f) const {
+void cowmap<K, V, Compare>::inorder_traverse (const cowtree& subtree, Functor&& f) const {
     if (!subtree.empty()) {
-        inorder_traverse (subtree.left(), f);
-        f (subtree.value<value_type>().first, subtree.value<value_type>().second);
-        inorder_traverse (subtree.right(), f);
+        inorder_traverse (subtree.left(), std::forward<Functor>(f));
+        std::forward<Functor>(f) (subtree.value<value_type>().first,
+                                  subtree.value<value_type>().second);
+        inorder_traverse (subtree.right(), std::forward<Functor>(f));
     }
 }
 
