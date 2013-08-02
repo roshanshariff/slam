@@ -22,7 +22,8 @@ namespace planar_robot {
 
     double trajectory_rmse (const planar_trajectory& a, const planar_trajectory& b);
 
-    double map_rmse (const planar_map& actual, const planar_map& estimate);
+    double map_rmse (const pose& origin, const planar_map& landmarks,
+                     const pose& est_origin, const planar_map& estimates);
     
 }
 

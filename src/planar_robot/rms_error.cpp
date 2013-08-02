@@ -37,22 +37,22 @@ double planar_robot::trajectory_rmse (const planar_trajectory& a, const planar_t
 }
 
 
-double planar_robot::map_rmse (const planar_map& landmarks, const planar_map& estimates) {
+double planar_robot::map_rmse (const pose& origin, const planar_map& landmarks,
+                               const pose& est_origin, const planar_map& estimates) {
     
     using namespace boost::accumulators;
     accumulator_set<double, stats<tag::mean>> acc;
     
     auto landmark = landmarks.cbegin();
-    
-    for (auto estimate = estimates.cbegin(); estimate != estimates.cend(); ++estimate) {
+    for (const auto& id_feature : estimates) {
         
-        while (landmark != landmarks.cend() && landmark->first != estimate->first) {
-            ++landmark;
-        }
-        
+        const auto id = id_feature.first;
+        while (landmark != landmarks.cend() && landmark->first != id) ++landmark;
         assert (landmark != landmarks.cend());
         
-        acc ((estimate->second.to_vector() - landmark->second.to_vector()).squaredNorm());
+        auto feature = -origin + (*landmark).second;
+        auto estimate = -est_origin + id_feature.second;
+        acc ((estimate.to_vector() - feature.to_vector()).squaredNorm());
     }
     
     return std::sqrt (mean (acc));

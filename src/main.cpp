@@ -178,12 +178,21 @@ int main (int argc, char* argv[]) {
         if (slam_plot) slam_plot->plot();
     }
     
+    const auto trajectory_rmse = [&](const slam_result_type& result) -> double {
+        return planar_robot::trajectory_rmse (ground_truth->get_trajectory(), result.get_trajectory());
+    };
+    
+    const auto map_rmse = [&](const slam_result_type& result) -> double {
+        return planar_robot::map_rmse (ground_truth->get_initial_state(), ground_truth->get_feature_map(),
+                                       result.get_initial_state(), result.get_feature_map());
+    };
+
     if (mcmc_slam) {
         std::cout
         << "MCMC-SLAM Trajectory RMSE: "
-        << planar_robot::trajectory_rmse (ground_truth->get_trajectory(), mcmc_slam->get_trajectory()) << '\n'
+        << trajectory_rmse (*mcmc_slam) << '\n'
         << "MCMC-SLAM Map RMSE: "
-        << planar_robot::map_rmse (ground_truth->get_feature_map(), mcmc_slam->get_feature_map()) << '\n'
+        << map_rmse (*mcmc_slam) << '\n'
         << "MCMC-SLAM log likelihood ratio: "
         << mcmc_slam->get_log_likelihood() - dataset_log_likelihood
         << "\n\n";
@@ -195,9 +204,9 @@ int main (int argc, char* argv[]) {
         << "Multi-MCMC-SLAM Chains: "
         << multi_mcmc->num_chains() << '\n'
         << "Multi-MCMC-SLAM Trajectory RMSE: "
-        << planar_robot::trajectory_rmse (ground_truth->get_trajectory(), multi_mcmc->get_trajectory()) << '\n'
+        << trajectory_rmse (*multi_mcmc) << '\n'
         << "Multi-MCMC-SLAM Map RMSE: "
-        << planar_robot::map_rmse (ground_truth->get_feature_map(), multi_mcmc->get_feature_map()) << '\n'
+        << map_rmse (*multi_mcmc) << '\n'
         << "Multi-MCMC-SLAM log likelihood ratio: "
         << multi_mcmc->get_log_likelihood() - dataset_log_likelihood
         << "\n\n";
@@ -205,9 +214,9 @@ int main (int argc, char* argv[]) {
         auto average = multi_mcmc->get_average();
         std::cout
         << "Multi-MCMC-SLAM Averaged Trajectory RMSE: "
-        << planar_robot::trajectory_rmse (ground_truth->get_trajectory(), average->get_trajectory()) << '\n'
+        << trajectory_rmse (*average) << '\n'
         << "Multi-MCMC-SLAM Averaged Map RMSE: "
-        << planar_robot::map_rmse (ground_truth->get_feature_map(), average->get_feature_map()) << '\n'
+        << map_rmse (*average) << '\n'
         << "Multi-MCMC-SLAM log likelihood ratio: "
         << slam::slam_log_likelihood (*data, *average) - dataset_log_likelihood
         << "\n\n";        
@@ -216,9 +225,9 @@ int main (int argc, char* argv[]) {
     if (g2o_slam) {
         std::cout
         << "G2O-SLAM Trajectory RMSE: "
-        << planar_robot::trajectory_rmse (ground_truth->get_trajectory(), g2o_slam->get_trajectory()) << '\n'
+        << trajectory_rmse (*g2o_slam) << '\n'
         << "G2O-SLAM Map RMSE: "
-        << planar_robot::map_rmse (ground_truth->get_feature_map(), g2o_slam->get_feature_map()) << '\n'
+        << map_rmse (*g2o_slam) << '\n'
         << "G2O-SLAM log likelihood ratio: "
         << slam::slam_log_likelihood (*data, *g2o_slam) - dataset_log_likelihood
         << "\n\n";
