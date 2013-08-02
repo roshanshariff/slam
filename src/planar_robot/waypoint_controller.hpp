@@ -53,8 +53,6 @@ namespace planar_robot {
             ++waypoint;
             direction = 0;
             direction_deriv = 0;
-            std::cout << "Seeking waypoint " << (1 + waypoint%waypoints.size())
-            << " of " << waypoints.size() << std::endl;
         }
         
         const position& current_waypoint () const {

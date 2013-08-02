@@ -30,28 +30,24 @@ namespace slam {
         double log_likelihood = 0;
         
         const auto& trajectory = estimate.get_trajectory();
-        const auto& feature_map = estimate.get_feature_map();
-        
         for (timestep_type t; t < trajectory.size(); ++t) {
             log_likelihood += data.control(t).log_likelihood (ControlModel::observe (trajectory[t]));
         }
         
-        for (const auto& feature : feature_map) {
+        const auto initial_state = estimate.get_initial_state();
+        for (const auto& id_feature : estimate.get_feature_map()) {
             
-            featureid_type id = feature.first;
-            auto observation = feature.second;
-            timestep_type timestep;
+            const featureid_type id = id_feature.first;
+            if (!data.feature_observed (id)) continue;
             
-            assert (data.feature_observed (id));
-            
-            for (const auto& obs : data.get_observations(id)) {
-                
-                observation = trajectory.accumulate (obs.first, timestep) + observation;
+            auto feature = -initial_state + id_feature.second;
 
+            timestep_type timestep {0};
+            for (const auto& obs : data.get_observations(id)) {
+                feature = trajectory.accumulate (obs.first, timestep) + feature;
                 timestep = obs.first;
                 const ObservationModel& distribution = obs.second;
-                
-                log_likelihood += distribution.log_likelihood (ObservationModel::observe (observation));
+                log_likelihood += distribution.log_likelihood (ObservationModel::observe (feature));
             }
         }
         

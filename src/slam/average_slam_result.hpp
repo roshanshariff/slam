@@ -53,21 +53,22 @@ namespace slam {
                 
     }
     
-    template <class State, class Feature, class ResultPtrIter>
-    auto average_slam_result (ResultPtrIter results_begin, ResultPtrIter results_end)
+    template <class State, class Feature, class Container>
+    auto average_slam_result (const Container& results)
     -> std::unique_ptr<slam_result<State, Feature>> {
         
-        assert (results_begin != results_end);
+        assert (results.begin() != results.end());
         
         using average_slam_result_details::avg_acc;
         
         std::vector<avg_acc<State>> state_avgs;
         utility::flat_map<featureid_type, avg_acc<Feature>> feature_avgs;
         
-        for (auto iter = results_begin; iter != results_end; ++iter) {
+        for (const auto& result_ptr : results) {
             
-            const auto& trajectory = (*iter)->get_trajectory();
-            const auto& map = (*iter)->get_feature_map();
+            const auto& initial_state = result_ptr->get_initial_state();
+            const auto& trajectory = result_ptr->get_trajectory();
+            const auto& map = result_ptr->get_feature_map();
             
             if (state_avgs.size() < trajectory.size()) {
                 state_avgs.resize (trajectory.size());
@@ -78,7 +79,7 @@ namespace slam {
             }
             
             for (const auto& feature : map) {
-                feature_avgs[feature.first].accumulate (feature.second);
+                feature_avgs[feature.first].accumulate (-initial_state + feature.second);
             }
         }
         
@@ -89,11 +90,8 @@ namespace slam {
         auto& trajectory = result->get_trajectory();
         trajectory.reserve (state_avgs.size());
         
-        State state;
         for (const auto& state_avg : state_avgs) {
-            State next_state = state_avg.get();
-            trajectory.push_back (-state + next_state);
-            state = next_state;
+            trajectory.push_back_accumulated (state_avg.get());
         }
         
         // Calculate average map

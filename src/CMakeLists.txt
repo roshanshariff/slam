@@ -30,6 +30,8 @@ set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules
 
 set (CMAKE_INCLUDE_CURRENT_DIR true)
 
+set (CMAKE_BUILD_TYPE Release)
+
 find_package (Boost 1.50.0 COMPONENTS program_options filesystem system timer REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 target_link_libraries (slam ${Boost_LIBRARIES})

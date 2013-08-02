@@ -35,6 +35,7 @@ namespace slam {
         slam_initialiser (unsigned int seed) : random(seed) { }
         
         virtual void control (timestep_type t, const ControlModel& control) override {
+            (void)t; // Silence unused variable warning
             assert (t == this->current_timestep());
             auto initial_estimate = control.proposal().initial_value (random);
             this->get_trajectory().push_back (initial_estimate);

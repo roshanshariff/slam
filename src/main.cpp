@@ -56,10 +56,10 @@ int main (int argc, char* argv[]) {
     
     random_source random (remember_option(options, "seed", (unsigned int)std::random_device()()));
     
-    unsigned int sim_seed = remember_option (options, "sim-seed", random());
-    unsigned int init_seed = remember_option (options, "init-seed", random());
-    unsigned int mcmc_slam_seed = remember_option (options, "mcmc-slam-seed", random());
-    unsigned int multi_mcmc_seed = remember_option (options, "multi-mcmc-seed", random());
+    unsigned int sim_seed = remember_option (options, "sim-seed", (unsigned int)random());
+    unsigned int init_seed = remember_option (options, "init-seed", (unsigned int)random());
+    unsigned int mcmc_slam_seed = remember_option (options, "mcmc-slam-seed", (unsigned int)random());
+    unsigned int multi_mcmc_seed = remember_option (options, "multi-mcmc-seed", (unsigned int)random());
     
     const control_model_type::builder control_model_builder (options);
     const observation_model_type::builder observation_model_builder (options);
@@ -291,6 +291,8 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
         { "Simulator", simulator_type::program_options() },
         { "Controller", controller_type::program_options() },
         { "Sensor", sensor_type::program_options() },
+        { "Control Model", control_model_type::builder::program_options() },
+        { "Observation Model", observation_model_type::builder::program_options() },
         { "MCMC-SLAM", mcmc_slam_type::program_options() },
         { "Multi-MCMC", multi_mcmc_type::program_options() },
         { "G2O-SLAM", g2o_slam_type::program_options() },

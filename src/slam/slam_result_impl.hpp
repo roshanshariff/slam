@@ -50,6 +50,7 @@ namespace slam {
         /** Member functions from timestep_listener */
         
         virtual void timestep (timestep_type t) override {
+            (void)t; // Silence unused parameter warning
             assert (t <= current_timestep());
         }
         

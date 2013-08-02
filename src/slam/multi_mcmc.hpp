@@ -71,7 +71,7 @@ namespace slam {
         }
         
         auto get_average () -> std::unique_ptr<slam_result_type> {
-            return average_slam_result<state_type, feature_type> (mcmc_chains.begin(), mcmc_chains.end());
+            return average_slam_result<state_type, feature_type> (mcmc_chains);
         }
         
         // Overridden virtual member functions of slam::slam_result
