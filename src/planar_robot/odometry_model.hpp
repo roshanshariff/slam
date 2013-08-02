@@ -16,12 +16,11 @@ namespace planar_robot {
     struct odometry_model : public independent_normal_base<3, odometry_model> {
         
         using base_type = independent_normal_base<3, odometry_model>;
+        using associated_type = pose;
 
-        using associate_type = pose;
-
-	odometry_model () { }
-        
-	odometry_model (const vector_type& mean, const vector_type& stddev) : base_type(mean, stddev) { }
+	odometry_model () = default;
+	odometry_model (const vector_type& mean, const vector_type& stddev)
+        : base_type(mean, stddev) { }
         
 	static auto subtract (const vector_type& a, const vector_type& b) -> vector_type {
             return vector_type (a(0)-b(0), wrap_angle(a(1)-b(1)), wrap_angle(a(2)-b(2)));
@@ -34,6 +33,27 @@ namespace planar_robot {
 	static auto inv_observe -> associated_type (const vector_type& control) {
             return pose::polar (control(0), control(1), control(1)+control(2));
 	}
+        
+        class proposal_dist {
+            
+            const odometry_model& model;
+            
+        public:
+            
+            explicit proposal_dist (decltype(model) model) : model(model) { }
+            
+            using result_type = associated_type;
+            static constexpr int vector_dim = odometry_model::vector_dim;
+            
+            auto operator() (random_source& random) const -> result_type { return inv_observe (model (random)); }
+            auto likelihood (const result_type& x) const -> double { return model.likelihood (observe (x)); }
+            auto log_likelihood (const result_type& x) const -> double { return model.log_likelihood (observe (x)); }
+            auto initial_value (random_source&) const -> result_type { return inv_observe (model.mean()); }
+        };
+        
+        auto proposal () const -> proposal_dist {
+            return proposal_dist(*this);
+        }
         
 	class builder : public std::unary_function<vector_type, odometry_model> {
             

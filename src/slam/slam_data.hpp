@@ -65,6 +65,7 @@ namespace slam {
         observation_collection m_observations;
         
         std::vector<ControlModel> m_controls;
+        utility::listeners<timestep_listener> m_timestep_listeners;
         utility::listeners<listener> m_listeners;
         
     public:
@@ -81,15 +82,17 @@ namespace slam {
             return timestep_type (m_controls.size());
         }
         
+        /** Member functions from timestep_listener. Forward signals to listeners */
+        
         virtual void timestep (timestep_type timestep) override {
             assert (timestep == current_timestep());
             using namespace std::placeholders;
-            m_listeners.for_each (std::bind (&listener::timestep, _1, timestep));
+            m_timestep_listeners.for_each (std::bind (&listener::timestep, _1, timestep));
         }
         
         virtual void completed () override {
             using namespace std::placeholders;
-            m_listeners.for_each (std::bind (&listener::completed, _1));
+            m_timestep_listeners.for_each (std::bind (&listener::completed, _1));
         }
         
         /** Retrieve controls. */
@@ -126,9 +129,20 @@ namespace slam {
         void add_control (const ControlModel&);
         void add_observation (featureid_type, const ObservationModel&);
         
+        void add_dataset (const dataset<ControlModel, ObservationModel>&,
+                          const typename ControlModel::builder&,
+                          const typename ObservationModel::builder&);
+        
         /** Add new listener */
         
-        void add_listener (const std::shared_ptr<listener>& l) { m_listeners.add(l); }
+        void add_timestep_listener (const std::shared_ptr<timestep_listener>& l) {
+            m_timestep_listeners.add(l);
+        }
+        
+        void add_listener (const std::shared_ptr<listener>& l) {
+            add_timestep_listener(l);
+            m_listeners.add(l);
+        }
         
     };
     
@@ -166,6 +180,32 @@ void slam::slam_data<ControlModel, ObservationModel>
     
     using namespace std::placeholders;
     m_listeners.for_each (std::bind (&listener::observation, _1, t, std::cref(obs_info_iter->second)));
+}
+
+
+template <class ControlModel, class ObservationModel>
+void slam::slam_data<ControlModel, ObservationModel>
+::add_dataset (const dataset<ControlModel, ObservationModel>& data,
+               const typename ControlModel::builder& control_model_builder,
+               const typename ObservationModel::builder& obs_model_builder) {
+    
+    auto add_observations = [&](timestep_type t) {
+        for (const auto& obs : data.observations_at (t)) {
+            add_observation (obs.second.id, obs_model_builder(obs.second.observation));
+        }
+    };
+    
+    add_observations (current_timestep());
+    timestep (current_timestep());
+    
+    for (timestep_type t; t < data.current_timestep(); ++t) {
+        add_control (control_model_builder (data.control(current_timestep()),
+                                            data.timedelta(current_timestep())));
+        add_observations (current_timestep());
+        timestep (current_timestep());
+    }
+    
+    completed();
 }
 
 

@@ -12,15 +12,16 @@
 #include <cstddef>
 #include <cmath>
 #include <utility>
+#include <vector>
 
 #include "utility/container_fwd.hpp"
+#include "utility/utility.hpp"
+
 
 namespace slam {
     
     
-    class timestep_type {
-        std::size_t timestep;
-    public:
+    struct timestep_type {
         explicit timestep_type (std::size_t timestep = 0) : timestep(timestep) { }
         operator std::size_t () const { return timestep; }
         bool operator== (timestep_type other) const { return timestep == other.timestep; }
@@ -30,6 +31,8 @@ namespace slam {
         timestep_type& operator-- () { --timestep; return *this; }
         timestep_type& operator+= (int x) { timestep += x; return *this; }
         timestep_type& operator-= (int x) { timestep -= x; return *this; }
+    private:
+        std::size_t timestep;
     };
     
     using namespace std::rel_ops;
@@ -41,29 +44,30 @@ namespace slam {
     inline timestep_type operator- (timestep_type t, int x) { return t -= x; }
     
     
-    class featureid_type {
-        std::size_t featureid;
-    public:
+    struct featureid_type {
         explicit featureid_type (std::size_t featureid) : featureid(featureid) { }
         operator std::size_t () const { return featureid; }
         bool operator== (featureid_type other) const { return featureid == other.featureid; }
         bool operator< (featureid_type other) const { return featureid < other.featureid; }
+    private:
+        std::size_t featureid;
     };
     
     
     struct timestep_listener {
         virtual void timestep (timestep_type) = 0;
         virtual void completed () { }
-        virtual ~timestep_listener () { }
+        virtual ~timestep_listener () = default;
     };
     
     
     struct data_source : public virtual timestep_listener {
-        virtual timestep_type current_timestep () const = 0;
+        virtual auto current_timestep () const -> timestep_type = 0;
+        virtual ~data_source () = default;
     };
     
     
-    template <class State, class Feature>
+    template <typename State, typename Feature>
     struct slam_result : public data_source {
         
         using state_type = State;
@@ -72,15 +76,45 @@ namespace slam {
         using trajectory_type = utility::bitree<state_type>;
         using feature_map_type = utility::flat_map<featureid_type, feature_type>;
         
-        virtual State get_state (timestep_type) const = 0;
-        virtual Feature get_feature (featureid_type) const = 0;
+        virtual auto get_initial_state () const -> state_type { return state_type(); };
+        
+        virtual auto get_state (timestep_type) const -> state_type = 0;
+        virtual auto get_feature (featureid_type) const -> feature_type = 0;
 
-        virtual const trajectory_type& get_trajectory () const = 0;
-        virtual const feature_map_type& get_feature_map () const = 0;
+        virtual auto get_trajectory () const -> const trajectory_type& = 0;
+        virtual auto get_feature_map () const -> const feature_map_type& = 0;
+        
+        virtual ~slam_result () = default;
     };
     
     template <class ControlModel, class ObsModel>
-    using slam_result_of = slam_result<typename ControlModel::associated_type, typename ObsModel::associated_type>;
+    using slam_result_of
+    = slam_result<typename ControlModel::associated_type, typename ObsModel::associated_type>;
+    
+    
+    template <class ControlModel, class ObservationModel>
+    struct dataset {
+        
+        using control_type = typename ControlModel::vector_type;
+        using observation_type = typename ObservationModel::vector_type;
+        
+        struct observation_info {
+            featureid_type id;
+            observation_type observation;
+        };
+        
+        using observation_collection = utility::flat_multimap<timestep_type, observation_info>;
+        using observation_range = iter_pair_range<typename observation_collection::const_iterator>;
+
+        virtual auto current_timestep () const -> timestep_type = 0;
+
+        virtual auto control (timestep_type) const -> const control_type& = 0;
+        virtual auto timedelta (timestep_type) const -> double = 0;
+        virtual auto timestamp (timestep_type) const -> double = 0;
+        
+        virtual auto observations () const -> observation_range = 0;
+        virtual auto observations_at (timestep_type) const -> observation_range = 0;
+    };
     
 }
 

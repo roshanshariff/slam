@@ -23,8 +23,9 @@ namespace planar_robot {
 	using base_type = independent_normal_base<3, velocity_slip_model>;
 	using associated_type = pose;
         
-	velocity_slip_model () { }
-	velocity_slip_model (const vector_type& mean, const vector_type& stddev) : base_type(mean, stddev) { }
+	velocity_slip_model () = default;
+	velocity_slip_model (const vector_type& mean, const vector_type& stddev)
+        : base_type(mean, stddev) { }
         
 	static auto subtract (const vector_type& a, const vector_type& b) -> vector_type {
             return a - b;
@@ -55,16 +56,20 @@ namespace planar_robot {
             }
 	}
         
+        static auto from_steering (double v, double w, double g = 0.0) -> vector_type {
+            return {v, w, g};
+        }
+        
         class proposal_dist {
             
             const velocity_slip_model& model;
             
         public:
             
-            proposal_dist (decltype(model) model) : model(model) { }
+            explicit proposal_dist (decltype(model) model) : model(model) { }
             
             using result_type = associated_type;
-            static const int vector_dim = velocity_slip_model::vector_dim;
+            static constexpr int vector_dim = velocity_slip_model::vector_dim;
             
             auto operator() (random_source& random) const -> result_type { return inv_observe (model (random)); }
             auto likelihood (const result_type& x) const -> double { return model.likelihood (observe (x)); }
@@ -73,37 +78,29 @@ namespace planar_robot {
         };
         
         auto proposal () const -> proposal_dist {
-            return { *this };
+            return proposal_dist(*this);
         }
         
 	class builder : public std::unary_function<vector_type, velocity_slip_model> {
             
             Eigen::Matrix3d mat_variance;
-            double m_dt;
             
 	public:
             
-            builder (double a1, double a2, double a3, double a4, double a5, double a6, double dt) : m_dt(dt) {
+            builder (double a1, double a2, double a3, double a4, double a5, double a6) {
                 mat_variance <<
                 a1, a2, 0,
                 a3, a4, 0,
                 a5, a6, 0;
-                mat_variance *= m_dt;
             }
             
-            builder (const boost::program_options::variables_map&, double dt);
+            builder (const boost::program_options::variables_map&);
             
             static auto program_options () -> boost::program_options::options_description;
             
-            auto operator() (const vector_type& control) const -> velocity_slip_model {
-                return { m_dt*control, m_dt*(mat_variance*control.cwiseAbs2()).cwiseSqrt() };
+            auto operator() (const vector_type& control, double dt) const -> velocity_slip_model {
+                return { dt*control, dt*(dt*mat_variance*control.cwiseAbs2()).cwiseSqrt() };
             }
-            
-            auto from_steering (double v, double w, double g = 0.0) -> velocity_slip_model {
-                return operator()({v, w, g});
-            }
-            
-            auto dt () const -> double { return m_dt; }
 	};
         
     };
@@ -114,9 +111,10 @@ namespace planar_robot {
         using base_type = independent_normal_base<2, velocity_model>;
         using associated_type = pose;
         
-        velocity_model () { }
+        velocity_model () = default;
         
-        velocity_model (const vector_type& mean, const vector_type& stddev) : base_type(mean, stddev) { }
+        velocity_model (const vector_type& mean, const vector_type& stddev)
+        : base_type(mean, stddev) { }
         
         static auto subtract (const vector_type& a, const vector_type& b) -> vector_type {
             return a - b;
@@ -131,6 +129,10 @@ namespace planar_robot {
             return velocity_slip_model::inv_observe ({ control(0), control(1), 0.0 });
 	}
         
+        static auto from_steering (double v, double w) -> vector_type {
+            return {v, w};
+        }
+        
         class proposal_dist {
             
             const velocity_model& model;
@@ -138,9 +140,9 @@ namespace planar_robot {
         public:
             
             using result_type = associated_type;
-            static const int vector_dim = velocity_model::vector_dim;
+            static constexpr int vector_dim = velocity_model::vector_dim;
             
-            proposal_dist (decltype(model) model) : model(model) { }
+            explicit proposal_dist (decltype(model) model) : model(model) { }
             auto operator() (random_source& random) const -> result_type { return inv_observe (model (random)); }
             auto likelihood (const result_type& x) const -> double { return model.likelihood (observe (x)); }
             auto log_likelihood (const result_type& x) const -> double { return model.log_likelihood (observe (x)); }
@@ -148,36 +150,28 @@ namespace planar_robot {
         };
         
         auto proposal () const -> proposal_dist {
-            return { *this };
+            return proposal_dist(*this);
         }
         
         class builder {
             
             Eigen::Matrix2d mat_variance;
-            double m_dt;
             
         public:
             
-            builder (double a1, double a2, double a3, double a4, double dt) : m_dt(dt) {
+            builder (double a1, double a2, double a3, double a4) {
                 mat_variance <<
                 a1, a2,
                 a3, a4;
-                mat_variance *= m_dt;
             }
             
-            builder (const boost::program_options::variables_map&, double dt=1.0);
+            builder (const boost::program_options::variables_map&);
             
             static auto program_options () -> boost::program_options::options_description;
 
-            auto operator() (const vector_type& control) const -> velocity_model {
-                return { m_dt*control, m_dt*(mat_variance*control.cwiseAbs2()).cwiseSqrt() };
+            auto operator() (const vector_type& control, double dt) const -> velocity_model {
+                return { dt*control, dt*(dt*mat_variance*control.cwiseAbs2()).cwiseSqrt() };
             }
-            
-            auto from_steering (double v, double w) -> velocity_model {
-                return operator()({v, w});
-            }
-            
-            auto dt () const -> double { return m_dt; }
         };
         
     };

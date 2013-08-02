@@ -88,7 +88,7 @@ void unscented_transform (const unscented_params<N>& params, TransformFunc f,
                           multivariate_normal_dense_base<M, ResultDist>& result,
                           Eigen::Matrix<double, N, M>* cross_cov = nullptr)
 {
-    unscented_transform (params, f, state, result, StateDist::matrix_type::Zero(), cross_cov);
+    unscented_transform (params, f, state, result, ResultDist::matrix_type::Zero(), cross_cov);
 }
 
 

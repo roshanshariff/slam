@@ -82,23 +82,23 @@ namespace slam {
             }
         }
         
-        virtual auto current_timestep () const override -> timestep_type {
+        virtual auto current_timestep () const -> timestep_type override {
             return max_likelihood->current_timestep();
         }
         
-        virtual auto get_state (timestep_type t) const override -> state_type {
+        virtual auto get_state (timestep_type t) const -> state_type override {
             return max_likelihood->get_state (t);
         }
         
-        virtual auto get_feature (featureid_type id) const override -> feature_type {
+        virtual auto get_feature (featureid_type id) const -> feature_type override {
             return max_likelihood->get_feature (id);
         }
         
-        virtual auto get_trajectory () const override -> const trajectory_type& {
+        virtual auto get_trajectory () const -> const trajectory_type& override {
             return max_likelihood->get_trajectory();
         }
         
-        virtual auto get_feature_map () const override -> const feature_map_type& {
+        virtual auto get_feature_map () const -> const feature_map_type& override {
             return max_likelihood->get_feature_map();
         }
         

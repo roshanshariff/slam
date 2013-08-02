@@ -49,9 +49,9 @@ target_link_libraries (slam ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIBRARY} ${G2O_SOLVE
 target_link_libraries (dataset ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIBRARY} ${G2O_SOLVER_CSPARSE} ${G2O_SOLVER_CSPARSE_EXTENSION})
 
 if (CMAKE_COMPILER_IS_GNUCXX)
-    add_definitions ("-std=c++11 -Werror -Wall -Wextra -march=native -mno-avx")
+    add_definitions ("-std=c++11 -Werror -Wall -Wextra -march=native -mno-avx -Wno-unused-local-typedefs")
 endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_definitions ("-std=c++11 -stdlib=libc++ -Werror -Wall -Wno-error=c++11-narrowing")
+    add_definitions ("-std=c++11 -stdlib=libc++ -Werror -Wall -Wno-error=c++11-narrowing -Wno-error=unused-variable")
 endif()

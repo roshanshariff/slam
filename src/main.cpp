@@ -34,7 +34,9 @@
 using slam_result_type = slam::slam_result_of<control_model_type, observation_model_type>;
 using slam_result_impl_type = slam::slam_result_of_impl<control_model_type, observation_model_type>;
 
-using simulator_type = simulator<controller_type, sensor_type>;
+using simulator_type = simulator<control_model_type, observation_model_type, controller_type, sensor_type>;
+using slam_data_type = slam::slam_data<control_model_type, observation_model_type>;
+using slam_dataset_type = slam::dataset<control_model_type, observation_model_type>;
 using slam_initialiser_type = slam::slam_initialiser<control_model_type, observation_model_type>;
 using mcmc_slam_type = slam::mcmc_slam<control_model_type, observation_model_type>;
 using multi_mcmc_type = slam::multi_mcmc<control_model_type, observation_model_type>;
@@ -59,26 +61,46 @@ int main (int argc, char* argv[]) {
     unsigned int mcmc_slam_seed = remember_option (options, "mcmc-slam-seed", random());
     unsigned int multi_mcmc_seed = remember_option (options, "multi-mcmc-seed", random());
     
-    auto sim = std::make_shared<simulator_type> (options, sim_seed);
+    const control_model_type::builder control_model_builder (options);
+    const observation_model_type::builder observation_model_builder (options);
+    
+    auto data = std::make_shared<slam_data_type>();
+    
+    std::shared_ptr<slam_dataset_type> dataset;
+    std::shared_ptr<slam_result_type> ground_truth;
+    
+    if (options.count ("dataset")) {
+        //dataset = std::make_shared<planar_robot::range_only_dataset> (options);
+    }
+    else {
+        controller_type controller (options);
+        sensor_type sensor (options);
+        auto simulator = std::make_shared<simulator_type> (options, sim_seed,
+                                                           control_model_builder,
+                                                           observation_model_builder,
+                                                           controller, sensor);
+        dataset = simulator;
+        ground_truth = simulator;
+    }
+    assert (dataset);
     
     auto init = std::make_shared<slam_initialiser_type> (init_seed);
-    sim->add_data_listener (init);
+    data->add_listener (init);
     
     std::shared_ptr<mcmc_slam_type> mcmc_slam;
     std::shared_ptr<mcmc_slam_type::updater> mcmc_slam_updater;
     if (options.count ("mcmc-slam")) {
-        mcmc_slam = std::make_shared<mcmc_slam_type> (sim->get_slam_data(), mcmc_slam_seed);
+        mcmc_slam = std::make_shared<mcmc_slam_type> (data, mcmc_slam_seed);
         mcmc_slam->set_initialiser (init);
         mcmc_slam_updater = std::make_shared<mcmc_slam_type::updater>(mcmc_slam, options);
-        sim->add_timestep_listener (mcmc_slam);
-        sim->add_timestep_listener (mcmc_slam_updater);
+        data->add_timestep_listener (mcmc_slam);
+        data->add_timestep_listener (mcmc_slam_updater);
     }
     
     std::shared_ptr<multi_mcmc_type> multi_mcmc;
     if (options.count ("multi-mcmc")) {
-        multi_mcmc = std::make_shared<multi_mcmc_type> (sim->get_slam_data(),
-                                                                   options, multi_mcmc_seed);
-        sim->add_timestep_listener (multi_mcmc);
+        multi_mcmc = std::make_shared<multi_mcmc_type> (data, options, multi_mcmc_seed);
+        data->add_timestep_listener (multi_mcmc);
     }
     
     std::shared_ptr<g2o_slam_type> g2o_slam;
@@ -86,22 +108,22 @@ int main (int argc, char* argv[]) {
     if (options.count ("g2o")) {
         g2o_slam = std::make_shared<g2o_slam_type> (init);
         g2o_slam_updater = std::make_shared<g2o_slam_type::updater>(g2o_slam, options);
-        sim->add_data_listener (g2o_slam);
-        sim->add_timestep_listener (g2o_slam_updater);
+        data->add_listener (g2o_slam);
+        data->add_timestep_listener (g2o_slam_updater);
     }
     
     std::shared_ptr<g2o_clustering_type> g2o_clustering;
     if (options.count ("cluster")) {
-        g2o_clustering = std::make_shared<g2o_clustering_type>(sim->get_slam_data(), init);
-        sim->add_data_listener (g2o_clustering);
+        g2o_clustering = std::make_shared<g2o_clustering_type>(data, init);
+        data->add_listener (g2o_clustering);
     }
     
     std::shared_ptr<slam_plotter> slam_plot;
     if (options.count ("slam-plot")) {
         
-        slam_plot = std::make_shared<slam_plotter> (options, sim->get_initial_state());
+        slam_plot = std::make_shared<slam_plotter> (options, ground_truth->get_initial_state());
         
-        slam_plot->add_data_source (sim, true, "Trajectory", "Landmarks",
+        slam_plot->add_data_source (ground_truth, true, "Trajectory", "Landmarks",
                                     "lc rgbcolor 'black' pt 6 ps 1.5",
                                     "lc rgbcolor 'black' lw 5",
                                     "size 10,20,50 filled lc rgbcolor 'black'");
@@ -120,7 +142,7 @@ int main (int argc, char* argv[]) {
                                         "size 10,20,50 filled lc rgbcolor 'red'");
         }
         
-        sim->add_timestep_listener (slam_plot);
+        data->add_timestep_listener (slam_plot);
     }
     
     std::shared_ptr<time_series_plotter> likelihood_plot;
@@ -131,11 +153,11 @@ int main (int argc, char* argv[]) {
         if (mcmc_slam) {
 
             likelihood_plot->add_data_source ([=](slam::timestep_type) {
-                return slam::slam_log_likelihood (*sim->get_slam_data(), *mcmc_slam) - sim->get_log_likelihood();
+                return slam::slam_log_likelihood (*data, *mcmc_slam) - slam::slam_log_likelihood (*data, *ground_truth);
             }, "MCMC-SLAM log likelihood", "lc rgbcolor 'green' lw 5");
         }
         
-        sim->add_timestep_listener (likelihood_plot);
+        data->add_timestep_listener (likelihood_plot);
     }
     
     /* set up simulation logging */
@@ -145,8 +167,10 @@ int main (int argc, char* argv[]) {
     
     {
         boost::timer::auto_cpu_timer timer (3, "CPU Time: %t seconds\n\n");
-        (*sim)();
+        data->add_dataset (*dataset, control_model_builder, observation_model_builder);
     }
+    
+    const double dataset_log_likelihood = slam::slam_log_likelihood (*data, *ground_truth);
     
     if (mcmc_slam && g2o_slam) {
         g2o_slam->reinitialise (*mcmc_slam);
@@ -157,11 +181,11 @@ int main (int argc, char* argv[]) {
     if (mcmc_slam) {
         std::cout
         << "MCMC-SLAM Trajectory RMSE: "
-        << planar_robot::trajectory_rmse (sim->get_trajectory(), mcmc_slam->get_trajectory()) << '\n'
+        << planar_robot::trajectory_rmse (ground_truth->get_trajectory(), mcmc_slam->get_trajectory()) << '\n'
         << "MCMC-SLAM Map RMSE: "
-        << planar_robot::map_rmse (sim->get_feature_map(), mcmc_slam->get_feature_map()) << '\n'
+        << planar_robot::map_rmse (ground_truth->get_feature_map(), mcmc_slam->get_feature_map()) << '\n'
         << "MCMC-SLAM log likelihood ratio: "
-        << mcmc_slam->get_log_likelihood() - sim->get_log_likelihood()
+        << mcmc_slam->get_log_likelihood() - dataset_log_likelihood
         << "\n\n";
     }
     
@@ -171,32 +195,32 @@ int main (int argc, char* argv[]) {
         << "Multi-MCMC-SLAM Chains: "
         << multi_mcmc->num_chains() << '\n'
         << "Multi-MCMC-SLAM Trajectory RMSE: "
-        << planar_robot::trajectory_rmse (sim->get_trajectory(), multi_mcmc->get_trajectory()) << '\n'
+        << planar_robot::trajectory_rmse (ground_truth->get_trajectory(), multi_mcmc->get_trajectory()) << '\n'
         << "Multi-MCMC-SLAM Map RMSE: "
-        << planar_robot::map_rmse (sim->get_feature_map(), multi_mcmc->get_feature_map()) << '\n'
+        << planar_robot::map_rmse (ground_truth->get_feature_map(), multi_mcmc->get_feature_map()) << '\n'
         << "Multi-MCMC-SLAM log likelihood ratio: "
-        << multi_mcmc->get_log_likelihood() - sim->get_log_likelihood()
+        << multi_mcmc->get_log_likelihood() - dataset_log_likelihood
         << "\n\n";
         
         auto average = multi_mcmc->get_average();
         std::cout
         << "Multi-MCMC-SLAM Averaged Trajectory RMSE: "
-        << planar_robot::trajectory_rmse (sim->get_trajectory(), average->get_trajectory()) << '\n'
+        << planar_robot::trajectory_rmse (ground_truth->get_trajectory(), average->get_trajectory()) << '\n'
         << "Multi-MCMC-SLAM Averaged Map RMSE: "
-        << planar_robot::map_rmse (sim->get_feature_map(), average->get_feature_map()) << '\n'
+        << planar_robot::map_rmse (ground_truth->get_feature_map(), average->get_feature_map()) << '\n'
         << "Multi-MCMC-SLAM log likelihood ratio: "
-        << slam::slam_log_likelihood (*sim->get_slam_data(), *average) - sim->get_log_likelihood()
+        << slam::slam_log_likelihood (*data, *average) - dataset_log_likelihood
         << "\n\n";        
     }
     
     if (g2o_slam) {
         std::cout
         << "G2O-SLAM Trajectory RMSE: "
-        << planar_robot::trajectory_rmse (sim->get_trajectory(), g2o_slam->get_trajectory()) << '\n'
+        << planar_robot::trajectory_rmse (ground_truth->get_trajectory(), g2o_slam->get_trajectory()) << '\n'
         << "G2O-SLAM Map RMSE: "
-        << planar_robot::map_rmse (sim->get_feature_map(), g2o_slam->get_feature_map()) << '\n'
+        << planar_robot::map_rmse (ground_truth->get_feature_map(), g2o_slam->get_feature_map()) << '\n'
         << "G2O-SLAM log likelihood ratio: "
-        << slam::slam_log_likelihood (*sim->get_slam_data(), *g2o_slam) - sim->get_log_likelihood()
+        << slam::slam_log_likelihood (*data, *g2o_slam) - dataset_log_likelihood
         << "\n\n";
     }
     
@@ -216,11 +240,11 @@ int main (int argc, char* argv[]) {
         for (const auto& cluster : g2o_clustering->get_clusters()) {
             if (top_clusters.size() >= color_names.size()) break;
             top_clusters.push_back (std::make_shared<slam_result_impl_type> (cluster.estimate));
-            std::cout << top_clusters.size() << ": " << (cluster.log_likelihood - sim->get_log_likelihood()) << '\n';
+            std::cout << top_clusters.size() << ": " << (cluster.log_likelihood - dataset_log_likelihood) << '\n';
         }
         
-        auto cluster_plot = std::make_shared<slam_plotter>(options, sim->get_initial_state());
-        cluster_plot->add_data_source (sim, true, "Trajectory", "Landmarks",
+        auto cluster_plot = std::make_shared<slam_plotter>(options, ground_truth->get_initial_state());
+        cluster_plot->add_data_source (ground_truth, true, "Trajectory", "Landmarks",
                                        "lc rgbcolor 'black' pt 6 ps 1.5",
                                        "lc rgbcolor 'black' lw 5",
                                        "size 10,20,50 filled lc rgbcolor 'black'");

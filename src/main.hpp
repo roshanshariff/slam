@@ -14,15 +14,15 @@ namespace planar_robot {
     struct range_only_model;
     struct velocity_slip_model;
     struct velocity_model;
-    template <class ControlModel> class waypoint_controller;
-    template <class ObservationModel> class landmark_sensor;
+    class waypoint_controller;
+    class landmark_sensor;
 }
 
 using control_model_type = planar_robot::velocity_model;
-using observation_model_type = planar_robot::range_only_model;
+using observation_model_type = planar_robot::range_bearing_model;
 
-using controller_type = planar_robot::waypoint_controller<control_model_type>;
-using sensor_type = planar_robot::landmark_sensor<observation_model_type>;
+using controller_type = planar_robot::waypoint_controller;
+using sensor_type = planar_robot::landmark_sensor;
 
 #include "planar_robot/waypoint_controller.hpp"
 #include "planar_robot/landmark_sensor.hpp"

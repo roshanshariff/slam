@@ -33,7 +33,7 @@ public:
     struct value_compare {
         explicit value_compare (const key_compare& cmp) : key_cmp(cmp) { }
         bool operator() (const value_type& lhs, const value_type& rhs) const {
-            return cmp (lhs.first, rhs.first);
+            return key_cmp (lhs.first, rhs.first);
         }
         const key_compare& get_key_compare() const { return key_cmp; }
         key_compare& get_key_compare() { return key_cmp; }

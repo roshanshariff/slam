@@ -30,14 +30,13 @@ auto velocity_slip_model::builder::program_options () -> po::options_description
 }
 
 
-velocity_slip_model::builder::builder (const po::variables_map& options, double dt)
+velocity_slip_model::builder::builder (const po::variables_map& options)
 : builder (options["velmodel-alpha1"].as<double>(),
            options["velmodel-alpha2"].as<double>(),
            options["velmodel-alpha3"].as<double>(),
            options["velmodel-alpha4"].as<double>(),
            options["velmodel-alpha5"].as<double>(),
-           options["velmodel-alpha6"].as<double>(),
-           dt)
+           options["velmodel-alpha6"].as<double>())
 { }
 
 
@@ -56,10 +55,9 @@ auto velocity_model::builder::program_options () -> po::options_description {
 }
 
 
-velocity_model::builder::builder (const po::variables_map& options, double dt)
+velocity_model::builder::builder (const po::variables_map& options)
 : builder (options["velmodel-alpha1"].as<double>(),
            options["velmodel-alpha2"].as<double>(),
            options["velmodel-alpha3"].as<double>(),
-           options["velmodel-alpha4"].as<double>(),
-           dt)
+           options["velmodel-alpha4"].as<double>())
 { }

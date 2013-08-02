@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <iterator>
 #include <cmath>
+#include <cstddef>
 
 #include "utility/random.hpp"
 
@@ -29,38 +30,41 @@ namespace slam {
             particle (const Particle& p, double w = 1.0) : Particle(p), weight(w) { }
         };
         
-        struct compare_particle_weight {
-            bool operator() (const particle& a, const particle& b) const { return a.weight > b.weight; }
-        };
-        
         std::vector<particle> particles;
-        const particle* max_weight;
+        particle* max_weight;
         
         double weight_sum;
         double squared_weight_sum;
         
     public:
         
+        using iterator = Particle*;
+        using const_iterator = const Particle*;
+        
         particle_filter ()
         : particles(1), max_weight(&particles.front()), weight_sum(1.0), squared_weight_sum(1.0) { }
         
-        size_t size () const { return particles.size(); }
+        std::size_t size () const { return particles.size(); }
+        
         double effective_size () const {
             return squared_weight_sum > 0 ? weight_sum*weight_sum/squared_weight_sum : 0;
         }
         
         template <class Updater> void update (Updater);
         
-        void resample (random_source& random, size_t new_size);
+        template <class Initializer> void reinitialize (std::size_t new_size, Initializer);
+        
+        void resample (random_source& random, std::size_t new_size);
         void resample (random_source& random) { resample (random, size()); }
         
-        template <class Initializer> void reinitialize (size_t new_size, Initializer);
+        iterator begin () { return particles.data(); }
+        iterator end () { return particles.data()+size(); }
+        const_iterator begin () const { return particles.data(); }
+        const_iterator end () const { return particles.data()+size(); }
         
-        const Particle& operator[] (size_t index) const { return particles[index]; }
-        Particle& operator[] (size_t index) { return particles[index]; }
-        
+        Particle& max_weight_particle () { return *max_weight; }
         const Particle& max_weight_particle () const { return *max_weight; }
-        
+
     };
     
 }
@@ -79,14 +83,16 @@ void slam::particle_filter<Particle>::update (Updater f) {
         if (!std::isfinite(particle.weight) || particle.weight < 0) particle.weight = 0;
         weight_sum += particle.weight;
         squared_weight_sum += particle.weight * particle.weight;
-        if (compare_particle_weight()(particle, *max_weight)) max_weight = &particle;
+        if (particle.weight > max_weight->weight) max_weight = &particle;
     }
 }
 
 template <class Particle>
-void slam::particle_filter<Particle>::resample (random_source& random, size_t new_size) {
+void slam::particle_filter<Particle>::resample (random_source& random, std::size_t new_size) {
     
-    std::sort (particles.begin(), particles.end(), compare_particle_weight());
+    std::sort (particles.begin(), particles.end(), [](const particle& a, const particle& b) {
+        return a.weight > b.weight;
+    });
     
     std::vector<particle> new_particles;
     new_particles.reserve (new_size);
@@ -110,10 +116,10 @@ void slam::particle_filter<Particle>::resample (random_source& random, size_t ne
 
 template <class Particle>
 template <class Initializer>
-void slam::particle_filter<Particle>::reinitialize (size_t new_size, Initializer init) {
+void slam::particle_filter<Particle>::reinitialize (std::size_t new_size, Initializer init) {
     particles.clear();
     particles.reserve(new_size);
-    std::generate_n (std::back_inserter (particles), new_size, init);
+    std::generate_n (std::back_inserter(particles), new_size, init);
     max_weight = &particles.front();
     weight_sum = squared_weight_sum = new_size;
 }

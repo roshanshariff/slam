@@ -34,9 +34,8 @@ T remember_option (boost::program_options::variables_map& options, const std::st
 
 
 template <class Iter>
-struct iter_pair_range : std::pair<Iter,Iter> {
-    iter_pair_range (const std::pair<Iter,Iter>& x) : std::pair<Iter,Iter>(x) { }
-    iter_pair_range (Iter begin, Iter end) : std::pair<Iter,Iter>(begin, end) { }
+struct iter_pair_range : public std::pair<Iter,Iter> {
+    using std::pair<Iter, Iter>::pair;
     auto begin() const -> Iter { return this->first; }
     auto end() const -> Iter { return this->second; }
     auto size() const -> decltype(Iter() - Iter()) { return end() - begin(); }

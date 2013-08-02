@@ -22,7 +22,8 @@ namespace planar_robot {
         
 	range_bearing_model () = default;
         
-	range_bearing_model (const vector_type& mean, const vector_type& stddev) : base_type(mean, stddev) { }
+	range_bearing_model (const vector_type& mean, const vector_type& stddev)
+        : base_type(mean, stddev) { }
         
 	static auto subtract (const vector_type& a, const vector_type& b) -> vector_type {
             return { a(0)-b(0), wrap_angle(a(1)-b(1)) };
@@ -43,9 +44,9 @@ namespace planar_robot {
         public:
             
             using result_type = associated_type;
-            static const int vector_dim = range_bearing_model::vector_dim;
+            static constexpr int vector_dim = range_bearing_model::vector_dim;
             
-            proposal_dist (const range_bearing_model& model) : model(model) { }
+            explicit proposal_dist (const range_bearing_model& model) : model(model) { }
             
             auto operator() (random_source& random) const -> result_type { return inv_observe (model (random)); }
             auto likelihood (const result_type& x) const -> double { return model.likelihood (observe (x)); }
@@ -54,7 +55,7 @@ namespace planar_robot {
         };
         
         auto proposal () const -> proposal_dist {
-            return { *this };
+            return proposal_dist(*this);
         }
         
 	class builder : public std::unary_function<vector_type, range_bearing_model> {
@@ -82,7 +83,7 @@ namespace planar_robot {
         
         using associated_type = position;
         
-        range_only_model () { };
+        range_only_model () = default;
         
         range_only_model (const vector_type& mean, const vector_type& stddev) : base_type(mean, stddev) { }
         
@@ -103,9 +104,9 @@ namespace planar_robot {
         public:
             
             using result_type = associated_type;
-            static const int vector_dim = range_only_model::vector_dim + 1;
+            static constexpr int vector_dim = range_only_model::vector_dim + 1;
             
-            proposal_dist (const range_only_model& model) : model(model) { }
+            explicit proposal_dist (const range_only_model& model) : model(model) { }
             
             auto operator() (random_source& random) const -> result_type {
                 using namespace boost::math::constants;
@@ -129,7 +130,7 @@ namespace planar_robot {
         };
         
         auto proposal () const -> proposal_dist {
-            return { *this };
+            return proposal_dist(*this);
         }
         
         class builder : public std::unary_function<vector_type, range_only_model> {

@@ -23,8 +23,8 @@ private:
     
 public:
     
-    random_source () { }
-    random_source (result_type seed) : engine(seed) { }
+    random_source () = default;
+    explicit random_source (result_type seed) : engine(seed) { }
     
     auto operator()() -> result_type { return engine(); }
     void seed (result_type seed) { engine.seed(seed); uniform_dist.reset(); normal_dist.reset(); }
@@ -43,7 +43,7 @@ public:
 template <int N, class Derived>
 struct multivariate_normal_base {
     
-    const static int vector_dim = N;
+    static constexpr int vector_dim = N;
     
     using vector_type = Eigen::Matrix<double, N, 1>;
     using matrix_type = Eigen::Matrix<double, N, N>;
@@ -54,9 +54,9 @@ private:
     
 protected:
     
-    multivariate_normal_base () { }
+    multivariate_normal_base () = default;
     
-    multivariate_normal_base (const vector_type& v) : m_mean(v) { }
+    explicit multivariate_normal_base (const vector_type& v) : m_mean(v) { }
     
 public:
     
@@ -76,7 +76,9 @@ public:
     
     auto chol_cov_log_det () const -> double { return derived().chol_cov_log_det(); }
     
-    static auto subtract (const vector_type& a, const vector_type& b) -> vector_type { return Derived::subtract(a, b); }
+    static auto subtract (const vector_type& a, const vector_type& b) -> vector_type {
+        return Derived::subtract(a, b);
+    }
     
     auto operator() (random_source& random) const -> vector_type {
         vector_type result;
@@ -122,7 +124,7 @@ private:
     
 protected:
     
-    multivariate_normal_dense_base () { }
+    multivariate_normal_dense_base () = default;
     
     multivariate_normal_dense_base (const vector_type& mean, const matrix_type& chol_cov)
     : base_type(mean), m_chol_cov(chol_cov) { }
@@ -152,7 +154,7 @@ public:
 
 
 template <int N>
-struct multivariate_normal_dist : public multivariate_normal_dense_base<N, multivariate_normal_dist<N> > {
+struct multivariate_normal_dist : public multivariate_normal_dense_base<N, multivariate_normal_dist<N>> {
     
     using base_type = multivariate_normal_dense_base<N, multivariate_normal_dist>;
     using typename base_type::matrix_type;
@@ -178,7 +180,7 @@ struct multivariate_normal_adapter
     
     using associated_type = Adapted;
     
-    multivariate_normal_adapter () { }
+    multivariate_normal_adapter () = default;
     
     multivariate_normal_adapter (const vector_type& mean, const matrix_type& chol_cov)
     : base_type(mean, chol_cov) { }
@@ -211,7 +213,7 @@ private:
     
 protected:
     
-    independent_normal_base () { }
+    independent_normal_base () = default;
     
     independent_normal_base (const vector_type& mean, const vector_type& std_dev)
     : base_type(mean), m_stddev(std_dev) { }

@@ -17,7 +17,7 @@
 #include <boost/program_options.hpp>
 #include <boost/optional.hpp>
 #include <boost/none.hpp>
-
+#include <boost/range/adaptor/reversed.hpp>
 #include <Eigen/Eigen>
 
 #include "slam/interfaces.hpp"
@@ -48,10 +48,16 @@ namespace slam {
         
         friend class fastslam_mcmc<ControlModel, ObservationModel>;
         
-        using state_type = typename ControlModel::result_type;
-        using feature_type = typename ObservationModel::result_type;
-        
+        using slam_result_type = slam_result_of<ControlModel, ObservationModel>;
         using slam_data_type = slam_data<ControlModel, ObservationModel>;
+        
+    public:
+        using typename slam_result_type::state_type;
+        using typename slam_result_type::feature_type;
+        using typename slam_result_type::trajectory_type;
+        using typename slam_result_type::feature_map_type;
+
+    private:
         
         using vec = vector_transform_functors<ControlModel, ObservationModel>;
         
@@ -72,8 +78,6 @@ namespace slam {
         struct observed_feature_type {
             featureid_type id;
             ObservationModel observation;
-            observed_feature_type (featureid_type id, const ObservationModel& obs)
-            : id(id), observation(obs) { }
         };
         
         
@@ -90,14 +94,14 @@ namespace slam {
         
         /** The particle filter, its target size, and the resample threshold. */
         particle_filter<particle_type> particles;
-        size_t num_particles;
+        std::size_t num_particles;
         double resample_threshold;
         double collapse_threshold;
         
         /** Whether to keep a per-particle trajectory as opposed to one combined trajectory. */
         const bool discard_history;
-        mutable utility::bitree<state_type> trajectory_estimate;
-        mutable utility::flat_map<featureid_type, feature_type> map_estimate;
+        mutable trajectory_type trajectory_estimate;
+        mutable feature_map_type map_estimate;
         
         /** All the UKF parameters used by FastSLAM */
         const struct unscented_params_holder {
@@ -118,11 +122,11 @@ namespace slam {
         double particle_state_update (particle_type&) const;
         double particle_log_weight (const particle_type&) const;
         
-        bool filter_collapsed () const {
+        auto filter_collapsed () const -> bool {
             return particles.effective_size() < num_particles*collapse_threshold;
         }
         
-        bool resample_required () const {
+        auto resample_required () const -> bool {
             return particles.effective_size() < num_particles*resample_threshold;
         }
         
@@ -133,28 +137,30 @@ namespace slam {
         
         fastslam (boost::program_options::variables_map& options, unsigned int seed);
         
-        static boost::program_options::options_description program_options ();
+        static auto program_options () -> boost::program_options::options_description;
         
-        double effective_particle_ratio () const { return particles.effective_size()/particles.size(); }
+        auto effective_particle_ratio () const -> double {
+            return particles.effective_size()/particles.size();
+        }
         
         // Overridden virtual member functions of slam::slam_result
         
         virtual void timestep (timestep_type) override;
         
-        virtual timestep_type current_timestep () const override {
+        virtual auto current_timestep () const -> timestep_type override {
             assert (next_timestep > 0);
             return next_timestep - 1;
         }
         
-        virtual state_type get_state (timestep_type t) const override;
+        virtual auto get_state (timestep_type t) const -> state_type override;
         
-        virtual feature_type get_feature (featureid_type id) const override {
+        virtual auto get_feature (featureid_type id) const -> feature_type override {
             return particles.max_weight_particle().features.get(id).mean();
         }
         
-        virtual const decltype(trajectory_estimate)& get_trajectory () const override;
+        virtual auto get_trajectory () const -> const trajectory_type& override;
         
-        virtual const decltype(map_estimate)& get_feature_map () const override;
+        virtual auto get_feature_map () const -> const feature_map_type& override;
         
         // Overridden virtual member functions of slam::slam_data::listener
         
@@ -167,7 +173,7 @@ namespace slam {
         virtual void observation (timestep_type t, const typename slam_data_type::observation_info& obs) override {
             assert (t == next_timestep);
             auto& features = obs.index() == 0 ? new_features : seen_features;
-            features.emplace_back (obs.id(), obs.observation());
+            features.push_back ({obs.id(), obs.observation()});
         }
         
     };
@@ -197,7 +203,7 @@ void slam::fastslam<ControlModel, ObservationModel>
         const state_type& state_estimate = particles.max_weight_particle().trajectory.state;
         
         if (discard_history) {
-            trajectory_estimate.push_back (-trajectory_estimate.accumulate() + state_estimate);
+            trajectory_estimate.push_back_accumulated (state_estimate);
         }
 
         assert ((trajectory_estimate.size() == timestep) == discard_history);
@@ -206,14 +212,14 @@ void slam::fastslam<ControlModel, ObservationModel>
     // Update particle features
     
     for (const auto& obs : seen_features) {
-        for (size_t i = 0; i < particles.size(); ++i) {
+        for (auto& particle : particles) {
             
-            const state_type& state = particles[i].trajectory.state;
+            const state_type& state = particle.trajectory.state;
             
-            feature_dist feature = particles[i].features.get (obs.id);
+            feature_dist feature = particle.features.get (obs.id);
             unscented_update (ukf_params.feature, typename vec::feature_observer(state),
-                              feature.vector_model(), obs.observation.vector_model());
-            particles[i].features.insert (obs.id, feature);
+                              feature.vector_model(), obs.observation);
+            particle.features.insert (obs.id, feature);
         }
     }
     seen_features.clear();
@@ -221,14 +227,14 @@ void slam::fastslam<ControlModel, ObservationModel>
     // Initialize new features
     
     for (const auto& obs : new_features) {
-        for (size_t i = 0; i < particles.size(); ++i) {
+        for (auto& particle : particles) {
             
-            const state_type& state = particles[i].trajectory.state;
+            const state_type& state = particle.trajectory.state;
             
             feature_dist feature;
             unscented_transform (ukf_params.obs, typename vec::feature_initializer(state),
-                                 obs.observation.vector_model(), feature.vector_model());
-            particles[i].features.insert (obs.id, feature);
+                                 obs.observation, feature.vector_model());
+            particle.features.insert (obs.id, feature);
         }
     }
     num_features += new_features.size();
@@ -249,7 +255,7 @@ auto slam::fastslam<ControlModel, ObservationModel>
     state_dist state, state_proposal;
     
     unscented_transform (ukf_params.control, typename vec::state_predictor(particle.trajectory.state),
-                         current_control->vector_model(), state.vector_model());
+                         *current_control, state.vector_model());
     
     { // Calculate proposal distribution
         
@@ -268,7 +274,7 @@ auto slam::fastslam<ControlModel, ObservationModel>
             state_feature_joint.chol_cov().template bottomLeftCorner<vec::feature_dim, vec::state_dim>().setZero();
             
             unscented_update (ukf_params.state_feature, typename vec::state_feature_observer(),
-                              state_feature_joint, obs.observation.vector_model());
+                              state_feature_joint, obs.observation);
         }
         
         state_proposal.vector_model().mean() = state_feature_joint.mean().template head<vec::state_dim>();
@@ -299,11 +305,11 @@ auto slam::fastslam<ControlModel, ObservationModel>
         
         const feature_dist& feature = particle.features.get (obs.id);
         
-        multivariate_normal_adapter<typename ObservationModel::vector_model_type> predicted_obs;
+        ObservationModel predicted_obs;
         unscented_transform (ukf_params.feature, typename vec::feature_observer (particle.trajectory.state),
-                             feature.vector_model(), predicted_obs, obs.observation.vector_model().derived().chol_cov());
+                             feature.vector_model(), predicted_obs, obs.observation.derived().chol_cov());
         
-        log_weight += predicted_obs.log_likelihood (obs.observation.vector_model().mean());
+        log_weight += predicted_obs.log_likelihood (obs.observation.mean());
     }
     
     return log_weight;
@@ -313,18 +319,13 @@ auto slam::fastslam<ControlModel, ObservationModel>
 template <class ControlModel, class ObservationModel>
 auto slam::fastslam<ControlModel, ObservationModel>
 ::get_state (timestep_type timestep) const -> state_type {
-    
     assert (timestep <= current_timestep());
-
     if (!discard_history && trajectory_estimate.size() != current_timestep()) {
-        
         const typename particle_type::state_list* p = &particles.max_weight_particle().trajectory;
-        
         for (timestep_type t = current_timestep(); t > timestep; --t) {
             p = p->previous.get();
             assert(p);
         }
-
         return p->state;
     }
     else {
@@ -335,19 +336,23 @@ auto slam::fastslam<ControlModel, ObservationModel>
 
 template <class ControlModel, class ObservationModel>
 auto slam::fastslam<ControlModel, ObservationModel>
-::get_trajectory () const -> const decltype(trajectory_estimate)& {
+::get_trajectory () const -> const trajectory_type& {
     
     if (!discard_history && trajectory_estimate.size() != current_timestep()) {
         
-        trajectory_estimate.clear();
-        trajectory_estimate.resize (current_timestep());
-        
         const typename particle_type::state_list* p = &particles.max_weight_particle().trajectory;
-        
-        for (timestep_type t = current_timestep(); t > 0; --t) {
-            assert (p->previous);
-            trajectory_estimate[t-1] = -p->previous->state + p->state;
+        std::vector<state_type> states_reversed;
+
+        while (p->previous) {
+            states_reversed.push_back (p->state);
             p = p->previous.get();
+        }
+
+        trajectory_estimate.clear();
+        trajectory_estimate.reserve(states_reversed.size());
+        
+        for (const auto& state : boost::adaptors::reverse (states_reversed)) {
+            trajectory_estimate.push_back_accumulated (state);
         }
     }
     
@@ -358,17 +363,17 @@ auto slam::fastslam<ControlModel, ObservationModel>
 
 template <class ControlModel, class ObservationModel>
 auto slam::fastslam<ControlModel, ObservationModel>
-::get_feature_map () const -> const decltype(map_estimate)& {
+::get_feature_map () const -> const feature_map_type& {
     
     if (map_estimate.size() != num_features) {
         
         map_estimate.clear();
         map_estimate.reserve(num_features);
         
-        particles.max_weight_particle().features.for_each
-        ([&](featureid_type id, const feature_dist& estimate) {
-            map_estimate.emplace_hint (map_estimate.end(), id, estimate.mean());
-        });
+        auto map_inserter = [&](featureid_type id, const feature_dist& estimate) {
+            map_estimate.emplace_hint (map_estimate.cend(), id, estimate.mean());
+        };
+        particles.max_weight_particle().features.for_each (map_inserter);
     }
     
     assert (map_estimate.size() == num_features);

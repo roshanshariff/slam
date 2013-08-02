@@ -45,10 +45,13 @@ namespace slam {
         using slam_result_type = slam_result_of<ControlModel, ObservationModel>;
         using slam_data_type = slam_data<ControlModel, ObservationModel>;
         
+        /** See http://gcc.gnu.org/bugzilla/show_bug.cgi?id=58047 for why the redundant
+         ** "state_type = " is needed here in g++ 4.8.1 */
+
         using state_type = typename slam_result_type::state_type;
         using feature_type = typename slam_result_type::feature_type;
-        using trajectory_type = typename slam_result_type::trajectory_type;
-        using feature_map_type = typename slam_result_type::feature_map_type;
+        using typename slam_result_type::trajectory_type;
+        using typename slam_result_type::feature_map_type;
 
         using control_type = typename ControlModel::vector_type;
         using observation_type = typename ObservationModel::vector_type;
@@ -59,15 +62,15 @@ namespace slam {
             
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
             
-            vertex_state () { }
+            vertex_state () = default;
             
             vertex_state (int id, const state_type& estimate) {
                 this->setId (id);
                 this->setEstimate (estimate);
             }
             
-            virtual bool read (std::istream&) { return true; }
-            virtual bool write (std::ostream&) const { return true; }
+            virtual auto read (std::istream&) -> bool { return true; }
+            virtual auto write (std::ostream&) const -> bool { return true; }
             
         protected:
             
@@ -86,15 +89,15 @@ namespace slam {
             
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
             
-            vertex_landmark () { }
+            vertex_landmark () = default;
             
             vertex_landmark (int id, const feature_type& estimate) {
                 this->setId (id);
                 this->setEstimate (estimate);
             }
             
-            virtual bool read (std::istream&) { return true; }
-            virtual bool write (std::ostream&) const { return true; }
+            virtual auto read (std::istream&) -> bool { return true; }
+            virtual auto write (std::ostream&) const -> bool { return true; }
             
         protected:
             
@@ -126,8 +129,8 @@ namespace slam {
                 this->setInformation (chol_cov_inv.transpose() * chol_cov_inv);
             }
             
-            virtual bool read (std::istream&) { return true; }
-            virtual bool write (std::ostream&) const { return true; }
+            virtual auto read (std::istream&) -> bool { return true; }
+            virtual auto write (std::ostream&) const -> bool { return true; }
             
         protected:
             
@@ -157,8 +160,8 @@ namespace slam {
                 this->setInformation (chol_cov_inv.transpose() * chol_cov_inv);
             }
             
-            virtual bool read (std::istream&) { return true; }
-            virtual bool write (std::ostream&) const { return true; }
+            virtual auto read (std::istream&) -> bool { return true; }
+            virtual auto write (std::ostream&) const -> bool { return true; }
             
         protected:
             
@@ -175,15 +178,12 @@ namespace slam {
         
         std::shared_ptr<slam_result_type> initialiser;
         
-        unsigned int g2o_steps = 0;
-        unsigned int g2o_end_steps = 0;
-        bool need_init = false;
-        
         g2o::SparseOptimizer optimizer;
-        int next_vertex_id = 0;
+        bool need_init = false;
         
         std::vector<vertex_state*> state_vertices;
         std::map<featureid_type, vertex_landmark*> feature_vertices;
+        int next_vertex_id = 0;
         
         mutable trajectory_type trajectory_estimate;
         mutable feature_map_type map_estimate;
@@ -200,31 +200,31 @@ namespace slam {
         
         void optimise (unsigned int iterations);
         
-        // Overridden virtual member functions of slam::slam_data::listener
+        /** Overridden virtual member functions of slam::slam_data::listener */
 
         virtual void control (timestep_type t, const ControlModel& control) override;
         virtual void observation (timestep_type t, const typename slam_data_type::observation_info& obs) override;
         
         virtual void timestep (timestep_type) override;
         
-        // Overridden virtual member functions of slam::slam_result
+        /** Overridden virtual member functions of slam::slam_result */
         
-        virtual timestep_type current_timestep () const override {
+        virtual auto current_timestep () const -> timestep_type override {
             assert (next_timestep > 0);
             return next_timestep - 1;
         }
         
-        virtual state_type get_state (timestep_type t) const override {
+        virtual auto get_state (timestep_type t) const -> state_type override {
             return state_vertices.at(t)->estimate();
         }
         
-        virtual feature_type get_feature (featureid_type id) const override {
+        virtual auto get_feature (featureid_type id) const -> feature_type override {
             return feature_vertices.at(id)->estimate();
         }
         
-        virtual const decltype(trajectory_estimate)& get_trajectory () const override;
+        virtual auto get_trajectory () const -> const trajectory_type& override;
         
-        virtual const decltype(map_estimate)& get_feature_map () const override;
+        virtual auto get_feature_map () const -> const feature_map_type& override;
         
         double objective_value () const { return optimizer.activeRobustChi2(); }
         
@@ -369,16 +369,15 @@ void slam::g2o_slam<ControlModel, ObservationModel>
 
 template <class ControlModel, class ObservationModel>
 auto slam::g2o_slam<ControlModel, ObservationModel>
-::get_trajectory () const -> const decltype(trajectory_estimate)& {
+::get_trajectory () const -> const trajectory_type& {
     
     if (trajectory_estimate.size() != current_timestep()) {
         
         trajectory_estimate.clear();
         trajectory_estimate.reserve (current_timestep());
         
-        for (timestep_type t; t < current_timestep(); ++t) {
-            
-            trajectory_estimate.push_back (-get_state(t) + get_state(t+1));
+        for (timestep_type t (1); t <= current_timestep(); ++t) {
+            trajectory_estimate.push_back_accumulated (get_state (t));
         }
     }
     
@@ -389,7 +388,7 @@ auto slam::g2o_slam<ControlModel, ObservationModel>
 
 template <class ControlModel, class ObservationModel>
 auto slam::g2o_slam<ControlModel, ObservationModel>
-::get_feature_map () const -> const decltype(map_estimate)& {
+::get_feature_map () const -> const feature_map_type& {
     
     if (map_estimate.size() != feature_vertices.size()) {
         

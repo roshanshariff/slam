@@ -61,8 +61,9 @@ private:
 
 class cowtree::root : public cowtree {
 public:
-    friend void swap (root& a, root& b) noexcept { a.swap(b); }
     using cowtree::clear;
+    using cowtree::swap;
+    friend void swap (root& a, root& b) noexcept { a.swap(b); }
 };
 
 

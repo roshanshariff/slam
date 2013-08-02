@@ -17,55 +17,79 @@
 namespace slam {
     
     template <class State, class Feature>
-    class slam_result_impl : public slam_result<State, Feature> {
-        
-        utility::bitree<State> m_trajectory;
-        utility::flat_map<featureid_type, Feature> m_map;
-
-    public:
+    class slam_result_impl : public virtual slam_result<State, Feature> {
         
         using slam_result_type = slam_result<State, Feature>;
+
+    public:
+        using typename slam_result_type::state_type;
+        using typename slam_result_type::feature_type;
+        using typename slam_result_type::trajectory_type;
+        using typename slam_result_type::feature_map_type;
+        
+    private:
+        state_type m_initial_state;
+        trajectory_type m_trajectory;
+        feature_map_type m_map;
+
+    public:
         
         slam_result_impl () { };
         
         explicit slam_result_impl (const slam_result_type& o)
-        : m_trajectory (o.get_trajectory()), m_map (o.get_feature_map()) { }
+        : m_initial_state(o.get_initial_state()), m_trajectory(o.get_trajectory()),
+        m_map(o.get_feature_map()) { }
         
         auto operator= (const slam_result_type& o) -> slam_result_impl& {
+            m_initial_state = o.get_initial_state();
             m_trajectory = o.get_trajectory();
             m_map = o.get_feature_map();
             return *this;
         }
         
+        /** Member functions from timestep_listener */
+        
         virtual void timestep (timestep_type t) override {
             assert (t <= current_timestep());
         }
         
-        virtual auto current_timestep () const override -> timestep_type {
+        /** Member functions from data_source */
+        
+        virtual auto current_timestep () const -> timestep_type override {
             return timestep_type (m_trajectory.size());
         }
         
-        virtual auto get_state (timestep_type t) const override -> State {
-            return m_trajectory.accumulate (t);
+        /** Member functions from slam_result */
+        
+        virtual auto get_initial_state () const -> state_type override {
+            return m_initial_state;
         }
         
-        virtual auto get_feature (featureid_type id) const override -> Feature {
+        virtual auto get_state (timestep_type t) const -> state_type override {
+            return get_initial_state() + m_trajectory.accumulate (t);
+        }
+        
+        virtual auto get_feature (featureid_type id) const -> feature_type override {
             return m_map.at (id);
         }
         
-        virtual auto get_trajectory () const override -> const decltype(m_trajectory)& {
+        virtual auto get_trajectory () const -> const trajectory_type& override {
             return m_trajectory;
         }
         
-        virtual auto get_feature_map () const override -> const decltype(m_map)& {
+        virtual auto get_feature_map () const -> const feature_map_type& override {
             return m_map;
         }
         
-        auto get_trajectory () -> decltype(m_trajectory)& {
+        void set_initial_state (const state_type& state) {
+            m_initial_state = state;
+        }
+        
+        auto get_trajectory () -> trajectory_type& {
             return m_trajectory;
         }
         
-        auto get_feature_map () -> decltype(m_map)& {
+        auto get_feature_map () -> feature_map_type& {
             return m_map;
         }
         
