@@ -1,10 +1,9 @@
 #ifndef _PLANAR_ROBOT_POSE_HPP
 #define _PLANAR_ROBOT_POSE_HPP
 
-#include <cmath>
+#include <complex>
 
 #include <Eigen/Core>
-#include <Eigen/Geometry>
 
 #include "planar_robot/position.hpp"
 #include "utility/geometry.hpp"
@@ -17,46 +16,46 @@ namespace planar_robot {
     
     class pose {
         
-        Eigen::Vector2d translation;
-        Eigen::Rotation2Dd rotation;
+	std::complex<double> translation;
+	std::complex<double> rotation;
         
     protected:
         
-	pose (const Eigen::Vector2d& trans, const Eigen::Rotation2Dd& rot)
+	pose (const std::complex<double>& trans, const std::complex<double>& rot)
 	: translation(trans), rotation(rot) { }
         
     public:
         
-	static const int vector_dim = 3;
+	static constexpr int vector_dim = 3;
 	using vector_type = Eigen::Vector3d;
         
-	pose () : pose({ 0.0, 0.0 }, 0.0) { }
+	pose () : translation(), rotation(1) { }
         
 	static pose cartesian (double x, double y, double bearing) {
-            return pose ({ x, y }, bearing);
+            return pose (std::complex<double>(x,y), std::polar(1.0, bearing));
 	}
         
-	static pose polar (double dist, double dir, double bearing) {
-            return pose ({ dist*std::cos(dir), dist*std::sin(dir) }, bearing);
+	static pose polar (double distance, double direction, double bearing) {
+            return pose (std::polar(distance, direction), std::polar(1.0, bearing));
 	}
         
 	static pose from_position (const position& position, double bearing) {
-            return pose (position.pos, bearing);
+            return pose (position.pos, std::polar(1.0, bearing));
 	}
         
-	double x () const { return translation.x(); }
-	double y () const { return translation.y(); }
-	double bearing () const { return rotation.angle(); }
-	double distance () const { return translation.norm(); }
-	double direction () const { return std::atan2 (y(), x()); }
-	double distance_squared () const { return translation.squaredNorm(); }
+	double x () const { return translation.real(); }
+	double y () const { return translation.imag(); }
+	double bearing () const { return std::arg(rotation); }
+	double distance () const { return std::abs(translation); }
+	double direction () const { return std::arg(translation); }
+	double distance_squared () const { return std::norm(translation); }
         
-	vector_type to_vector () const { return { x(), y(), bearing() }; }
+	vector_type to_vector () const { return vector_type(x(), y(), bearing()); }
         
 	static pose from_vector (const vector_type& v) { return cartesian (v(0), v(1), v(2)); }
         
         static vector_type subtract (const vector_type& a, const vector_type& b) {
-            return { a(0)-b(0), a(1)-b(1), wrap_angle(a(2)-b(2)) };
+            return vector_type (a(0)-b(0), a(1)-b(1), wrap_angle(a(2)-b(2)));
         }
         
 	pose& operator+= (const pose& p) {
@@ -66,8 +65,8 @@ namespace planar_robot {
 	}
         
 	pose operator- () const {
-            Eigen::Rotation2Dd inverse_rot = rotation.inverse();
-            return { inverse_rot*(-translation), inverse_rot };
+            std::complex<double> inverse_rot = std::complex<double>(1.0)/rotation;
+            return pose (-translation*inverse_rot, inverse_rot);
 	}
         
 	friend position operator+ (const pose&, const position&);

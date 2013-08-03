@@ -1,7 +1,7 @@
 #ifndef _PLANAR_ROBOT_POSITION_HPP
 #define _PLANAR_ROBOT_POSITION_HPP
 
-#include <cmath>
+#include <complex>
 
 #include <Eigen/Core>
 
@@ -14,36 +14,36 @@ namespace planar_robot {
     
     class position {
         
-        Eigen::Vector2d pos;
+	std::complex<double> pos;
         
     protected:
         
-	explicit position (const Eigen::Vector2d& p) : pos(p) { }
+	position (const std::complex<double>& p) : pos(p) { }
         
     public:
         
-	static const int vector_dim = 2;
+	static constexpr int vector_dim = 2;
 	using vector_type = Eigen::Vector2d;
         
-        position () : position({ 0.0, 0.0 }) { }
+        position () : pos() { }
         
 	static position cartesian (double x, double y) {
-            return position ({ x, y });
+            return position (std::complex<double> (x, y));
 	}
         
-	static position polar (double dist, double dir) {
-            return position ({ dist*std::cos(dir), dist*std::sin(dir) });
+	static position polar (double distance, double direction) {
+            return position (std::polar (distance, direction));
 	}
         
-	double x () const { return pos.x(); }
-	double y () const { return pos.y(); }
-	double distance () const { return pos.norm(); }
-	double direction () const { return std::atan2 (y(), x()); }
-	double distance_squared () const { return pos.squaredNorm(); }
+	double x () const { return pos.real(); }
+	double y () const { return pos.imag(); }
+	double distance () const { return std::abs(pos); }
+	double direction () const { return std::arg(pos); }
+	double distance_squared () const { return std::norm(pos); }
         
-	vector_type to_vector () const { return pos; }
+	vector_type to_vector () const { return vector_type (x(), y()); }
         
-	static position from_vector (const vector_type& v) { return position (v); }
+	static position from_vector (const vector_type& v) { return cartesian (v(0), v(1)); }
         
         static vector_type subtract (const vector_type& a, const vector_type& b) { return a - b; }
         
