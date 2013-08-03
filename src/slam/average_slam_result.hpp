@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include <boost/range/adaptor/indirected.hpp>
 #include <Eigen/Core>
 
 #include "slam/interfaces.hpp"
@@ -59,16 +60,17 @@ namespace slam {
         
         assert (results.begin() != results.end());
         
+        using namespace boost::adaptors;
         using average_slam_result_details::avg_acc;
         
         std::vector<avg_acc<State>> state_avgs;
         utility::flat_map<featureid_type, avg_acc<Feature>> feature_avgs;
         
-        for (const auto& result_ptr : results) {
+        for (const auto& result : indirect(results)) {
             
-            const auto& initial_state = result_ptr->get_initial_state();
-            const auto& trajectory = result_ptr->get_trajectory();
-            const auto& map = result_ptr->get_feature_map();
+            const auto& initial_state = result.get_initial_state();
+            const auto& trajectory = result.get_trajectory();
+            const auto& map = result.get_feature_map();
             
             if (state_avgs.size() < trajectory.size()) {
                 state_avgs.resize (trajectory.size());
@@ -83,7 +85,7 @@ namespace slam {
             }
         }
         
-        auto result = make_unique<slam_result_impl<State, Feature>>();
+        auto result = utility::make_unique<slam_result_impl<State, Feature>>();
         
         // Calculate average trajectory
         

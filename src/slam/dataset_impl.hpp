@@ -56,11 +56,10 @@ namespace slam {
         }
         
         virtual auto observations () const -> observation_range override {
-            return { m_observations.begin(), m_observations.end() };
+            return m_observations;
         }
         
         virtual auto observations_at (timestep_type t) const -> observation_range override {
-            // TODO: Use equal_range when boost bug is fixed
             return m_observations.equal_range(t);
         }
         

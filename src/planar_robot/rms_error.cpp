@@ -25,12 +25,8 @@ double planar_robot::trajectory_rmse (const planar_trajectory& a, const planar_t
     using namespace boost::accumulators;
     accumulator_set<double, stats<tag::mean>> acc;
     
-    pose a_pos, b_pos;
-    
-    for (size_t i = 0; i < a.size(); ++i) {
-        a_pos += a[i];
-        b_pos += b[i];
-        acc ((-a_pos + b_pos).distance_squared());
+    for (size_t t = 1; t <= a.size(); ++t) {
+        acc ((-a.accumulate(t) + b.accumulate(t)).distance_squared());
     }
 
     return std::sqrt (mean (acc));

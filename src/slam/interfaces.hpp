@@ -14,6 +14,8 @@
 #include <utility>
 #include <vector>
 
+#include <boost/range/sub_range.hpp>
+
 #include "utility/container_fwd.hpp"
 #include "utility/utility.hpp"
 
@@ -104,7 +106,7 @@ namespace slam {
         };
         
         using observation_collection = utility::flat_multimap<timestep_type, observation_info>;
-        using observation_range = iter_pair_range<typename observation_collection::const_iterator>;
+        using observation_range = boost::sub_range<const observation_collection>;
 
         virtual auto current_timestep () const -> timestep_type = 0;
 

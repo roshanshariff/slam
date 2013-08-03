@@ -10,59 +10,47 @@
 #define slam_utility_hpp
 
 #include <cstdio>
-#include <string>
 #include <utility>
 #include <memory>
 #include <type_traits>
 
-#include <boost/program_options.hpp>
+namespace utility {
+    
+    std::shared_ptr<FILE> open_file (const char* filename, const char* mode);
+    
+    std::shared_ptr<FILE> open_process (const char* command, const char* mode);
 
-
-std::shared_ptr<FILE> open_file (const char* filename, const char* mode);
-
-std::shared_ptr<FILE> open_process (const char* command, const char* mode);
-
-
-template <class T>
-T remember_option (boost::program_options::variables_map& options, const std::string& key, T default_value) {
-    if (options[key].empty()) {
-        options.insert (std::make_pair (key, boost::program_options::variable_value (default_value, false)));
-        return default_value;
+    /** Implementation from http://isocpp.org/files/papers/N3656.txt */
+    
+    template<class T> struct _Unique_if {
+        typedef std::unique_ptr<T> _Single_object;
+    };
+    
+    template<class T> struct _Unique_if<T[]> {
+        typedef std::unique_ptr<T[]> _Unknown_bound;
+    };
+    
+    template<class T, size_t N> struct _Unique_if<T[N]> {
+        typedef void _Known_bound;
+    };
+    
+    template<class T, class... Args>
+    typename _Unique_if<T>::_Single_object
+    make_unique(Args&&... args) {
+        return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
     }
-    else return options[key].as<T>();
-}
-
-
-template <class Iter>
-struct iter_pair_range : public std::pair<Iter,Iter> {
-    using std::pair<Iter, Iter>::pair;
-    auto begin() const -> Iter { return this->first; }
-    auto end() const -> Iter { return this->second; }
-    auto size() const -> decltype(Iter() - Iter()) { return end() - begin(); }
-};
-
-
-template <class Iter>
-inline iter_pair_range<Iter> as_range (std::pair<Iter,Iter> const& range) { return range; }
-
-template <class Iter>
-inline iter_pair_range<Iter> as_range (Iter begin, Iter end) { return iter_pair_range<Iter>(begin, end); }
-
-template <typename T, typename... Args>
-auto make_unique_helper (std::false_type, Args&&... args) -> std::unique_ptr<T> {
-    return std::unique_ptr<T> (new T (std::forward<Args>(args)...));
-}
-
-template <typename T, typename... Args>
-auto make_unique_helper (std::true_type, Args&&... args) -> std::unique_ptr<T> {
-    static_assert (std::extent<T>::value == 0, "make_unique<T[N]>() is forbidden, please use make_unique<T>()");
-    using U = typename std::remove_extent<T>::type;
-    return std::unique_ptr<T> (new U[sizeof...(Args)] { std::forward<Args>(args)... });
-}
-
-template <typename T, typename... Args>
-auto make_unique (Args&&... args) -> std::unique_ptr<T> {
-    return make_unique_helper<T> (std::is_array<T>(), std::forward<Args>(args)...);
+    
+    template<class T>
+    typename _Unique_if<T>::_Unknown_bound
+    make_unique(size_t n) {
+        typedef typename std::remove_extent<T>::type U;
+        return std::unique_ptr<T>(new U[n]());
+    }
+    
+    template<class T, class... Args>
+    typename _Unique_if<T>::_Known_bound
+    make_unique(Args&&...) = delete;
+    
 }
 
 #endif

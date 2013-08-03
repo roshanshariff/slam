@@ -55,9 +55,10 @@ simulator<ControlModel, ObservationModel, Controller, Sensor>
              const typename ObservationModel::builder& observation_model_builder,
              Controller& controller, const Sensor& sensor) {
     
-    random_source random (remember_option (options, "sim-seed", seed));
     const unsigned int sensor_skip = options["sensor-skip"].as<unsigned int>();
     const double dt = options["dt"].as<double>();
+
+    random_source random (seed);
     
     {
         auto& map = this->get_feature_map();

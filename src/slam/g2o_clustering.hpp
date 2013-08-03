@@ -13,6 +13,8 @@
 #include <vector>
 #include <algorithm>
 
+#include <boost/range/adaptor/reversed.hpp>
+
 #include "slam/interfaces.hpp"
 #include "slam/slam_data.hpp"
 #include "slam/slam_result_impl.hpp"
@@ -56,19 +58,21 @@ namespace slam {
         
         void add (const slam_result_type& candidate) {
             
+            using namespace boost::adaptors;
+            
             this->reinitialise (candidate);
             this->optimise ();
             
             double log_likelihood = slam_log_likelihood (*data, *this);
         
             bool new_cluster = true;
-            for (auto cluster = clusters.rbegin(); cluster != clusters.rend(); ++cluster) {
+            for (auto& cluster : reverse(clusters)) {
                 
-                if (cluster->distance (*this) <= rmse_threshold) {
+                if (cluster.distance (*this) <= rmse_threshold) {
                     
-                    if (log_likelihood > cluster->log_likelihood) {
-                        cluster->estimate = *this;
-                        cluster->log_likelihood = log_likelihood;
+                    if (log_likelihood > cluster.log_likelihood) {
+                        cluster.estimate = *this;
+                        cluster.log_likelihood = log_likelihood;
                     }
                     
                     new_cluster = false;

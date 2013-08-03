@@ -8,4 +8,4 @@
 
 #include "slam/fastslam.hpp"
 
-template class slam::fastslam<control_model_type, observation_model_type>;
+template class slam::fastslam<control_model_type, fastslam_observation_model_type>;

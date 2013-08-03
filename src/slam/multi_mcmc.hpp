@@ -17,6 +17,7 @@
 #include <fstream>
 
 #include <boost/program_options.hpp>
+#include <boost/range/adaptor/indirected.hpp>
 
 #include "slam/interfaces.hpp"
 #include "slam/mcmc_slam.hpp"
@@ -112,14 +113,15 @@ namespace slam {
 template <class ControlModel, class ObservationModel>
 void slam::multi_mcmc<ControlModel, ObservationModel>
 ::update (unsigned int count) {
-    for (const auto& mcmc : mcmc_chains) {
+    using namespace boost::adaptors;
+    for (auto& mcmc : indirect(mcmc_chains)) {
         for (unsigned int i = 0; i < count; ++i) {
-            bool accepted = mcmc->update();
+            bool accepted = mcmc.update();
             if (accepted) ++num_accepted;
             ++num_updates;
         }
-        if (mcmc->get_log_likelihood() > max_likelihood->get_log_likelihood()) {
-            max_likelihood = mcmc.get();
+        if (mcmc.get_log_likelihood() > max_likelihood->get_log_likelihood()) {
+            max_likelihood = &mcmc;
         }
     }
 }
@@ -171,7 +173,7 @@ slam::multi_mcmc<ControlModel, ObservationModel>
     
     unsigned int num_mcmc_chains = options["multi-mcmc-chains"].as<unsigned int>();
     while (num_mcmc_chains--) {
-        mcmc_chains.push_back (make_unique<mcmc_slam_type> (data, random()));
+        mcmc_chains.push_back (utility::make_unique<mcmc_slam_type> (data, random()));
     }
     
     max_likelihood = mcmc_chains.front().get();

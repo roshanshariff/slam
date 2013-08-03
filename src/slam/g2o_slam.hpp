@@ -198,7 +198,7 @@ namespace slam {
         
         void reinitialise (const slam_result_type&);
         
-        void optimise (unsigned int iterations);
+        void optimise (unsigned int iterations = 1000);
         
         /** Overridden virtual member functions of slam::slam_data::listener */
 
@@ -266,8 +266,10 @@ void slam::g2o_slam<ControlModel, ObservationModel>
         state_vertices.at(t)->setEstimate (trajectory.accumulate (t));
     }
     
+    const auto& initial_state = initialiser.get_initial_state();
+    
     for (const auto& feature : initialiser.get_feature_map()) {
-        feature_vertices.at(feature.first)->setEstimate (feature.second);
+        feature_vertices.at(feature.first)->setEstimate (-initial_state + feature.second);
     }
     
     need_init = true;
@@ -276,7 +278,7 @@ void slam::g2o_slam<ControlModel, ObservationModel>
 
 template <class ControlModel, class ObservationModel>
 void slam::g2o_slam<ControlModel, ObservationModel>
-::optimise (const unsigned int max_iterations = 1000) {
+::optimise (const unsigned int max_iterations) {
 
     if (max_iterations > 0) {
         
@@ -316,10 +318,10 @@ void slam::g2o_slam<ControlModel, ObservationModel>
     state_type initial_estimate = -initialiser->get_state(t) + initialiser->get_state(t+1);
     
     auto v0 = state_vertices.back();
-    auto v1 = make_unique<vertex_state>(next_vertex_id++, v0->estimate() + initial_estimate);
+    auto v1 = utility::make_unique<vertex_state>(next_vertex_id++, v0->estimate() + initial_estimate);
     state_vertices.push_back (v1.get());
     
-    auto e = make_unique<edge_control>(v0, v1.get(), control);
+    auto e = utility::make_unique<edge_control>(v0, v1.get(), control);
     
     optimizer.addVertex (v1.release());
     optimizer.addEdge (e.release());
@@ -343,14 +345,14 @@ void slam::g2o_slam<ControlModel, ObservationModel>
         assert (initialiser);
         feature_type initial_estimate = -initialiser->get_state(t) + initialiser->get_feature (obs.id());
         
-        auto v = make_unique<vertex_landmark>(next_vertex_id++, v0->estimate() + initial_estimate);
+        auto v = utility::make_unique<vertex_landmark>(next_vertex_id++, v0->estimate() + initial_estimate);
         feature_vertices[obs.id()] = v.get();
         
         v1 = v.get();
         optimizer.addVertex (v.release());
     }
     
-    auto e = make_unique<edge_obs>(v0, v1, obs.observation());
+    auto e = utility::make_unique<edge_obs>(v0, v1, obs.observation());
     optimizer.addEdge (e.release());
     
     need_init = true;
@@ -415,15 +417,15 @@ slam::g2o_slam<ControlModel, ObservationModel>
 //    using OptimizationAlgorithm = g2o::OptimizationAlgorithmGaussNewton;
     using OptimizationAlgorithm = g2o::OptimizationAlgorithmLevenberg;
     
-    auto linearSolver = make_unique<SlamLinearSolver>();
+    auto linearSolver = utility::make_unique<SlamLinearSolver>();
     linearSolver->setBlockOrdering(false);
     
-    auto blockSolver = make_unique<SlamBlockSolver>(linearSolver.release());
+    auto blockSolver = utility::make_unique<SlamBlockSolver>(linearSolver.release());
     
-    auto solver = make_unique<OptimizationAlgorithm>(blockSolver.release());
+    auto solver = utility::make_unique<OptimizationAlgorithm>(blockSolver.release());
     optimizer.setAlgorithm(solver.release());
     
-    auto v = make_unique<vertex_state>(next_vertex_id++, state_type());
+    auto v = utility::make_unique<vertex_state>(next_vertex_id++, state_type());
     v->setFixed (true);
     
     state_vertices.push_back (v.get());

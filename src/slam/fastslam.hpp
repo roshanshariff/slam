@@ -305,7 +305,7 @@ auto slam::fastslam<ControlModel, ObservationModel>
         
         const feature_dist& feature = particle.features.get (obs.id);
         
-        ObservationModel predicted_obs;
+        multivariate_normal_adapter<ObservationModel> predicted_obs;
         unscented_transform (ukf_params.feature, typename vec::feature_observer (particle.trajectory.state),
                              feature.vector_model(), predicted_obs, obs.observation.derived().chol_cov());
         
@@ -338,6 +338,8 @@ template <class ControlModel, class ObservationModel>
 auto slam::fastslam<ControlModel, ObservationModel>
 ::get_trajectory () const -> const trajectory_type& {
     
+    using namespace boost::adaptors;
+    
     if (!discard_history && trajectory_estimate.size() != current_timestep()) {
         
         const typename particle_type::state_list* p = &particles.max_weight_particle().trajectory;
@@ -351,7 +353,7 @@ auto slam::fastslam<ControlModel, ObservationModel>
         trajectory_estimate.clear();
         trajectory_estimate.reserve(states_reversed.size());
         
-        for (const auto& state : boost::adaptors::reverse (states_reversed)) {
+        for (const auto& state : reverse(states_reversed)) {
             trajectory_estimate.push_back_accumulated (state);
         }
     }
@@ -402,7 +404,7 @@ auto slam::fastslam<ControlModel, ObservationModel>
 template <class ControlModel, class ObservationModel>
 slam::fastslam<ControlModel, ObservationModel>
 ::fastslam (boost::program_options::variables_map& options, unsigned int seed)
-: random           (remember_option (options, "fastslam-seed", seed)),
+: random           (seed),
 num_particles      (options["num-particles"].as<size_t>()),
 resample_threshold (options["resample-threshold"].as<double>()),
 discard_history    (options.count("no-history")),
@@ -412,6 +414,6 @@ ukf_params         (options["ukf-alpha"].as<double>(),
 { }
 
 
-extern template class slam::fastslam<control_model_type, observation_model_type>;
+extern template class slam::fastslam<control_model_type, fastslam_observation_model_type>;
 
 #endif

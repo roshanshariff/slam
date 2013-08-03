@@ -8,6 +8,9 @@
 #include <vector>
 #include <map>
 
+#include <boost/range/sub_range.hpp>
+#include <boost/range/adaptor/map.hpp>
+
 #include "slam/interfaces.hpp"
 #include "utility/flat_map.hpp"
 #include "utility/listeners.hpp"
@@ -59,7 +62,7 @@ namespace slam {
     private:
 
         using observation_collection = utility::flat_multimap<timestep_type, observation_info>;
-        using observation_range = iter_pair_range<typename observation_collection::const_iterator>;
+        using observation_range = boost::sub_range<const observation_collection>;
 
         feature_collection m_features;
         observation_collection m_observations;
@@ -104,12 +107,11 @@ namespace slam {
         /** Retrieve observations. */
         
         observation_range observations () const {
-            return observation_range (m_observations.begin(), m_observations.end());
+            return m_observations;
         }
         
         observation_range observations_at (timestep_type t) const {
-            // TODO: Use equal_range when boost bug is fixed
-            return observation_range (m_observations.lower_bound(t), m_observations.upper_bound(t));
+            return m_observations.equal_range(t);
         }
         
         /** Retrieve features. */
@@ -189,16 +191,18 @@ void slam::slam_data<ControlModel, ObservationModel>
                const typename ControlModel::builder& control_model_builder,
                const typename ObservationModel::builder& obs_model_builder) {
     
+    using namespace boost::adaptors;
+
     auto add_observations = [&](timestep_type t) {
-        for (const auto& obs : data.observations_at (t)) {
-            add_observation (obs.second.id, obs_model_builder(obs.second.observation));
+        for (const auto& obs : values(data.observations_at(t))) {
+            add_observation (obs.id, obs_model_builder(obs.observation));
         }
     };
     
     add_observations (current_timestep());
     timestep (current_timestep());
     
-    for (timestep_type t; t < data.current_timestep(); ++t) {
+    while (current_timestep() < data.current_timestep()) {
         add_control (control_model_builder (data.control(current_timestep()),
                                             data.timedelta(current_timestep())));
         add_observations (current_timestep());

@@ -46,6 +46,16 @@ using g2o_clustering_type = slam::g2o_clustering<control_model_type, observation
 boost::program_options::variables_map parse_options (int argc, char* argv[]);
 
 
+template <class T>
+T remember_option (boost::program_options::variables_map& options, const std::string& key, T default_value) {
+    if (options[key].empty()) {
+        options.insert (std::make_pair (key, boost::program_options::variable_value (default_value, false)));
+        return default_value;
+    }
+    else return options[key].as<T>();
+}
+
+
 int main (int argc, char* argv[]) {
     
     /* parse program options */
@@ -59,7 +69,10 @@ int main (int argc, char* argv[]) {
     unsigned int sim_seed = remember_option (options, "sim-seed", (unsigned int)random());
     unsigned int init_seed = remember_option (options, "init-seed", (unsigned int)random());
     unsigned int mcmc_slam_seed = remember_option (options, "mcmc-slam-seed", (unsigned int)random());
+    unsigned int fastslam_seed = remember_option (options, "fastslam-seed", (unsigned int)random());
     unsigned int multi_mcmc_seed = remember_option (options, "multi-mcmc-seed", (unsigned int)random());
+    
+    (void)fastslam_seed;
     
     const control_model_type::builder control_model_builder (options);
     const observation_model_type::builder observation_model_builder (options);

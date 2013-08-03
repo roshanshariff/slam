@@ -10,6 +10,8 @@
 #include <vector>
 
 #include <boost/program_options.hpp>
+#include <boost/range/sub_range.hpp>
+#include <boost/range/adaptor/map.hpp>
 
 #include "slam/interfaces.hpp"
 #include "slam/slam_data.hpp"
@@ -54,7 +56,7 @@ namespace slam {
         using feature_observations = typename slam_data_type::feature_observations;
         using feature_iterator = typename slam_data_type::feature_iterator;
         
-        using feature_obs_range = iter_pair_range<typename feature_observations::const_iterator>;
+        using feature_obs_range = boost::sub_range<const feature_observations>;
         
         /** For each observed feature, store a pointer to the feature's observations, the time
          step relative to which the feature estimate is stored, and the estimate itself. */
@@ -277,26 +279,24 @@ void slam::mcmc_slam<ControlModel, ObservationModel>
 ::timestep (const timestep_type timestep) {
     
     assert (timestep <= data->current_timestep());
-    
-    //unsigned int mcmc_updates = 0;
+    using namespace boost::adaptors;
     
     while (next_timestep <= timestep) {
         
         if (next_timestep > 0) add_state_edge();
         
-        for (const auto& obs : data->observations_at(next_timestep)) {
+        for (const auto& obs : values(data->observations_at(next_timestep))) {
             
-            const auto& obs_info = obs.second;
-            auto insertion = feature_index.emplace (obs_info.id(), feature_estimates.size());
+            auto insertion = feature_index.emplace (obs.id(), feature_estimates.size());
             
             if (insertion.second) {
-                add_feature_edge (obs_info);
+                add_feature_edge (obs);
                 map_estimate.clear();
             }
             else {
                 const feature_estimate& f = feature_estimates[insertion.first->second];
                 const feature_type estimate = state_estimates.accumulate(next_timestep, f.parent_timestep()) + f.estimate();
-                log_likelihood += obs_info.observation().log_likelihood (ObservationModel::observe (estimate));
+                log_likelihood += obs.observation().log_likelihood (ObservationModel::observe (estimate));
                 assert (std::isfinite (log_likelihood));
             }
         }
@@ -423,8 +423,7 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
 ::edge_log_likelihood_ratio (const feature_edge& edge, const feature_type& proposed) const -> double {
     
     return obs_likelihood_ratio (edge.feature, edge.feature.parent_timestep(),
-                                 {edge.feature.observations().begin(), edge.feature.observations().end()},
-                                 proposed);
+                                 edge.feature.observations(), proposed);
 }
 
 

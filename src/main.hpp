@@ -21,6 +21,9 @@ namespace planar_robot {
 using control_model_type = planar_robot::velocity_model;
 using observation_model_type = planar_robot::range_only_model;
 
+// Must be a model that supports inv_observe
+using fastslam_observation_model_type = planar_robot::range_bearing_model;
+
 using controller_type = planar_robot::waypoint_controller;
 using sensor_type = planar_robot::landmark_sensor;
 

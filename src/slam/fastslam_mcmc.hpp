@@ -63,7 +63,7 @@ namespace slam {
         void set_fastslam (const decltype(m_fastslam)& p) { m_fastslam = p; }
         void set_mcmc_slam (const decltype(m_mcmc_slam)& p) { m_mcmc_slam = p; }
     };
-        
+    
 }
 
 template <class ControlModel, class ObservationModel>
@@ -84,16 +84,16 @@ void slam::fastslam_mcmc<ControlModel, ObservationModel>
     
     m_fastslam->timestep(t);
     if (t == 0) return;
-
+    
     bool resample_required_previous = resample_required;
     resample_required = m_fastslam->resample_required();
     
     if (resample_required && resample_required_previous) {
-    m_fastslam->get_trajectory();
+        m_fastslam->get_trajectory();
         m_mcmc_slam->timestep(t);
         std::cout << "Reinitialising FastSLAM... ";
         m_fastslam->particles.reinitialize (m_fastslam->num_particles,
-                                          std::bind(&fastslam_mcmc::sample_particle, this));
+                                            std::bind(&fastslam_mcmc::sample_particle, this));
         std::cout <<"done\n";
         resample_required = false;
     }
@@ -105,7 +105,7 @@ void slam::fastslam_mcmc<ControlModel, ObservationModel>
 ::completed () {
     
     std::cout << "Running MCMC steps at end.\n";
-
+    
     if (m_mcmc_slam) {
         for (unsigned int i = 0; i < mcmc_end_steps; ++i) m_mcmc_slam->update();
     }
@@ -123,32 +123,34 @@ auto slam::fastslam_mcmc<ControlModel, ObservationModel>
     for (std::size_t i = 0; i < num_updates; ++i) {
         m_mcmc_slam->update();
     }
-        
+    
     typename fastslam_type::particle_type particle;
     
-    for (std::size_t i = 0; i < m_mcmc_slam->get_trajectory().size(); ++i) {
+    for (timestep_type t (1); t <= m_mcmc_slam->current_timestep(); ++t) {
         particle.trajectory.previous = std::make_shared<decltype(particle.trajectory)>(particle.trajectory);
-        particle.trajectory.state += m_mcmc_slam->get_trajectory()[i];
+        particle.trajectory.state = m_mcmc_slam->get_trajectory().accumulate(t);
     }
     
-    for (std::size_t feature_index = 0; feature_index < m_mcmc_slam->feature_estimates.size(); ++feature_index) {
+    for (std::size_t fi = 0; fi < m_mcmc_slam->feature_estimates.size(); ++fi) {
         
-        const auto& f = m_mcmc_slam->feature_estimates[feature_index];
+        const auto& f = m_mcmc_slam->feature_estimates[fi];
+        
+        auto mcmc_feature = [&]() {
+            return m_mcmc_slam->get_trajectory().accumulate(f.parent_timestep()) + f.estimate();
+        };
         
         using feature_dist = typename fastslam_type::feature_dist;
         using feature_vector = typename feature_dist::vector_type;
-        static const int feature_dim = fastslam_type::vec::feature_dim;
+        constexpr int feature_dim = fastslam_type::vec::feature_dim;
         
-        const feature_vector base = (m_mcmc_slam->get_state(f.parent_timestep()) + f.estimate()).to_vector();
-        Eigen::Matrix<double, fastslam_type::vec::feature_dim, Eigen::Dynamic> samples (feature_dim, num_feature_samples);
+        const feature_vector base = mcmc_feature().to_vector();
+        Eigen::Matrix<double, feature_dim, Eigen::Dynamic> samples (feature_dim, num_feature_samples);
         
         for (unsigned int i = 0; i < num_feature_samples; ++i) {
-            
             for (unsigned int j = 0; j < mcmc_feature_updates; ++j) {
-                m_mcmc_slam->update (typename mcmc_slam_type::feature_edge (*m_mcmc_slam, feature_index), false);
+                m_mcmc_slam->update (typename mcmc_slam_type::feature_edge (*m_mcmc_slam, fi), false);
             }
-            
-            feature_vector feature = (m_mcmc_slam->get_state(f.parent_timestep()) + f.estimate()).to_vector();
+            feature_vector feature = mcmc_feature().to_vector();
             samples.col(i) = feature_dist::subtract (base, feature);
         }
         
@@ -164,8 +166,7 @@ auto slam::fastslam_mcmc<ControlModel, ObservationModel>
         feature.vector_model().mean() = feature_dist::subtract (base, base_innov);
         feature.vector_model().chol_cov()
         = samples.transpose().householderQr().matrixQR()
-        .template topLeftCorner<fastslam_type::vec::feature_dim, fastslam_type::vec::feature_dim>()
-        .template triangularView<Eigen::Upper>()
+        .template topLeftCorner<feature_dim, feature_dim>().template triangularView<Eigen::Upper>()
         .transpose();
         
         particle.features.insert (f.id(), feature);
@@ -199,6 +200,6 @@ num_feature_samples (options["feature-samples"].as<unsigned int>())
 { }
 
 
-extern template class slam::fastslam_mcmc<control_model_type, observation_model_type>;
+extern template class slam::fastslam_mcmc<control_model_type, fastslam_observation_model_type>;
 
 #endif

@@ -10,11 +10,11 @@
 
 #include "utility/utility.hpp"
 
-std::shared_ptr<FILE> open_file (const char* filename, const char* mode) {
+std::shared_ptr<FILE> utility::open_file (const char* filename, const char* mode) {
     return std::shared_ptr<FILE> (fopen (filename, mode), &fclose);
 }
 
-std::shared_ptr<FILE> open_process (const char* command, const char* mode) {
+std::shared_ptr<FILE> utility::open_process (const char* command, const char* mode) {
     return std::shared_ptr<FILE> (popen (command, mode), &pclose);
 }
 

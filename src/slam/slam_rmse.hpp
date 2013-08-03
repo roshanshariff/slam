@@ -31,25 +31,27 @@ namespace slam {
             const auto& bt = b.get_trajectory();
             auto t = std::min (at.size(), bt.size());
             
-            State a_state, b_state;
-            
-            for (size_t i = 0; i < t; ++i) {
-                a_state += at[i];
-                b_state += bt[i];
-                acc (State::subtract(a_state.to_vector(), b_state.to_vector()).squaredNorm());
+            for (size_t i = 1; i <= t; ++i) {
+                acc (State::subtract(at.accumulate(i).to_vector(), bt.accumulate(i).to_vector())
+                     .squaredNorm());
             }
         }
-        
-        auto iter = b.get_feature_map().cbegin();
-        const auto end = b.get_feature_map().cend();
-        
-        for (const auto& feature : a.get_feature_map()) {
-            
-            while (iter != end && iter->first < feature.first) ++iter;
-            if (iter == end) break;
-            if (iter->first != feature.first) continue;
-            
-            acc (Feature::subtract (feature.second.to_vector(), iter->second.to_vector()).squaredNorm());
+
+        {
+            auto iter = b.get_feature_map().begin();
+            const auto end = b.get_feature_map().end();
+
+            for (const auto& id_feature : a.get_feature_map()) {
+                
+                const auto id = id_feature.first;
+                while (iter != end && iter->first < id) ++iter;
+                if (iter == end) break;
+                if (iter->first != id) continue;
+                
+                auto af = -a.get_initial_state() + id_feature.second;
+                auto bf = -b.get_initial_state() + (*iter).second;
+                acc (Feature::subtract (af.to_vector(), bf.to_vector()).squaredNorm());
+            }
         }
         
         return std::sqrt (mean (acc));

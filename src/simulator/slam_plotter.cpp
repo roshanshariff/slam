@@ -100,11 +100,8 @@ void slam_plotter::plot_trajectory (const data_source& source) {
     
     const auto& trajectory = source.source->get_trajectory();
     
-    pose state = initial_pose;
-    gnuplot << state.x() << state.y();
-
-    for (size_t i = 0; i < trajectory.size(); ++i) {
-        state += trajectory[i];
+    for (size_t i = 0; i <= trajectory.size(); ++i) {
+        pose state = initial_pose + trajectory.accumulate(i);
         gnuplot << state.x() << state.y();
     }
     
@@ -116,7 +113,7 @@ void slam_plotter::plot_trajectory (const data_source& source) {
 
 void slam_plotter::plot_state (const data_source& source) {
 
-    pose state = initial_pose + source.source->get_state(source.source->current_timestep());
+    pose state = source.source->get_state(source.source->current_timestep());
     
     double epsilon = 5;
     double xdelta = epsilon * std::cos (state.bearing());
