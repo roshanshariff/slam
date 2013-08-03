@@ -25,7 +25,15 @@ class simulator
 : public slam::dataset_impl <ControlModel, ObservationModel>,
 public slam::slam_result_of_impl <ControlModel, ObservationModel> {
 
+    using dataset_impl_type = slam::dataset_impl<ControlModel, ObservationModel>;
+    using slam_result_impl_type = slam::slam_result_of_impl<ControlModel, ObservationModel>;
+    
 public:
+    
+    using typename slam_result_impl_type::state_type;
+    using typename slam_result_impl_type::feature_type;
+    using typename slam_result_impl_type::trajectory_type;
+    using typename slam_result_impl_type::feature_map_type;
     
     simulator (boost::program_options::variables_map& options, unsigned int seed,
                const typename ControlModel::builder& control_model_builder,
@@ -58,9 +66,10 @@ simulator<ControlModel, ObservationModel, Controller, Sensor>
         }
     }
 
-    auto current_state = [&]() {
-        return this->get_state(this->current_timestep());
-    };
+    this->set_initial_state (controller.initial_state());
+    state_type state;
+    
+    auto current_state = [&]() { return this->get_initial_state() + state; };
     
     auto sense = [&]() {
         using namespace std::placeholders;
@@ -68,15 +77,15 @@ simulator<ControlModel, ObservationModel, Controller, Sensor>
                                                  std::bind (&simulator::add_observation_now, this, _1, _2));
     };
 
-    this->set_initial_state (controller.initial_state());
     sense();
     
     while (!controller.finished()) {
         
         const auto control = controller.template control<ControlModel> (current_state(), dt);
         this->add_control (dt, control);
-        
-        this->get_trajectory().push_back (control_model_builder(control, dt).proposal()(random));
+
+        state += control_model_builder(control, dt).proposal()(random);
+        this->get_trajectory().push_back_accumulated (state);
         
         if (this->current_timestep() % sensor_skip == 0) sense();
     }
