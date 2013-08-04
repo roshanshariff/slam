@@ -12,6 +12,8 @@
 #include <sstream>
 #include <iomanip>
 
+#include <boost/range/adaptor/map.hpp>
+
 #include "simulator/slam_plotter.hpp"
 #include "utility/bitree.hpp"
 #include "utility/flat_map.hpp"
@@ -37,7 +39,7 @@ void slam_plotter::timestep (slam::timestep_type t) {
         boost::filesystem::path output_file = (*output_dir)/output_filename.str();
         std::fprintf (gnuplot.handle(), "set output '%s'\n", output_file.c_str());
     }
-    plot();
+    plot(t);
 }
 
 
@@ -50,7 +52,7 @@ void slam_plotter::completed () {
 }
 
 
-void slam_plotter::plot () {
+void slam_plotter::plot (boost::optional<slam::timestep_type> timestep) {
     
     if (!title.empty()) std::fprintf (gnuplot.handle(), "set title '%s'\n", title.c_str());
     else gnuplot.puts ("set title\n");
@@ -62,9 +64,10 @@ void slam_plotter::plot () {
     gnuplot.puts ("set offsets graph 0.2, graph 0.05, graph 0.05, graph 0.05\n");
 
     for (const auto& source : data_sources) {
+        const auto t = timestep ? *timestep : source.source->current_timestep();
         plot_map (source);
-        plot_trajectory (source);
-        plot_state (source);
+        plot_trajectory (source, t);
+        plot_state (source, t);
     }
     gnuplot.plot ();
     
@@ -80,11 +83,13 @@ void slam_plotter::add_title (const std::string& title) {
 
 void slam_plotter::plot_map (const data_source& source) {
     
+    using namespace boost::adaptors;
+    
     const auto& feature_map = source.source->get_feature_map();
     if (feature_map.empty()) return;
     
-    for (const auto& feature : feature_map) {
-        position pos = initial_pose + feature.second;
+    for (const auto& feature : values(feature_map)) {
+        position pos = initial_pose + (-source.source->get_initial_state() + feature);
         gnuplot << pos.x() << pos.y();
     }
 
@@ -96,11 +101,12 @@ void slam_plotter::plot_map (const data_source& source) {
 }
 
 
-void slam_plotter::plot_trajectory (const data_source& source) {
+void slam_plotter::plot_trajectory (const data_source& source, slam::timestep_type t) {
     
     const auto& trajectory = source.source->get_trajectory();
+    assert (t <= trajectory.size());
     
-    for (size_t i = 0; i <= trajectory.size(); ++i) {
+    for (size_t i = 0; i <= t; ++i) {
         pose state = initial_pose + trajectory.accumulate(i);
         gnuplot << state.x() << state.y();
     }
@@ -111,9 +117,9 @@ void slam_plotter::plot_trajectory (const data_source& source) {
 }
 
 
-void slam_plotter::plot_state (const data_source& source) {
+void slam_plotter::plot_state (const data_source& source, slam::timestep_type t) {
 
-    pose state = source.source->get_state(source.source->current_timestep());
+    pose state = source.source->get_state(t);
     
     double epsilon = 5;
     double xdelta = epsilon * std::cos (state.bearing());

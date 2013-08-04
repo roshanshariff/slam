@@ -53,8 +53,8 @@ class slam_plotter : public slam::timestep_listener {
     /** Implementation member functions. */
     void add_title (const std::string& title);
     void plot_map (const data_source&);
-    void plot_trajectory (const data_source&);
-    void plot_state (const data_source&);
+    void plot_trajectory (const data_source&, slam::timestep_type t);
+    void plot_state (const data_source&, slam::timestep_type t);
         
 public:
     
@@ -71,7 +71,7 @@ public:
                           std::string feature_point_style, std::string trajectory_line_style,
                           std::string state_arrow_style);
 
-    void plot ();
+    void plot (boost::optional<slam::timestep_type> timestep = {});
     
 };
 
