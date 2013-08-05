@@ -187,8 +187,8 @@ int main (int argc, char* argv[]) {
     
     if (mcmc_slam && g2o_slam) {
         g2o_slam->reinitialise (*mcmc_slam);
-        g2o_slam->optimise();
-        if (slam_plot) slam_plot->plot();
+        g2o_slam_updater->completed();
+        if (slam_plot) slam_plot->completed();
     }
     
     const auto trajectory_rmse = [&](const slam_result_type& result) -> double {
@@ -278,7 +278,7 @@ int main (int argc, char* argv[]) {
                                            "size 10,20,50 filled lc rgbcolor '"+color_names[i]+"'");
         }
 
-        cluster_plot->plot();
+        cluster_plot->completed();
     }
     
     return EXIT_SUCCESS;

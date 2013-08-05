@@ -20,6 +20,8 @@
 #include <g2o/core/base_vertex.h>
 #include <g2o/core/base_binary_edge.h>
 #include <g2o/core/sparse_optimizer.h>
+#include <g2o/core/sparse_optimizer_terminate_action.h>
+#include <g2o/core/hyper_graph.h>
 #include <g2o/core/block_solver.h>
 #include <g2o/core/optimization_algorithm_gauss_newton.h>
 #include <g2o/core/optimization_algorithm_levenberg.h>
@@ -94,6 +96,7 @@ namespace slam {
             vertex_landmark (int id, const feature_type& estimate) {
                 this->setId (id);
                 this->setEstimate (estimate);
+                //this->setMarginalized (true);
             }
             
             virtual auto read (std::istream&) -> bool { return true; }
@@ -178,8 +181,13 @@ namespace slam {
         
         std::shared_ptr<slam_result_type> initialiser;
         
+        g2o::SparseOptimizerTerminateAction optimizer_terminate_action;
+        bool optimizer_force_stop_flag = false;
+        
         g2o::SparseOptimizer optimizer;
-        bool need_init = false;
+        g2o::HyperGraph::VertexSet new_vertices;
+        g2o::HyperGraph::EdgeSet new_edges;
+        bool optimizer_need_init = true;
         
         std::vector<vertex_state*> state_vertices;
         std::map<featureid_type, vertex_landmark*> feature_vertices;
@@ -198,7 +206,7 @@ namespace slam {
         
         void reinitialise (const slam_result_type&);
         
-        void optimise (unsigned int iterations = 1000);
+        int optimise (int iterations = 1000);
         
         /** Overridden virtual member functions of slam::slam_data::listener */
 
@@ -242,12 +250,14 @@ namespace slam {
             
             virtual void timestep (timestep_type t) override {
                 instance->timestep (t);
-                if (t > 0) instance->optimise (steps);
+                const int iterations = instance->optimise (steps);
+                std::cout << "G2O iterations: " << iterations << '\n';
             }
             
             virtual void completed () override {
                 instance->completed();
-                instance->optimise (end_steps);
+                const int iterations = instance->optimise (end_steps);
+                std::cout << "G2O iterations: " << iterations << '\n';
             }
         };
         
@@ -261,49 +271,45 @@ void slam::g2o_slam<ControlModel, ObservationModel>
 ::reinitialise (const slam_result_type& initialiser) {
     
     const auto& trajectory = initialiser.get_trajectory();
-    
     for (timestep_type t (1); t <= trajectory.size(); ++t) {
         state_vertices.at(t)->setEstimate (trajectory.accumulate (t));
     }
+    trajectory_estimate.clear();
     
     const auto& initial_state = initialiser.get_initial_state();
-    
     for (const auto& feature : initialiser.get_feature_map()) {
         feature_vertices.at(feature.first)->setEstimate (-initial_state + feature.second);
     }
-    
-    need_init = true;
+    map_estimate.clear();
 }
 
 
 template <class ControlModel, class ObservationModel>
-void slam::g2o_slam<ControlModel, ObservationModel>
-::optimise (const unsigned int max_iterations) {
-
-    if (max_iterations > 0) {
-        
-        if (need_init) {
-            optimizer.initializeOptimization();
-            need_init = false;
-        }
-        
-        optimizer.optimize(1);
-        unsigned int iterations = 1;
-        double chi2 = optimizer.activeRobustChi2();
-        
-        while (iterations < max_iterations) {
-            optimizer.optimize(1, true);
-            ++iterations;
-            double old_chi2 = chi2;
-            chi2 = optimizer.activeRobustChi2();
-            if (chi2 > old_chi2 - 0.01) break;
-        }
-        
-        std::cout << iterations << " iterations\n";
-        
-        trajectory_estimate.clear();
-        map_estimate.clear();
+auto slam::g2o_slam<ControlModel, ObservationModel>
+::optimise (const int max_iterations) -> int {
+    
+    if (max_iterations <= 0 || state_vertices.size() <= 1 || feature_vertices.empty()) {
+        return 0;
     }
+    
+    if (optimizer_need_init) {
+        optimizer.initializeOptimization();
+        optimizer_need_init = false;
+    }
+    else {
+        optimizer.updateInitialization (new_vertices, new_edges);
+    }
+    
+    new_vertices.clear();
+    new_edges.clear();
+    
+    const int iterations = optimizer.optimize(max_iterations, false);
+    optimizer_force_stop_flag = false;
+    
+    trajectory_estimate.clear();
+    map_estimate.clear();
+    
+    return iterations;
 }
 
 
@@ -323,10 +329,11 @@ void slam::g2o_slam<ControlModel, ObservationModel>
     
     auto e = utility::make_unique<edge_control>(v0, v1.get(), control);
     
+    new_vertices.insert (v1.get());
     optimizer.addVertex (v1.release());
+
+    new_edges.insert (e.get());
     optimizer.addEdge (e.release());
-    
-    need_init = true;
 }    
 
 
@@ -349,13 +356,13 @@ void slam::g2o_slam<ControlModel, ObservationModel>
         feature_vertices[obs.id()] = v.get();
         
         v1 = v.get();
+        new_vertices.insert (v.get());
         optimizer.addVertex (v.release());
     }
     
     auto e = utility::make_unique<edge_obs>(v0, v1, obs.observation());
+    new_edges.insert (e.get());
     optimizer.addEdge (e.release());
-    
-    need_init = true;
 }
 
 
@@ -430,6 +437,10 @@ slam::g2o_slam<ControlModel, ObservationModel>
     
     state_vertices.push_back (v.get());
     optimizer.addVertex (v.release());
+    
+    optimizer_terminate_action.setGainThreshold(1e-8);
+    optimizer.setForceStopFlag (&optimizer_force_stop_flag);
+    optimizer.addPostIterationAction (&optimizer_terminate_action);
 }
 
 
