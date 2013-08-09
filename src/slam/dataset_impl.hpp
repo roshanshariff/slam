@@ -55,6 +55,10 @@ namespace slam {
             return m_timedeltas.accumulate(t);
         }
         
+        virtual auto timestep_at (double timestamp) const -> timestep_type override {
+            return timestep_type (m_timedeltas.binary_search (timestamp));
+        }
+
         virtual auto observations () const -> observation_range override {
             return m_observations;
         }
@@ -71,7 +75,7 @@ namespace slam {
         }
         
         void add_observation (timestep_type t, featureid_type id, observation_type obs) {
-            m_observations.insert ({t, {id, obs}});
+            m_observations.emplace (t, observation_info {id, obs});
         }
         
         void add_observation_now (featureid_type id, observation_type obs) {

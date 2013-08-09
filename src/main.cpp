@@ -30,6 +30,7 @@
 #include "utility/utility.hpp"
 
 #include "main.hpp"
+#include "dataset.hpp"
 
 using slam_result_type = slam::slam_result_of<control_model_type, observation_model_type>;
 using slam_result_impl_type = slam::slam_result_of_impl<control_model_type, observation_model_type>;
@@ -83,7 +84,8 @@ int main (int argc, char* argv[]) {
     std::shared_ptr<slam_result_type> ground_truth;
     
     if (options.count ("dataset")) {
-        //dataset = std::make_shared<planar_robot::range_only_dataset> (options);
+        std::tie(dataset, ground_truth) = read_range_only_data(options["dataset-dir"].as<std::string>(),
+                                                               options["dataset"].as<std::string>());
     }
     else {
         controller_type controller (options);
@@ -293,11 +295,13 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     po::options_description command_line_options ("Command Line Options");
     command_line_options.add_options()
     ("help,h", "usage information")
-    ("config-file,f", po::value<std::vector<std::string> >()->composing(), "configuration files");
+    ("config-file,f", po::value<std::vector<std::string>>()->composing(), "configuration files");
     
     po::options_description general_options ("General Options");
     general_options.add_options()
-    ("output-dir,o", po::value<std::string>()->default_value("./output"),
+    ("dataset", po::value<std::string>(), "name of dataset")
+    ("dataset-dir", po::value<std::string>()->default_value("input"), "location of datasets")
+    ("output-dir,o", po::value<std::string>()->default_value("output"),
      "directory for simulation output files")
     ("log", "produce detailed simulation logs")
     ("mcmc-slam", "enable MCMC-SLAM")

@@ -113,6 +113,7 @@ namespace slam {
         virtual auto control (timestep_type) const -> const control_type& = 0;
         virtual auto timedelta (timestep_type) const -> double = 0;
         virtual auto timestamp (timestep_type) const -> double = 0;
+        virtual auto timestep_at (double timestamp) const -> timestep_type = 0;
         
         virtual auto observations () const -> observation_range = 0;
         virtual auto observations_at (timestep_type) const -> observation_range = 0;

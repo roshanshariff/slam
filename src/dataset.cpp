@@ -6,179 +6,97 @@
 //  Copyright (c) 2012 University of Alberta. All rights reserved.
 //
 
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <iomanip>
-#include <vector>
-#include <utility>
-#include <algorithm>
-#include <map>
+#include <cmath>
 
-#include <Eigen/Core>
-#include <Eigen/SVD>
-#include <boost/math/constants/constants.hpp>
+#include <boost/filesystem/fstream.hpp>
 
-#include "planar_robot/pose.hpp"
-#include "planar_robot/velocity_model.hpp"
-#include "planar_robot/range_bearing_model.hpp"
-#include "planar_robot/rms_error.hpp"
-#include "slam/interfaces.hpp"
-#include "utility/bitree.hpp"
-#include "utility/geometry.hpp"
+#include "slam/dataset_impl.hpp"
+#include "slam/slam_result_impl.hpp"
+#include "dataset.hpp"
 
-using trajectory_type = utility::bitree<planar_robot::pose>;
+auto read_range_only_data (boost::filesystem::path dir, const std::string& name)
+-> range_only_data_type {
 
-struct dataset {
+    using control_model_type = planar_robot::velocity_model;
+    using observation_model_type = planar_robot::range_only_model;
     
+    using slam_result_impl_type = slam::slam_result_of_impl<control_model_type, observation_model_type>;
+    auto ground_truth = std::make_shared<slam_result_impl_type>();
     
-    std::vector<double> timestamps;
-    planar_robot::pose initial_pose;
-    trajectory_type trajectory;
-    
-    std::vector<planar_robot::velocity_model::vector_type> controls;
-    trajectory_type dead_reckoning;
-    
-    std::map<slam::featureid_type, planar_robot::position> feature_map;
-    
-    struct observation_type {
-        slam::timestep_type timestep;
-        slam::featureid_type feature;
-        planar_robot::range_only_model::vector_type observation;
-    };
-    
-    std::vector<observation_type> observations;
-    
-    slam::timestep_type get_timestep (double timestamp) const;
+    double start_timestamp;
 
-    void read_controls (const std::string& filename_DR);
-    void read_ground_truth (const std::string& filename_GT);
-    void read_feature_map (const std::string& filename_TL);
-    void read_observations (const std::string& filename_TD);
-};
+    /** Ground truth path from GPS */
+    {
+        boost::filesystem::ifstream input_GT (dir/name/(name+"_GT.txt"));
+        double t, x, y, bearing;
 
-slam::timestep_type dataset::get_timestep (double timestamp) const {
-    
-    auto upper_bound = std::upper_bound (timestamps.cbegin(), timestamps.cend(), timestamp);
-    slam::timestep_type t (upper_bound - timestamps.cbegin());
-    
-    if (t == 0) return t;
-    else if (t == timestamps.size()) return t-1;
-    else if (timestamps[t] - timestamp < timestamp - timestamps[t-1]) return t;
-    else return t-1;
-}
+        input_GT >> t >> x >> y >> bearing;
 
-void dataset::read_ground_truth (const std::string& filename_GT) {
-    
-    std::ifstream in (filename_GT);
-    double t, x, y, bearing;
-    
-    while (in >> t >> x >> y >> bearing) {
+        start_timestamp = t;
+        auto initial_state = planar_robot::pose::cartesian (x, y, bearing);
+
+        ground_truth->set_initial_state (initial_state);
         
-        
-        auto new_pose = planar_robot::pose::cartesian (x, y, bearing);
-        
-        if (timestamps.empty()) {
-            initial_pose = new_pose;
+        while (input_GT >> t >> x >> y >> bearing) {
+            auto state = -initial_state + planar_robot::pose::cartesian (x, y, bearing);
+            ground_truth->get_trajectory().push_back_accumulated (state);
         }
-        else {
-            trajectory.push_back (-(initial_pose + trajectory.accumulate()) + new_pose);
-        }
+    }
+
+    /** Surveyed node locations */
+    {
+        boost::filesystem::ifstream input_TL (dir/name/(name+"_TL.txt"));
+        double id, x, y;
         
-        timestamps.push_back (t);
-    }
-}
-
-void dataset::read_controls (const std::string& filename_DR) {
-
-    std::ifstream in (filename_DR);
-    double t, v, w;
-    
-    while (in >> t >> v >> w) {
-
-        controls.push_back ({v, w});
-        dead_reckoning.push_back (planar_robot::velocity_model::inv_observe (controls.back()));
-    }
-}
-
-void dataset::read_feature_map (const std::string& filename_TL) {
-    
-    std::ifstream in (filename_TL);
-    double id, x, y;
-    
-    while (in >> id >> x >> y) {
-        feature_map[slam::featureid_type(id)] = planar_robot::position::cartesian (x, y);
-    }
-}
-
-void dataset::read_observations (const std::string& filename_TD) {
-    
-    std::ifstream in (filename_TD);
-    double t, antenna, feature, range;
-    
-    while (in >> t >> antenna >> feature >> range) {
-        planar_robot::range_only_model::vector_type obs;
-        obs << range;
-        observations.push_back ({ get_timestep(t), slam::featureid_type(feature), obs });
-    }
-}
-
-Eigen::Matrix2d velocity_model_params (const dataset& data) {
-    
-    using namespace Eigen;
-
-    MatrixXd controls (data.controls.size(), 2);
-    for (std::size_t i = 0; i < data.controls.size(); ++i) {
-        controls.row(i) = data.controls[i].transpose();
+        while (input_TL >> id >> x >> y) {
+            slam::featureid_type feature_id (std::round (id));
+            auto position = planar_robot::position::cartesian(x, y);
+            ground_truth->get_feature_map().emplace(feature_id, position);
+        }
     }
     
-    MatrixXd actual (data.trajectory.size(), 2);
-    for (std::size_t i = 0; i < data.trajectory.size(); ++i) {
-        actual.row(i) = planar_robot::velocity_model::observe (data.trajectory[i]).transpose();
+    using dataset_impl_type = slam::dataset_impl<control_model_type, observation_model_type>;
+    auto dataset = std::make_shared<dataset_impl_type>();
+    
+    /** Odometry input */
+    {
+        boost::filesystem::ifstream input_DR (dir/name/(name+"_DR.txt"));
+        double timestamp, prev_timestamp = start_timestamp;
+        control_model_type::vector_type control;
+        
+        while (input_DR >> timestamp >> control(0) >> control(1)) {
+            const double dt = timestamp - prev_timestamp;
+            prev_timestamp = timestamp;
+            dataset->add_control(dt, control/dt);
+        }
     }
     
-    MatrixXd deviations = (controls - actual).cwiseAbs2();
-    
-//    MatrixX4d output (deviations.rows(), 4);
-//    output.leftCols<2>() = controls;
-//    output.rightCols<2>() = actual;
-//    std::cout << output << std::endl;
-    
-    Matrix2d params;
-    auto svd = controls.cwiseAbs2().jacobiSvd (ComputeThinU | ComputeThinV);
-    params.row(0) = svd.solve(deviations.col(0)).transpose();
-    params.row(1) = svd.solve(deviations.col(1)).transpose();
-    
-    return params;
-}
-
-int main (int argc, char* argv[]) {
-    
-    if (argc < 2) {
-        std::cerr << "Please specify data set name\n";
-        return 1;
+    /** Node range observations */
+    {
+        boost::filesystem::ifstream input_TD (dir/name/(name+"_TD.txt"));
+        double timestamp, antenna, id;
+        observation_model_type::vector_type observation;
+        
+        while (input_TD >> timestamp >> antenna >> id >> observation(0)) {
+            slam::featureid_type feature_id (std::round (id));
+            auto timestep = dataset->timestep_at(timestamp - start_timestamp);
+            dataset->add_observation(timestep, feature_id, observation);
+        }
     }
     
-    std::string base_name = argv[1];
-    std::string base_path = "input/"+base_name+"/"+base_name;
-
-    dataset data;
-    data.read_ground_truth (base_path+"_GT.txt");
-    data.read_controls (base_path+"_DR.txt");
-    data.read_feature_map (base_path+"_TL.txt");
-    data.read_observations (base_path+"_TD.txt");
+    {
+        boost::filesystem::ofstream controls (dir/name/"controls.txt");
+        controls << "# dt, actual v, actual w, actual g, commanded v, commanded w\n";
+        for (slam::timestep_type t {0}; t < dataset->current_timestep(); ++t) {
+            double dt = dataset->timedelta(t);
+            planar_robot::pose pose_delta = ground_truth->get_trajectory()[t];
+            auto actual = planar_robot::velocity_slip_model::observe(pose_delta);
+            actual /= dt;
+            auto commanded = dataset->control(t);
+            controls << dt << ' ' << actual(0) << ' ' << actual(1) << ' ' << actual(2) << ' '
+            << commanded(0) << ' ' << commanded(1) << '\n';
+        }
+    }
     
-//    std::cout << std::scientific << std::setprecision(16);
-//    
-//    auto pose = data.initial_pose;
-//    std::cout << pose.x() << '\t' << pose.y() << '\t' << pose.bearing() << '\n';
-//    for (const auto& pose_delta : data.dead_reckoning) {
-//        pose += pose_delta;
-//        std::cout << pose.x() << '\t' << pose.y() << '\t' << pose.bearing() << '\n';
-//    }
-    
-    auto vmodel_params = velocity_model_params (data);
-    std::cout << vmodel_params << std::endl;
-    
-    return 0;
+    return std::make_tuple (std::move(dataset), std::move(ground_truth));
 }

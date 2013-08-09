@@ -82,6 +82,8 @@ namespace slam {
             return m_map;
         }
         
+        /** Allow non-const reference to slam_result_impl */
+        
         void set_initial_state (const state_type& state) {
             m_initial_state = state;
         }
