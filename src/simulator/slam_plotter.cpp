@@ -119,7 +119,7 @@ void slam_plotter::plot_trajectory (const data_source& source, slam::timestep_ty
 
 void slam_plotter::plot_state (const data_source& source, slam::timestep_type t) {
 
-    pose state = source.source->get_state(t);
+    pose state = initial_pose + (-source.source->get_initial_state() + source.source->get_state(t));
     
     double epsilon = 5;
     double xdelta = epsilon * std::cos (state.bearing());
