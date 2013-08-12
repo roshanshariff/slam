@@ -169,16 +169,18 @@ void slam::slam_data<ControlModel, ObservationModel>
     
     const timestep_type t = current_timestep();
     
-    auto& feature_obs = m_features[id];
-    
+    auto feature_iter = m_features.emplace (std::piecewise_construct,
+                                            std::make_tuple(id), std::make_tuple()).first;
+    auto& feature_obs = feature_iter->second;
+
+    assert (feature_obs.lower_bound(t) == feature_obs.end());
     auto obs_iter = feature_obs.emplace_hint (feature_obs.end(), t, obs);
-    assert (obs_iter+1 == feature_obs.end());
     
-    const std::size_t index = obs_iter - feature_obs.begin();
+    const std::size_t obs_index = obs_iter - feature_obs.begin();
     
+    assert (m_observations.upper_bound(t) == m_observations.end());
     auto obs_info_iter = m_observations.emplace_hint (m_observations.end(), t,
-                                                      observation_info (m_features.find(id), index));
-    assert (obs_info_iter+1 == m_observations.end());
+                                                      observation_info (feature_iter, obs_index));
     
     using namespace std::placeholders;
     m_listeners.for_each (std::bind (&listener::observation, _1, t, std::cref(obs_info_iter->second)));

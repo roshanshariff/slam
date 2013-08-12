@@ -7,7 +7,7 @@
 //
 
 #include <cmath>
-
+#include <set>
 #include <boost/filesystem/fstream.hpp>
 
 #include "slam/dataset_impl.hpp"
@@ -77,10 +77,14 @@ auto read_range_only_data (boost::filesystem::path dir, const std::string& name)
         double timestamp, antenna, id;
         observation_model_type::vector_type observation;
         
+        std::set<std::pair<slam::timestep_type, slam::featureid_type>> observed;
+        
         while (input_TD >> timestamp >> antenna >> id >> observation(0)) {
             slam::featureid_type feature_id (std::round (id));
-            auto timestep = dataset->timestep_at(timestamp - start_timestamp);
-            dataset->add_observation(timestep, feature_id, observation);
+            slam::timestep_type timestep = dataset->timestep_at(timestamp - start_timestamp);
+            if (observed.emplace(timestep, feature_id).second) {
+                dataset->add_observation(timestep, feature_id, observation);
+            }
         }
     }
     
