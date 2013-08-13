@@ -37,6 +37,10 @@ namespace planar_robot {
             return position::polar (obs(0), obs(1));
         }
         
+        auto more_accurate_than (const range_bearing_model& other) const -> bool {
+            return std::abs(mean()(0)) < std::abs(other.mean()(0));
+        }
+        
         class proposal_dist {
             
             const range_bearing_model& model;
@@ -95,6 +99,10 @@ namespace planar_robot {
             vector_type result;
             result(0) = pos.distance();
             return result;
+        }
+        
+        auto more_accurate_than (const range_only_model& other) const -> bool {
+            return std::abs(mean()(0)) < std::abs(other.mean()(0));
         }
         
         class proposal_dist {
