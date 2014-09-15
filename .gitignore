@@ -2,7 +2,7 @@
 *~
 *.dSYM
 *.o
-build/
+build*/
 output/
 Debug/
 Release/
