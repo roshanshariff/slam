@@ -136,7 +136,7 @@ auto slam::fastslam_mcmc<ControlModel, ObservationModel>
         const auto& f = m_mcmc_slam->feature_estimates[fi];
         
         auto mcmc_feature = [&]() {
-            return m_mcmc_slam->get_trajectory().accumulate(f.parent_timestep()) + f.estimate();
+            return m_mcmc_slam->get_trajectory().accumulate(f.parent_timestep) + f.estimate;
         };
         
         using feature_dist = typename fastslam_type::feature_dist;
