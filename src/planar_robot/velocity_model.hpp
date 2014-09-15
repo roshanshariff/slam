@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <functional>
+#include <iostream>
 
 #include <boost/program_options.hpp>
 #include <boost/math/constants/constants.hpp>
@@ -13,7 +14,8 @@
 #include "planar_robot/pose.hpp"
 #include "utility/random.hpp"
 #include "utility/geometry.hpp"
-
+#include "utility/nnls.hpp"
+#include "slam/interfaces.hpp"
 
 namespace planar_robot {
     
@@ -159,6 +161,8 @@ namespace planar_robot {
             
         public:
             
+            builder (const Eigen::Matrix2d mat_variance) : mat_variance(mat_variance) { }
+            
             builder (double a1, double a2, double a3, double a4) {
                 mat_variance <<
                 a1, a2,
@@ -173,8 +177,39 @@ namespace planar_robot {
                 return { dt*control, dt*(dt*mat_variance*control.cwiseAbs2()).cwiseSqrt() };
             }
         };
+
+        template <class ObservationModel, class Feature>
+        static auto learn_from_data (const slam::dataset<velocity_model, ObservationModel>& dataset,
+                                     const slam::slam_result<pose, Feature>& ground_truth)
+        -> builder;
         
     };
+    
+    template <class ObservationModel, class Feature>
+    auto velocity_model::
+    learn_from_data (const slam::dataset<velocity_model, ObservationModel>& dataset,
+                     const slam::slam_result<pose, Feature>& ground_truth) -> builder {
+        
+        const auto& trajectory = ground_truth.get_trajectory();
+        assert (dataset.current_timestep() == ground_truth.current_timestep());
+        const std::size_t timesteps = dataset.current_timestep();
+
+        Eigen::MatrixX2d controls (std::size_t{timesteps}, 2);
+        Eigen::MatrixX2d variance (std::size_t{timesteps}, 2);
+        
+        for (slam::timestep_type t{0}; t < timesteps; ++t) {
+            const double dt = dataset.timedelta(t);
+            controls.row(std::size_t{t}) = dt*(dt*dataset.control(t)).cwiseAbs2();
+            variance.row(std::size_t{t}) = (observe(trajectory[t]) - dt*dataset.control(t)).cwiseAbs2();
+        }
+        
+        Eigen::Matrix2d learned;
+        learned.row(0) = utility::nnls (controls, variance.col(0));
+        learned.row(1) = utility::nnls (controls, variance.col(1));
+        
+        std::cout << "Learned control model:\n" << learned << std::endl;
+        return builder (learned);
+    }
     
     
 } // namespace planar_robot

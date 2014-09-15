@@ -1,5 +1,6 @@
 cmake_minimum_required (VERSION 2.8.8)
 project (slam CXX)
+enable_language (C)
 
 add_library (lib_planar_robot OBJECT
     planar_robot/waypoint_controller.cpp planar_robot/landmark_sensor.cpp
@@ -19,9 +20,16 @@ add_library (lib_slam OBJECT
 add_library (lib_utility OBJECT
     utility/utility.cpp utility/cowtree.cpp)
 
+add_library (lib_nnls OBJECT
+    utility/nnls.cpp utility/nnls.c)
+
+add_library (lib_dataset OBJECT
+    dataset.cpp)
+
 add_executable (slam
-    main.cpp dataset.cpp $<TARGET_OBJECTS:lib_planar_robot> $<TARGET_OBJECTS:lib_simulator>
-    $<TARGET_OBJECTS:lib_slam> $<TARGET_OBJECTS:lib_utility>)
+    main.cpp $<TARGET_OBJECTS:lib_planar_robot> $<TARGET_OBJECTS:lib_simulator>
+    $<TARGET_OBJECTS:lib_slam> $<TARGET_OBJECTS:lib_utility> $<TARGET_OBJECTS:lib_dataset>
+    $<TARGET_OBJECTS:lib_nnls>)
 
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules/")
 
@@ -45,9 +53,12 @@ include_directories (${G2O_INCLUDE_DIR})
 target_link_libraries (slam ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIBRARY} ${G2O_SOLVER_CSPARSE} ${G2O_SOLVER_CSPARSE_EXTENSION})
 
 if (CMAKE_COMPILER_IS_GNUCXX)
-    add_definitions ("-std=c++11 -Werror -Wall -Wextra -march=native -mno-avx -Wno-unused-local-typedefs")
+    add_definitions ("-Werror -Wall -Wextra -march=native -mno-avx -Wno-unused-local-typedefs")
+    set_property (TARGET lib_nnls PROPERTY COMPILE_FLAGS "-Wno-maybe-uninitialized")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_definitions ("-std=c++11 -stdlib=libc++ -Werror -Wall -Wno-error=c++11-narrowing -Wno-error=unused-variable")
+    add_definitions ("-Werror -Wall -Wno-error=c++11-narrowing -Wno-error=unused-variable")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++")
 endif()

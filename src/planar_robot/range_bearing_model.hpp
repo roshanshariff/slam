@@ -6,11 +6,15 @@
 
 #include <boost/program_options.hpp>
 #include <boost/math/constants/constants.hpp>
+#include <Eigen/Core>
+#include <iostream>
+#include <fstream>
 
 #include "planar_robot/position.hpp"
 #include "utility/random.hpp"
 #include "utility/geometry.hpp"
-
+#include "utility/nnls.hpp"
+#include "slam/interfaces.hpp"
 
 namespace planar_robot {
     
@@ -153,13 +157,48 @@ namespace planar_robot {
             
             static auto program_options () -> boost::program_options::options_description;
             
-            range_only_model operator() (const vector_type& observation) const {
+            auto operator() (const vector_type& observation) const -> range_only_model {
                 return range_only_model (observation, stddev);
             }
+            
         };
+        
+        template <class ControlModel, class State>
+        static auto learn_from_data (const slam::dataset<ControlModel, range_only_model>& dataset,
+                                     const slam::slam_result<State, position>& ground_truth)
+        -> builder;
         
     };
     
+    template <class ControlModel, class State>
+    auto range_only_model::
+    learn_from_data (const slam::dataset<ControlModel, range_only_model>& dataset,
+                     const slam::slam_result<State, position>& ground_truth) -> builder {
+        
+        const auto obs = dataset.observations();
+        const auto num_obs = obs.size();
+        
+        Eigen::MatrixX2d observations (num_obs, 2);
+        Eigen::VectorXd variance (num_obs);
+        
+        {
+            std::ofstream debug_out ("learn_range_only_model.txt");
+            
+            observations.col(1).setOnes();
+            for (std::size_t i = 0; i < num_obs; ++i) {
+                const auto t = obs[i].first;
+                const auto& obs_info = obs[i].second;
+                const auto rel_pos = -ground_truth.get_state(t) + ground_truth.get_feature(obs_info.id);
+                observations(i, 0) = std::abs(obs_info.observation(0));
+                variance(i) = std::pow (rel_pos.distance() - obs_info.observation(0), 2.0);
+                debug_out << observations(i,0) << ' ' << observations(i,1) << ' ' << variance(i) << '\n';
+            }
+        }
+        Eigen::VectorXd learned = utility::nnls (observations, variance);
+            
+        std::cout << "Learned observation model: " << learned.transpose() << std::endl;
+        return builder (std::sqrt (learned(1)));
+    }
     
 } // namespace planar_robot
 

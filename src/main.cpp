@@ -57,6 +57,10 @@ T remember_option (boost::program_options::variables_map& options, const std::st
 }
 
 
+void learn_model (const slam_dataset_type& dataset, const slam_result_type& ground_truth,
+                  const boost::program_options::variables_map& options);
+
+
 int main (int argc, char* argv[]) {
     
     /* parse program options */
@@ -98,6 +102,11 @@ int main (int argc, char* argv[]) {
         ground_truth = simulator;
     }
     assert (dataset);
+    
+    if (options.count("learn-model")) {
+        learn_model (*dataset, *ground_truth, options);
+        return 0;
+    }
     
     auto init = std::make_shared<slam_initialiser_type> (init_seed);
     data->add_listener (init);
@@ -311,6 +320,9 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     ("cluster", "try to cluster MCMC-SLAM results")
     ("slam-plot", "produce SLAM gnuplot output")
     ("plot-stats", "produce plots of various summary statistics")
+    ("learn-model", "learn observation and control models")
+    ("learn-model-iterations", po::value<unsigned int>()->default_value(5),
+     "number of iterations to use when learning control model")
     ("seed", po::value<unsigned int>(), "seed for global random number generator");
     
     const std::vector<std::pair<std::string, po::options_description>> module_options {
@@ -383,3 +395,33 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     
     return values;
 }
+
+
+void learn_model (const slam_dataset_type& dataset, const slam_result_type& ground_truth,
+                  const boost::program_options::variables_map& options) {
+    
+    observation_model_type::builder observation_model_builder (options);
+    //observation_model_builder = observation_model_type::learn_from_data (dataset, ground_truth);
+    (void)ground_truth;
+    
+    slam_result_impl_type result;
+    auto random_seed = (std::random_device())();
+
+    control_model_type::builder control_model_builder (options);
+
+    auto iterations = options["learn-model-iterations"].as<unsigned int>();
+    while (iterations--) {
+
+        auto data = std::make_shared<slam_data_type>();
+        auto mcmc_slam = std::make_shared<mcmc_slam_type> (data, random_seed);
+        auto mcmc_slam_updater = std::make_shared<mcmc_slam_type::updater>(mcmc_slam, options);
+        data->add_timestep_listener (mcmc_slam);
+        data->add_timestep_listener (mcmc_slam_updater);
+        data->add_dataset (dataset, control_model_builder, observation_model_builder);
+        
+        control_model_builder = control_model_type::learn_from_data (dataset, *mcmc_slam);
+    }
+    
+}
+
+
