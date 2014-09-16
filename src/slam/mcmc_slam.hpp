@@ -343,7 +343,7 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
 
         timestep_type timestep;
         do { timestep = timestep_type (state_weights.binary_search (state_weight*random.uniform())); }
-        while (timestep >= current_timestep());
+        while (timestep >= current_timestep() && ((std::cerr << "stuck in timestep select loop\n"), true));
 
         return update (state_edge (*this, timestep), true);
     }
@@ -351,7 +351,7 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
 
         std::size_t index;
         do { index = feature_weights.binary_search (feature_weight*random.uniform()); }
-        while (index >= feature_estimates.size());
+        while (index >= feature_estimates.size() && ((std::cerr << "stuck in landmark select loop\n"), true));
 
         return update (feature_edge (*this, index), true);
     }

@@ -15,10 +15,15 @@
 #include <boost/range/adaptor/map.hpp>
 
 #include "simulator/slam_plotter.hpp"
+#include "planar_robot/rms_error.hpp"
 #include "utility/bitree.hpp"
 #include "utility/flat_map.hpp"
 #include "utility/utility.hpp"
 
+
+void slam_plotter::set_ground_truth (std::shared_ptr<slam_result_type> source) {
+    ground_truth = source;
+}
 
 void slam_plotter::add_data_source (std::shared_ptr<slam_result_type> source, bool autoscale_map,
                                     std::string trajectory_title, std::string landmark_title,
@@ -65,9 +70,19 @@ void slam_plotter::plot (boost::optional<slam::timestep_type> timestep) {
 
     for (const auto& source : data_sources) {
         const auto t = timestep ? *timestep : source.source->current_timestep();
-        plot_map (source);
-        plot_trajectory (source, t);
-        plot_state (source, t);
+        pose origin;
+        if (ground_truth && source.source != ground_truth) {
+            if (match_ground_truth && source.source->get_feature_map().size() >= 2) {
+                origin = planar_robot::estimate_initial_pose(ground_truth->get_feature_map(),
+                                                             source.source->get_feature_map());
+            }
+            else {
+                origin = ground_truth->get_initial_state() + (-source.source->get_initial_state());
+            }
+        }
+        plot_map (source, origin);
+        plot_trajectory (source, t, origin);
+        plot_state (source, t, origin);
     }
     gnuplot.plot ();
     
@@ -81,7 +96,7 @@ void slam_plotter::add_title (const std::string& title) {
 }
 
 
-void slam_plotter::plot_map (const data_source& source) {
+void slam_plotter::plot_map (const data_source& source, const pose& origin) {
     
     using namespace boost::adaptors;
     
@@ -89,7 +104,7 @@ void slam_plotter::plot_map (const data_source& source) {
     if (feature_map.empty()) return;
     
     for (const auto& feature : values(feature_map)) {
-        position pos = initial_pose + (-source.source->get_initial_state() + feature);
+        position pos = origin + feature;
         gnuplot << pos.x() << pos.y();
     }
 
@@ -101,13 +116,11 @@ void slam_plotter::plot_map (const data_source& source) {
 }
 
 
-void slam_plotter::plot_trajectory (const data_source& source, slam::timestep_type t) {
+void slam_plotter::plot_trajectory (const data_source& source, slam::timestep_type t,
+                                    const pose& origin) {
     
-    const auto& trajectory = source.source->get_trajectory();
-    assert (t <= trajectory.size());
-    
-    for (size_t i = 0; i <= t; ++i) {
-        pose state = initial_pose + trajectory.accumulate(i);
+    for (slam::timestep_type i; i <= t; ++i) {
+        pose state = origin + source.source->get_state(i);
         gnuplot << state.x() << state.y();
     }
     
@@ -117,11 +130,12 @@ void slam_plotter::plot_trajectory (const data_source& source, slam::timestep_ty
 }
 
 
-void slam_plotter::plot_state (const data_source& source, slam::timestep_type t) {
+void slam_plotter::plot_state (const data_source& source, slam::timestep_type t,
+                               const pose& origin) {
 
-    pose state = initial_pose + (-source.source->get_initial_state() + source.source->get_state(t));
+    pose state = origin + source.source->get_state(t);
     
-    double epsilon = 5;
+    double epsilon = 1;
     double xdelta = epsilon * std::cos (state.bearing());
     double ydelta = epsilon * std::sin (state.bearing());
     gnuplot << state.x() << state.y() << xdelta << ydelta;
@@ -141,14 +155,16 @@ boost::program_options::options_description slam_plotter::program_options () {
      "Plot title")
     ("slam-plot-output-dir", po::value<std::string>(),
      "Output directory for plots (displayed on screen if unset)")
+    ("slam-plot-isometry", "calculate best fit between estimated map and ground truth")
     ("debug-slam-plot", "switch to debugging mode");
     return options;
 }
 
 
-slam_plotter::slam_plotter (boost::program_options::variables_map& options, const pose& initial_state)
-: initial_pose(initial_state), title (options["slam-plot-title"].as<std::string>()),
-gnuplot(options.count("debug-slam-plot") != 0)
+slam_plotter::slam_plotter (boost::program_options::variables_map& options)
+: title (options["slam-plot-title"].as<std::string>()),
+gnuplot(options.count("debug-slam-plot") != 0),
+match_ground_truth(options.count("slam-plot-isometry"))
 {
     if (options.count ("slam-plot-output-dir")) {
         output_dir = boost::filesystem::path (options["slam-plot-output-dir"].as<std::string>());

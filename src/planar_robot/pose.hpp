@@ -44,6 +44,10 @@ namespace planar_robot {
             return pose (position.pos, bearing);
 	}
         
+        static pose from_trans_rot (const Eigen::Vector2d& trans, const Eigen::Rotation2Dd& rot) {
+            return pose (trans, rot);
+        }
+        
 	double x () const { return translation.x(); }
 	double y () const { return translation.y(); }
 	double bearing () const { return rotation.angle(); }

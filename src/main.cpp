@@ -145,18 +145,19 @@ int main (int argc, char* argv[]) {
     std::shared_ptr<slam_plotter> slam_plot;
     if (options.count ("slam-plot")) {
         
-        slam_plot = std::make_shared<slam_plotter> (options, ground_truth->get_initial_state());
+        slam_plot = std::make_shared<slam_plotter> (options);
         
+        slam_plot->set_ground_truth(ground_truth);
         slam_plot->add_data_source (ground_truth, true, "Trajectory", "Landmarks",
-                                    "lc rgbcolor 'black' pt 6 ps 1.5",
-                                    "lc rgbcolor 'black' lw 5",
-                                    "size 10,20,50 filled lc rgbcolor 'black'");
+                                    "lc rgbcolor 'black' pt 6 ps 4",
+                                    "lc rgbcolor 'gray' lw 5",
+                                    "size 20,20,50 head filled lc rgbcolor 'gray'");
         
         if (mcmc_slam) {
             slam_plot->add_data_source (mcmc_slam, false, "MCMC-SLAM", "",
-                                        "lc rgbcolor 'green' pt 3 ps 1",
-                                        "lc rgbcolor 'green' lw 2",
-                                        "size 10,20,50 filled lc rgbcolor 'green'");
+                                        "lc rgbcolor 'blue' pt 3 ps 3",
+                                        "lc rgbcolor 'blue' lw 2",
+                                        "size 20,20,50 head filled lc rgbcolor 'blue'");
         }
         
         if (g2o_slam) {
@@ -202,21 +203,20 @@ int main (int argc, char* argv[]) {
         if (slam_plot) slam_plot->completed();
     }
     
-    const auto trajectory_rmse = [&](const slam_result_type& result) -> double {
-        return planar_robot::trajectory_rmse (ground_truth->get_trajectory(), result.get_trajectory());
-    };
-    
-    const auto map_rmse = [&](const slam_result_type& result) -> double {
-        return planar_robot::map_rmse (ground_truth->get_initial_state(), ground_truth->get_feature_map(),
-                                       result.get_initial_state(), result.get_feature_map());
+    const auto print_rmse = [ground_truth](const slam_result_type& estimate, const char* name) {
+
+        double map_rmse, traj_rmse;
+
+        std::tie(map_rmse, traj_rmse) = planar_robot::map_traj_rmse_align_start (*ground_truth, estimate);
+        std::cout << name << " Map RMSE: " << map_rmse << '\n' << name << " Trajectory RMSE: " << traj_rmse << '\n';
+
+        std::tie(map_rmse, traj_rmse) = planar_robot::map_traj_rmse_align_best (*ground_truth, estimate);
+        std::cout << name << " Aligned Map RMSE: " << map_rmse << '\n' << name << " Aligned Trajectory RMSE: " << traj_rmse << '\n';
     };
 
     if (mcmc_slam) {
+        print_rmse (*mcmc_slam, "MCMC-SLAM");
         std::cout
-        << "MCMC-SLAM Trajectory RMSE: "
-        << trajectory_rmse (*mcmc_slam) << '\n'
-        << "MCMC-SLAM Map RMSE: "
-        << map_rmse (*mcmc_slam) << '\n'
         << "MCMC-SLAM log likelihood ratio: "
         << mcmc_slam->get_log_likelihood() - dataset_log_likelihood
         << "\n\n";
@@ -226,32 +226,24 @@ int main (int argc, char* argv[]) {
         
         std::cout
         << "Multi-MCMC-SLAM Chains: "
-        << multi_mcmc->num_chains() << '\n'
-        << "Multi-MCMC-SLAM Trajectory RMSE: "
-        << trajectory_rmse (*multi_mcmc) << '\n'
-        << "Multi-MCMC-SLAM Map RMSE: "
-        << map_rmse (*multi_mcmc) << '\n'
+        << multi_mcmc->num_chains() << '\n';
+        print_rmse (*mcmc_slam, "Multi-MCMC");
+        std::cout
         << "Multi-MCMC-SLAM log likelihood ratio: "
         << multi_mcmc->get_log_likelihood() - dataset_log_likelihood
         << "\n\n";
         
         auto average = multi_mcmc->get_average();
+        print_rmse (*mcmc_slam, "Averaged-Multi-MCMC");
         std::cout
-        << "Multi-MCMC-SLAM Averaged Trajectory RMSE: "
-        << trajectory_rmse (*average) << '\n'
-        << "Multi-MCMC-SLAM Averaged Map RMSE: "
-        << map_rmse (*average) << '\n'
-        << "Multi-MCMC-SLAM log likelihood ratio: "
+        << "Averaged-Multi-MCMC log likelihood ratio: "
         << slam::slam_log_likelihood (*data, *average) - dataset_log_likelihood
         << "\n\n";        
     }
     
     if (g2o_slam) {
+        print_rmse(*g2o_slam, "G2O-SLAM");
         std::cout
-        << "G2O-SLAM Trajectory RMSE: "
-        << trajectory_rmse (*g2o_slam) << '\n'
-        << "G2O-SLAM Map RMSE: "
-        << map_rmse (*g2o_slam) << '\n'
         << "G2O-SLAM log likelihood ratio: "
         << slam::slam_log_likelihood (*data, *g2o_slam) - dataset_log_likelihood
         << "\n\n";
@@ -276,7 +268,8 @@ int main (int argc, char* argv[]) {
             std::cout << top_clusters.size() << ": " << (cluster.log_likelihood - dataset_log_likelihood) << '\n';
         }
         
-        auto cluster_plot = std::make_shared<slam_plotter>(options, ground_truth->get_initial_state());
+        auto cluster_plot = std::make_shared<slam_plotter>(options);
+        cluster_plot->set_ground_truth(ground_truth);
         cluster_plot->add_data_source (ground_truth, true, "Trajectory", "Landmarks",
                                        "lc rgbcolor 'black' pt 6 ps 1.5",
                                        "lc rgbcolor 'black' lw 5",

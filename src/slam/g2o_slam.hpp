@@ -251,13 +251,13 @@ namespace slam {
             virtual void timestep (timestep_type t) override {
                 instance->timestep (t);
                 const int iterations = instance->optimise (steps);
-                std::cout << "G2O iterations: " << iterations << '\n';
+                //std::cout << "G2O iterations: " << iterations << '\n';
             }
             
             virtual void completed () override {
                 instance->completed();
                 const int iterations = instance->optimise (end_steps);
-                std::cout << "G2O iterations: " << iterations << '\n';
+                //std::cout << "G2O iterations: " << iterations << '\n';
             }
         };
         
