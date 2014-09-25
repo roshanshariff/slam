@@ -35,7 +35,7 @@ auto utility::nnls (Eigen::MatrixXd A, Eigen::MatrixXd b, double* rnorm_ptr) -> 
     Eigen::VectorXi index (n);
 
     int mode;
-    nnls_c(A.data(), &mda, &m, &n, b.data(), x.data(), &rnorm, w.data(), zz.data(), index.data(), &mode);
+    nnls_c(A.data(), &mda, &m, &n, b.data(), x.data(), rnorm_ptr, w.data(), zz.data(), index.data(), &mode);
     
     switch (mode) {
         case 1: // THE SOLUTION HAS BEEN COMPUTED SUCCESSFULLY

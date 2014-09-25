@@ -23,6 +23,7 @@
    compilers. */
 #include <stdio.h>
 #include <math.h>
+#include <assert.h>
 #include "nnls.h"
 #define nnls_max(a,b) ((a) >= (b) ? (a) : (b))
 #define nnls_abs(x) ((x) >= 0 ? (x) : -(x))
@@ -200,6 +201,7 @@ L30:
 /*                                   FIND LARGEST POSITIVE W(J). */
 L60:
     wmax = 0.;
+    izmax = 0;
     i__1 = iz2;
     for (iz = iz1; iz <= i__1; ++iz) {
 	j = index[iz];
@@ -217,6 +219,7 @@ L60:
     if (wmax <= 0.) {
 	goto L350;
     }
+    assert(izmax > 0);
     iz = izmax;
     j = index[iz];
 
@@ -336,6 +339,7 @@ L210:
 /*                                  IF NOT COMPUTE ALPHA. */
 
     alpha = 2.;
+    jj = 0;
     i__1 = nsetp;
     for (ip = 1; ip <= i__1; ++ip) {
 	l = index[ip];
@@ -355,6 +359,7 @@ L210:
     if (alpha == 2.) {
 	goto L330;
     }
+    assert(jj > 0);
 
 /*          OTHERWISE USE ALPHA WHICH WILL BE BETWEEN 0. AND 1. TO */
 /*          INTERPOLATE BETWEEN THE OLD X AND THE NEW ZZ. */
