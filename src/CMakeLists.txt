@@ -2,34 +2,33 @@ cmake_minimum_required (VERSION 2.8.8)
 project (slam CXX)
 enable_language (C)
 
-add_library (lib_planar_robot OBJECT
+add_library (planar_robot STATIC
     planar_robot/waypoint_controller.cpp planar_robot/landmark_sensor.cpp
     planar_robot/velocity_model.cpp planar_robot/range_bearing_model.cpp
     planar_robot/rms_error.cpp)
-    
-add_library (lib_simulator OBJECT
+
+add_library (simulator STATIC
     simulator/simulator.cpp simulator/gnuplot_process.cpp simulator/slam_plotter.cpp
     simulator/time_series_plotter.cpp)
-    
-add_library (lib_slam OBJECT
+
+add_library (slam_impl STATIC
     slam/slam_data.cpp slam/mcmc_slam.cpp slam/multi_mcmc.cpp slam/g2o_slam.cpp
     slam/g2o_clustering.cpp
     #slam/fastslam.cpp slam/fastslam_mcmc.cpp
     )
-    
-add_library (lib_utility OBJECT
+
+add_library (utility STATIC
     utility/utility.cpp utility/cowtree.cpp)
 
-add_library (lib_nnls OBJECT
+add_library (nnls STATIC
     utility/nnls.cpp utility/nnls.c)
 
-add_library (lib_dataset OBJECT
+add_library (dataset STATIC
     dataset.cpp)
 
-add_executable (slam
-    main.cpp $<TARGET_OBJECTS:lib_planar_robot> $<TARGET_OBJECTS:lib_simulator>
-    $<TARGET_OBJECTS:lib_slam> $<TARGET_OBJECTS:lib_utility> $<TARGET_OBJECTS:lib_dataset>
-    $<TARGET_OBJECTS:lib_nnls>)
+add_executable (slam main.cpp)
+target_link_libraries (slam planar_robot simulator slam_impl utility
+                      dataset nnls)
 
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules/")
 
