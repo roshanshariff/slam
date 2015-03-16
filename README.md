@@ -10,6 +10,7 @@ G2O Install Instructions
 
 Install the following dependencies: cmake, suitesparse, eigen3, lapack, blas.
 With MacPorts:
+
     sudo port install cmake eigen3 SuiteSparse
 
 The following instructions will install to G2O_ROOT:
@@ -30,7 +31,9 @@ SLAM Install Instructions
 -------------------------
 
 Install the following dependencies: boost, gnuplot (apart from cmake and eigen3)
+
 With MacPorts:
+
     sudo port install boost gnuplot
 
 ````
