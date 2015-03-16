@@ -53,7 +53,7 @@ target_link_libraries (slam ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIBRARY} ${G2O_SOLVE
 
 if (CMAKE_COMPILER_IS_GNUCXX)
     add_definitions ("-Werror -Wall -Wextra -march=native -mno-avx -Wno-unused-local-typedefs")
-    set_property (TARGET lib_nnls PROPERTY COMPILE_FLAGS "-Wno-maybe-uninitialized")
+    set_property (TARGET nnls PROPERTY COMPILE_FLAGS "-Wno-maybe-uninitialized")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
 

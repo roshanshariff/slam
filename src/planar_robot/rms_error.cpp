@@ -108,7 +108,7 @@ auto planar_robot::estimate_initial_pose (const planar_map& ground_truth,
     
     Eigen::Matrix2Xd landmarks(2,features_vec.size());
     Eigen::Matrix2Xd est_landmarks(2,features_vec.size());
-    for (int i = 0; i < features_vec.size(); ++i) {
+    for (std::size_t i = 0; i < features_vec.size(); ++i) {
         landmarks.col(i) = features_vec[i].first.to_vector();
         est_landmarks.col(i) = features_vec[i].second.to_vector();
     }
