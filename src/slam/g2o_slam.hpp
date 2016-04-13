@@ -71,8 +71,8 @@ namespace slam {
                 this->setEstimate (estimate);
             }
             
-            virtual auto read (std::istream&) -> bool { return true; }
-            virtual auto write (std::ostream&) const -> bool { return true; }
+            virtual auto read (std::istream&) -> bool override { return true; }
+            virtual auto write (std::ostream&) const -> bool override { return true; }
             
         protected:
             
@@ -99,8 +99,8 @@ namespace slam {
                 //this->setMarginalized (true);
             }
             
-            virtual auto read (std::istream&) -> bool { return true; }
-            virtual auto write (std::ostream&) const -> bool { return true; }
+            virtual auto read (std::istream&) -> bool override { return true; }
+            virtual auto write (std::ostream&) const -> bool override { return true; }
             
         protected:
             
@@ -132,8 +132,8 @@ namespace slam {
                 this->setInformation (chol_cov_inv.transpose() * chol_cov_inv);
             }
             
-            virtual auto read (std::istream&) -> bool { return true; }
-            virtual auto write (std::ostream&) const -> bool { return true; }
+            virtual auto read (std::istream&) -> bool override { return true; }
+            virtual auto write (std::ostream&) const -> bool override { return true; }
             
         protected:
             
@@ -163,8 +163,8 @@ namespace slam {
                 this->setInformation (chol_cov_inv.transpose() * chol_cov_inv);
             }
             
-            virtual auto read (std::istream&) -> bool { return true; }
-            virtual auto write (std::ostream&) const -> bool { return true; }
+            virtual auto read (std::istream&) -> bool override { return true; }
+            virtual auto write (std::ostream&) const -> bool override { return true; }
             
         protected:
             
