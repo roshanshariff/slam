@@ -14,12 +14,13 @@
 #include <boost/container/container_fwd.hpp>
 
 namespace utility {
-    
-    using boost::container::flat_map;
-    using boost::container::flat_multimap;
-    
-    template <class Grp, class Alloc = std::allocator<Grp>> class bitree;
 
-}
+using boost::container::flat_map;
+using boost::container::flat_multimap;
+
+template <class Grp, class Alloc = std::allocator<Grp>>
+class bitree;
+
+} // namespace utility
 
 #endif

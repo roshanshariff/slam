@@ -8,4 +8,5 @@
 
 #include "simulator/simulator.hpp"
 
-template class simulator<control_model_type, observation_model_type, controller_type, sensor_type>;
+template class simulator<control_model_type, observation_model_type,
+                         controller_type, sensor_type>;

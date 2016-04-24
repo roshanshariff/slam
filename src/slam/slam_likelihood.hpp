@@ -13,49 +13,50 @@
 #include "slam/slam_data.hpp"
 
 namespace slam {
-    
 
 //    template <class ControlModel, class ObservationModel>
-//    double slam_log_likelihood (const slam_data<ControlModel, ObservationModel>&,
-//                                const mcmc_slam<ControlModel, ObservationModel>& estimate) {
-//        
+//    double slam_log_likelihood (const slam_data<ControlModel,
+//    ObservationModel>&,
+//                                const mcmc_slam<ControlModel,
+//                                ObservationModel>& estimate) {
+//
 //        return estimate.get_log_likelihood();
 //    }
-    
 
-    template <class ControlModel, class ObservationModel>
-    double slam_log_likelihood (const slam_data<ControlModel, ObservationModel>& data,
-                                const slam_result_of<ControlModel, ObservationModel>& estimate) {
-        
-        double log_likelihood = 0;
-        
-        const auto& trajectory = estimate.get_trajectory();
-        for (timestep_type t; t < trajectory.size(); ++t) {
-            log_likelihood += data.control(t).log_likelihood (ControlModel::observe (trajectory[t]));
-        }
-        
-        const auto initial_state = estimate.get_initial_state();
-        for (const auto& id_feature : estimate.get_feature_map()) {
-            
-            const featureid_type id = id_feature.first;
-            if (!data.feature_observed (id)) continue;
-            
-            auto feature = -initial_state + id_feature.second;
+template <class ControlModel, class ObservationModel>
+double slam_log_likelihood(
+    const slam_data<ControlModel, ObservationModel>& data,
+    const slam_result_of<ControlModel, ObservationModel>& estimate) {
 
-            timestep_type timestep {0};
-            for (const auto& obs : data.get_observations(id)) {
-                feature = trajectory.accumulate (obs.first, timestep) + feature;
-                timestep = obs.first;
-                const ObservationModel& distribution = obs.second;
-                log_likelihood += distribution.log_likelihood (ObservationModel::observe (feature));
-            }
-        }
-        
-        return log_likelihood;
+  double log_likelihood = 0;
+
+  const auto& trajectory = estimate.get_trajectory();
+  for (timestep_type t; t < trajectory.size(); ++t) {
+    log_likelihood +=
+        data.control(t).log_likelihood(ControlModel::observe(trajectory[t]));
+  }
+
+  const auto initial_state = estimate.get_initial_state();
+  for (const auto& id_feature : estimate.get_feature_map()) {
+
+    const featureid_type id = id_feature.first;
+    if (!data.feature_observed(id)) continue;
+
+    auto feature = -initial_state + id_feature.second;
+
+    timestep_type timestep{0};
+    for (const auto& obs : data.get_observations(id)) {
+      feature = trajectory.accumulate(obs.first, timestep) + feature;
+      timestep = obs.first;
+      const ObservationModel& distribution = obs.second;
+      log_likelihood +=
+          distribution.log_likelihood(ObservationModel::observe(feature));
     }
-    
-    
-} // namespace slam
+  }
 
+  return log_likelihood;
+}
+
+} // namespace slam
 
 #endif

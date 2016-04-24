@@ -12,9 +12,9 @@
 #include <Eigen/Core>
 
 namespace utility {
-    
-    auto nnls (Eigen::MatrixXd A, Eigen::MatrixXd b, double* rnorm_ptr = nullptr) -> Eigen::VectorXd;
 
+auto nnls(Eigen::MatrixXd A, Eigen::MatrixXd b, double* rnorm_ptr = nullptr)
+    -> Eigen::VectorXd;
 }
 
 #endif

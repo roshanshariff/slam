@@ -16,29 +16,33 @@
 #include "slam/interfaces.hpp"
 
 namespace planar_robot {
-    
-    using planar_slam_result = slam::slam_result <pose, position>;
-    
-    using planar_trajectory = planar_slam_result::trajectory_type;
-    using planar_map = planar_slam_result::feature_map_type;
 
-    double trajectory_rmse (const planar_trajectory& ground_truth,
-                            const planar_trajectory& estimate, const pose& initial_state);
+using planar_slam_result = slam::slam_result<pose, position>;
 
-    double map_rmse (const planar_map& ground_truth,
-                     const planar_map& estimates, const pose& origin);
-    
-    std::pair<double, double> map_traj_rmse (const planar_slam_result& ground_truth,
-                                             const planar_slam_result& estimate);
-    
-    std::pair<double, double> map_traj_rmse_align_start (const planar_slam_result& ground_truth,
-                                                         const planar_slam_result& estimate);
+using planar_trajectory = planar_slam_result::trajectory_type;
+using planar_map = planar_slam_result::feature_map_type;
 
-    std::pair<double, double> map_traj_rmse_align_best (const planar_slam_result& ground_truth,
-                                                        const planar_slam_result& estimate);
+double trajectory_rmse(const planar_trajectory& ground_truth,
+                       const planar_trajectory& estimate,
+                       const pose& initial_state);
 
-    pose estimate_initial_pose (const planar_map& ground_truth, const planar_map& estimates);
-    
-}
+double map_rmse(const planar_map& ground_truth, const planar_map& estimates,
+                const pose& origin);
+
+std::pair<double, double> map_traj_rmse(const planar_slam_result& ground_truth,
+                                        const planar_slam_result& estimate);
+
+std::pair<double, double>
+map_traj_rmse_align_start(const planar_slam_result& ground_truth,
+                          const planar_slam_result& estimate);
+
+std::pair<double, double>
+map_traj_rmse_align_best(const planar_slam_result& ground_truth,
+                         const planar_slam_result& estimate);
+
+pose estimate_initial_pose(const planar_map& ground_truth,
+                           const planar_map& estimates);
+
+} // namespace planar_robot
 
 #endif /* defined(_PLANAR_ROBOT_RMS_ERROR_HPP) */

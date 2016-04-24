@@ -10,44 +10,47 @@
 
 #include "simulator/time_series_plotter.hpp"
 
+void time_series_plotter::timestep(slam::timestep_type timestep) {
 
-void time_series_plotter::timestep (slam::timestep_type timestep) {
-    
-    long xmax = long(timestep);
-    long xmin = xmax + 1 - long(history_capacity);
-    std::fprintf (gnuplot.handle(), "set xrange [%ld:%ld]\n", xmin, xmax);
-    
-    bool use_y2 = false;
-    
-    for (auto& source : data_sources) {
-        auto value = source.function (timestep);
-        
-        use_y2 = use_y2 || source.secondary_axis;
-        
-        auto& range = source.secondary_axis ? y2range : yrange;
-        if (value < range.first) range.first = value;
-        if (value > range.second) range.second = value;
-        source.history.push_back (value);
-    }
-    std::fprintf (gnuplot.handle(), "set yrange [%f:%f]\n", yrange.first, yrange.second);
-    std::fprintf (gnuplot.handle(), "set y2range [%f:%f]\n", y2range.first, y2range.second);
-    
-    if (use_y2) gnuplot.puts ("set y2tics border\n");
-    
-    for (auto& source : data_sources) {
-        
-        long t = size_t(timestep) - source.history.size();
-        for (const auto& value : source.history) gnuplot << (++t) << value;
+  long xmax = long(timestep);
+  long xmin = xmax + 1 - long(history_capacity);
+  std::fprintf(gnuplot.handle(), "set xrange [%ld:%ld]\n", xmin, xmax);
 
-        gnuplot.plot (2);
-        gnuplot.puts (source.secondary_axis ? "axes x1y2 " : "axes x1y1 ");
+  bool use_y2 = false;
 
-        if (!source.title.empty()) std::fprintf (gnuplot.handle(), "title '%s' ", source.title.c_str());
-        else gnuplot.puts ("notitle ");
-        
-        gnuplot.puts ("with lines ");
-        gnuplot.puts (source.style.c_str());
-    }
+  for (auto& source : data_sources) {
+    auto value = source.function(timestep);
 
-    gnuplot.plot();
+    use_y2 = use_y2 || source.secondary_axis;
+
+    auto& range = source.secondary_axis ? y2range : yrange;
+    if (value < range.first) range.first = value;
+    if (value > range.second) range.second = value;
+    source.history.push_back(value);
+  }
+  std::fprintf(gnuplot.handle(), "set yrange [%f:%f]\n", yrange.first,
+               yrange.second);
+  std::fprintf(gnuplot.handle(), "set y2range [%f:%f]\n", y2range.first,
+               y2range.second);
+
+  if (use_y2) gnuplot.puts("set y2tics border\n");
+
+  for (auto& source : data_sources) {
+
+    long t = size_t(timestep) - source.history.size();
+    for (const auto& value : source.history) gnuplot << (++t) << value;
+
+    gnuplot.plot(2);
+    gnuplot.puts(source.secondary_axis ? "axes x1y2 " : "axes x1y1 ");
+
+    if (!source.title.empty())
+      std::fprintf(gnuplot.handle(), "title '%s' ", source.title.c_str());
+    else
+      gnuplot.puts("notitle ");
+
+    gnuplot.puts("with lines ");
+    gnuplot.puts(source.style.c_str());
+  }
+
+  gnuplot.plot();
 }
