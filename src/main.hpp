@@ -18,7 +18,7 @@ namespace planar_robot {
     class landmark_sensor;
 }
 
-using control_model_type = planar_robot::velocity_model;
+using control_model_type = planar_robot::velocity_slip_model;
 using observation_model_type = planar_robot::range_only_model;
 
 // Must be a model that supports inv_observe

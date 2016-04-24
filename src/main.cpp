@@ -22,6 +22,7 @@
 #include "slam/multi_mcmc.hpp"
 #include "slam/g2o_slam.hpp"
 #include "slam/g2o_clustering.hpp"
+#include "slam/hamiltonian.hpp"
 #include "slam/slam_likelihood.hpp"
 #include "simulator/simulator.hpp"
 #include "simulator/slam_plotter.hpp"
@@ -43,6 +44,8 @@ using mcmc_slam_type = slam::mcmc_slam<control_model_type, observation_model_typ
 using multi_mcmc_type = slam::multi_mcmc<control_model_type, observation_model_type>;
 using g2o_slam_type = slam::g2o_slam<control_model_type, observation_model_type>;
 using g2o_clustering_type = slam::g2o_clustering<control_model_type, observation_model_type>;
+using hmc_type = slam::reparam_hmc<control_model_type, observation_model_type>;
+
 
 boost::program_options::variables_map parse_options (int argc, char* argv[]);
 
@@ -57,9 +60,58 @@ T remember_option (boost::program_options::variables_map& options, const std::st
 }
 
 
+/*
 void learn_model (const slam_dataset_type& dataset, const slam_result_type& ground_truth,
                   const boost::program_options::variables_map& options);
+*/
 
+
+void dump_data (const slam_result_type& ground_truth, const slam_result_type& estimate,
+                const std::string& prefix) {
+
+  using planar_robot::pose;
+  using planar_robot::position;
+
+  pose origin = planar_robot::estimate_initial_pose(ground_truth.get_feature_map(),
+                                                    estimate.get_feature_map());
+  
+  {
+    std::ofstream traj_est (prefix+"traj_est.txt");
+    for (slam::timestep_type t; t <= estimate.current_timestep(); ++t) {
+      pose state = origin + estimate.get_state(t);
+      traj_est << state.x() << ' ' << state.y() << '\n';
+    }
+  }
+
+  {
+    std::ofstream traj_gt (prefix+"traj_gt.txt");
+    for (slam::timestep_type t; t <= ground_truth.current_timestep(); ++t) {
+      pose state = ground_truth.get_state(t);
+      traj_gt << state.x() << ' ' << state.y() << '\n';
+    }
+  }
+
+  using namespace boost::adaptors;
+  
+  {
+    std::ofstream map_est (prefix+"map_est.txt");
+    const auto& feature_map = estimate.get_feature_map();
+    for (const auto& feature : values(feature_map)) {
+        position pos = origin + feature;
+        map_est << pos.x() << ' ' << pos.y() << '\n';
+    }
+  }
+
+  {
+    std::ofstream map_gt (prefix+"map_gt.txt");
+    const auto& feature_map = ground_truth.get_feature_map();
+    for (const auto& feature : values(feature_map)) {
+        position pos = feature;
+        map_gt << pos.x() << ' ' << pos.y() << '\n';
+    }
+  }
+
+}
 
 int main (int argc, char* argv[]) {
     
@@ -74,6 +126,7 @@ int main (int argc, char* argv[]) {
     unsigned int sim_seed = remember_option (options, "sim-seed", (unsigned int)random());
     unsigned int init_seed = remember_option (options, "init-seed", (unsigned int)random());
     unsigned int mcmc_slam_seed = remember_option (options, "mcmc-slam-seed", (unsigned int)random());
+    unsigned int hmc_seed = remember_option (options, "hmc-seed", (unsigned int)random());
     unsigned int fastslam_seed = remember_option (options, "fastslam-seed", (unsigned int)random());
     unsigned int multi_mcmc_seed = remember_option (options, "multi-mcmc-seed", (unsigned int)random());
     
@@ -102,11 +155,13 @@ int main (int argc, char* argv[]) {
         ground_truth = simulator;
     }
     assert (dataset);
-    
+
+    /*
     if (options.count("learn-model")) {
         learn_model (*dataset, *ground_truth, options);
         return 0;
     }
+    */
     
     auto init = std::make_shared<slam_initialiser_type> (init_seed);
     data->add_listener (init);
@@ -142,6 +197,31 @@ int main (int argc, char* argv[]) {
         data->add_listener (g2o_clustering);
     }
     
+    std::shared_ptr<time_series_plotter> likelihood_plot;
+    if (options.count ("plot-stats")) {
+        
+        likelihood_plot = std::make_shared<time_series_plotter> (300);
+        
+        if (mcmc_slam) {
+
+            likelihood_plot->add_data_source ([=](slam::timestep_type) {
+                return slam::slam_log_likelihood (*data, *mcmc_slam) - slam::slam_log_likelihood (*data, *ground_truth);
+            }, "MCMC-SLAM log likelihood", "lc rgbcolor 'green' lw 5");
+        }
+        
+        data->add_timestep_listener (likelihood_plot);
+    }
+    
+    /* set up simulation logging */
+    
+    boost::filesystem::path output_dir (options["output-dir"].as<std::string>());
+    boost::filesystem::create_directories (output_dir);
+    
+    {
+        boost::timer::auto_cpu_timer timer (3, "CPU Time: %t seconds\n\n");
+        data->add_dataset (*dataset, control_model_builder, observation_model_builder);
+    }
+    
     std::shared_ptr<slam_plotter> slam_plot;
     if (options.count ("slam-plot")) {
         
@@ -168,31 +248,6 @@ int main (int argc, char* argv[]) {
         }
         
         data->add_timestep_listener (slam_plot);
-    }
-    
-    std::shared_ptr<time_series_plotter> likelihood_plot;
-    if (options.count ("plot-stats")) {
-        
-        likelihood_plot = std::make_shared<time_series_plotter> (300);
-        
-        if (mcmc_slam) {
-
-            likelihood_plot->add_data_source ([=](slam::timestep_type) {
-                return slam::slam_log_likelihood (*data, *mcmc_slam) - slam::slam_log_likelihood (*data, *ground_truth);
-            }, "MCMC-SLAM log likelihood", "lc rgbcolor 'green' lw 5");
-        }
-        
-        data->add_timestep_listener (likelihood_plot);
-    }
-    
-    /* set up simulation logging */
-    
-    boost::filesystem::path output_dir (options["output-dir"].as<std::string>());
-    boost::filesystem::create_directories (output_dir);
-    
-    {
-        boost::timer::auto_cpu_timer timer (3, "CPU Time: %t seconds\n\n");
-        data->add_dataset (*dataset, control_model_builder, observation_model_builder);
     }
     
     const double dataset_log_likelihood = slam::slam_log_likelihood (*data, *ground_truth);
@@ -284,6 +339,31 @@ int main (int argc, char* argv[]) {
 
         cluster_plot->completed();
     }
+
+    if (mcmc_slam && options.count("dump-data")) {
+      const std::string prefix = options["dump-data"].as<std::string>();
+      dump_data (*ground_truth, *mcmc_slam, prefix);
+    }
+
+    if (options.count("hmc")) {
+        auto hmc = std::make_shared<hmc_type>(data, *init, hmc_seed);
+        if (slam_plot) {
+            slam_plot->add_data_source (hmc, false, "HMC", "",
+                                        "lc rgbcolor 'red' pt 3 ps 3",
+                                        "lc rgbcolor 'red' lw 2",
+                                        "size 20,20,50 head filled lc rgbcolor 'red'");
+        }
+        if (slam_plot) slam_plot->completed();
+        for (int i = 1; i < 10; ++i) {
+            if (hmc->update(1e-10, 10)) {
+                std::cout << "ACCEPTED\n";
+            }
+            else {
+                std::cout << "REJECTED\n";
+            }
+            if (slam_plot) slam_plot->completed();
+        }
+    }
     
     return EXIT_SUCCESS;
     
@@ -310,12 +390,14 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     ("multi-mcmc", "enable Multi-MCMC-SLAM")
     ("fastslam", "enable FastSLAM 2.0")
     ("g2o", "enable offline SLAM using G2O")
+    ("hmc", "use Hamiltonian MCMC algorithm")
     ("cluster", "try to cluster MCMC-SLAM results")
     ("slam-plot", "produce SLAM gnuplot output")
     ("plot-stats", "produce plots of various summary statistics")
     ("learn-model", "learn observation and control models")
     ("learn-model-iterations", po::value<unsigned int>()->default_value(5),
      "number of iterations to use when learning control model")
+    ("dump-data", po::value<std::string>()->default_value(""), "dump MCMC-SLAM results")
     ("seed", po::value<unsigned int>(), "seed for global random number generator");
     
     const std::vector<std::pair<std::string, po::options_description>> module_options {
@@ -327,6 +409,7 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
         { "MCMC-SLAM", mcmc_slam_type::program_options() },
         { "Multi-MCMC", multi_mcmc_type::program_options() },
         { "G2O-SLAM", g2o_slam_type::program_options() },
+            //{ "HMC", hmc_type::program_options() },
         { "SLAM plot", slam_plotter::program_options() }
     };
     
@@ -389,7 +472,7 @@ boost::program_options::variables_map parse_options (int argc, char* argv[]) {
     return values;
 }
 
-
+/*
 void learn_model (const slam_dataset_type& dataset, const slam_result_type& ground_truth,
                   const boost::program_options::variables_map& options) {
     
@@ -416,5 +499,5 @@ void learn_model (const slam_dataset_type& dataset, const slam_result_type& grou
     }
     
 }
-
+*/
 

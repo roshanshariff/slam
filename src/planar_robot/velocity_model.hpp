@@ -38,8 +38,8 @@ namespace planar_robot {
             const double r = 0.5 * dp.distance_squared() / dp.y();
             
             if (std::isfinite(r)) {
-                const double theta = r >= 0 ? std::atan2 (dp.x(), r - dp.y()) : std::atan2 (-dp.x(), dp.y() - r);
-                return { r*theta, theta, wrap_angle(dp.bearing()-theta) };
+                const double alpha = r >= 0 ? std::atan2 (dp.x(), r - dp.y()) : std::atan2 (-dp.x(), dp.y() - r);
+                return { r*alpha, alpha, wrap_angle(dp.bearing()-alpha) };
             }
             else {
                 return { dp.x(), 0.0, dp.bearing() };
@@ -48,18 +48,69 @@ namespace planar_robot {
         
 	static auto inv_observe (const vector_type& control) -> associated_type {
             
-            const double v = control(0), w = control(1), g = control(2), r = v/w;
+            const double s = control(0), alpha = control(1), beta = control(2), r = s/alpha;
             
             if (std::isfinite(r)) {
-                return pose::cartesian (r*std::sin(w), r-r*std::cos(w), w+g);
+                return pose::cartesian (r*std::sin(alpha), r-r*std::cos(alpha), alpha+beta);
             }
             else {
-                return pose::cartesian (v, 0.0, g);
+                return pose::cartesian (s, 0.0, beta);
             }
 	}
         
-        static auto from_steering (double v, double w, double g = 0.0) -> vector_type {
-            return {v, w, g};
+        static auto obs_jacobian (const associated_type& dp) -> matrix_type {
+
+            const double x = dp.x(), y = dp.y();
+            const double ry = 0.5 * dp.distance_squared();
+            const double r = ry / y;
+            
+            Eigen::Matrix3d jacobian;
+            
+            if (std::isfinite(r)) {
+                const double alpha = r >= 0 ? std::atan2 (dp.x(), r - dp.y()) : std::atan2 (-dp.x(), dp.y() - r);
+                jacobian <<
+                    alpha*x/y - 1,  alpha*(1 - r/y)+(x/y),  0,
+                    -1/r,           x/ry,                   0,
+                    1/r,            -x/ry,                  1;
+            }
+            else {
+                jacobian <<
+                    1, 0,    0,
+                    0, 2/x,  0,
+                    0, -2/x, 1;
+            }
+            
+            return jacobian;
+        }
+        
+        static auto inv_obs_jacobian (const vector_type& control) -> matrix_type {
+
+            const double s = control(0), alpha = control(1);
+            const double inv_alpha = 1/alpha;
+            
+            Eigen::Matrix3d jacobian;
+
+            if (std::isfinite(inv_alpha)) {
+                const double r = s * inv_alpha;
+                const double sin_alpha = std::sin(alpha), cos_alpha = std::cos(alpha);
+                const double dx_ds = inv_alpha*sin_alpha, dy_ds = inv_alpha*(1 - cos_alpha);
+                jacobian <<
+                    dx_ds, r*(cos_alpha - dx_ds), 0,
+                    dy_ds, r*(sin_alpha - dy_ds), 0,
+                    0,     1,                     1;
+            }
+            else {
+                jacobian <<
+                    1, 0,   0,
+                    0, s/2, 0,
+                    0, 1,   1;
+            }
+
+            return jacobian;
+        }
+
+        static auto from_steering (double s, double alpha, double beta = 0.0) -> vector_type {
+            return {s, alpha, beta};
         }
         
         class proposal_dist {

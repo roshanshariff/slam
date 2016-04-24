@@ -182,14 +182,9 @@ namespace slam {
             return timestep_type(state_estimates.size());
         }
 
-        virtual state_type get_state (timestep_type t) const override {
-            assert (t <= current_timestep());
-            return state_estimates.accumulate(t);
-        }
-
         virtual feature_type get_feature (featureid_type id) const override {
             const feature_estimate& f = feature_estimates[feature_index.at(id)];
-            return get_state(f.parent_timestep) + f.estimate;
+            return this->get_state(f.parent_timestep) + f.estimate;
         }
 
         virtual const trajectory_type& get_trajectory () const override {
@@ -489,7 +484,7 @@ auto slam::mcmc_slam<ControlModel, ObservationModel>
 
         for (const auto& id_index : feature_index) {
             const feature_estimate& f = feature_estimates[id_index.second];
-            const feature_type obs = get_state(f.parent_timestep) + f.estimate;
+            const feature_type obs = this->get_state(f.parent_timestep) + f.estimate;
             map_estimate.emplace_hint (map_estimate.end(), id_index.first, obs);
         }
     }

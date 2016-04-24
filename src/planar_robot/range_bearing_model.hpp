@@ -40,6 +40,26 @@ namespace planar_robot {
         static auto inv_observe (const vector_type& obs) -> associated_type {
             return position::polar (obs(0), obs(1));
         }
+
+        static auto obs_jacobian (const associated_type& pos) -> matrix_type {
+            const double x = pos.x(), y = pos.y();
+            double r = pos.distance(), rsq = pos.distance_squared();
+            matrix_type jacobian;
+            jacobian <<
+                x/r,    y/r,
+                -y/rsq, x/rsq;
+            return jacobian;
+        }
+
+        static auto inv_obs_jacobian (const vector_type& obs) -> matrix_type {
+            const double r = obs(0), theta = obs(1);
+            const double cos_theta = std::cos(theta), sin_theta = std::sin(theta);
+            matrix_type jacobian;
+            jacobian <<
+                cos_theta, -r*sin_theta,
+                sin_theta, r*cos_theta;
+            return jacobian;
+        }
         
         auto more_accurate_than (const range_bearing_model& other) const -> bool {
             return std::abs(mean()(0)) < std::abs(other.mean()(0));

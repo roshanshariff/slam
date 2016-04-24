@@ -54,6 +54,8 @@ namespace planar_robot {
 	double distance () const { return translation.norm(); }
 	double direction () const { return std::atan2 (y(), x()); }
 	double distance_squared () const { return translation.squaredNorm(); }
+        const Eigen::Vector2d& get_translation () const { return translation; }
+        const Eigen::Rotation2Dd get_rotation () const { return rotation; }
         
 	vector_type to_vector () const { return { x(), y(), bearing() }; }
         

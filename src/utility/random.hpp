@@ -66,11 +66,13 @@ public:
     auto mean () const -> const vector_type& { return m_mean; }
     auto mean () -> vector_type& { return m_mean; }
     
-    auto chol_cov () const -> matrix_type { derived().chol_cov(); };
+    auto chol_cov () const -> matrix_type { return derived().chol_cov(); };
     
     void chol_cov_multiply (vector_type& v) const { derived().chol_cov_multiply(v); }
+    void chol_cov_trans_multiply (vector_type& v) const { derived(), chol_cov_trans_multiply(v); }
     
     void chol_cov_solve (vector_type& v) const { derived().chol_cov_solve(v); }
+    void chol_cov_trans_solve (vector_type& v) const { derived().chol_cov_trans_solve(v); }
     
     auto chol_cov_det () const -> double { return derived().chol_cov_det(); }
     
@@ -107,6 +109,13 @@ public:
         const double log_root_two_pi = 0.5 * std::log(2*boost::math::constants::pi<double>());
         return likelihood_exponent(x) - vector_dim*log_root_two_pi - chol_cov_log_det();
     }
+
+    auto grad_log_likelihood (vector_type x) const -> vector_type {
+        x = subtract(x, mean());
+        chol_cov_solve(x);
+        chol_cov_trans_solve(x);
+        return -x;
+    }
     
 };
 
@@ -138,8 +147,16 @@ public:
         v = m_chol_cov.template triangularView<Eigen::Lower>() * v;
     }
     
+    void chol_cov_trans_multiply (vector_type& v) const {
+        v = m_chol_cov.template triangularView<Eigen::Lower>().transpose() * v;
+    }
+    
     void chol_cov_solve (vector_type& v) const {
         m_chol_cov.template triangularView<Eigen::Lower>().solveInPlace(v);
+    }
+    
+    void chol_cov_trans_solve (vector_type& v) const {
+        m_chol_cov.template triangularView<Eigen::Lower>().transpose().solveInPlace(v);
     }
     
     auto chol_cov_det () const -> double {
@@ -226,8 +243,10 @@ public:
     auto chol_cov () const -> matrix_type { return m_stddev.asDiagonal(); }
     
     void chol_cov_multiply (vector_type& v) const { v.array() *= m_stddev.array(); }
+    void chol_cov_trans_multiply (vector_type& v) const { chol_cov_multiply(v); }
     
     void chol_cov_solve (vector_type& v) const { v.array() /= m_stddev.array(); }
+    void chol_cov_trans_solve (vector_type& v) const { chol_cov_solve(v); }
     
     auto chol_cov_det () const -> double { return m_stddev.array().prod(); }
     

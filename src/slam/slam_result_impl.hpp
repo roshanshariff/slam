@@ -17,11 +17,9 @@
 namespace slam {
     
     template <class State, class Feature>
-    class slam_result_impl : public virtual slam_result<State, Feature> {
+    struct slam_result_impl : public virtual slam_result<State, Feature> {
         
         using slam_result_type = slam_result<State, Feature>;
-
-    public:
         using typename slam_result_type::state_type;
         using typename slam_result_type::feature_type;
         using typename slam_result_type::trajectory_type;
@@ -64,14 +62,6 @@ namespace slam {
         
         virtual auto get_initial_state () const -> state_type override {
             return m_initial_state;
-        }
-        
-        virtual auto get_state (timestep_type t) const -> state_type override {
-            return get_initial_state() + m_trajectory.accumulate (t);
-        }
-        
-        virtual auto get_feature (featureid_type id) const -> feature_type override {
-            return m_map.at (id);
         }
         
         virtual auto get_trajectory () const -> const trajectory_type& override {

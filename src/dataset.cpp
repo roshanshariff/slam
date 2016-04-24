@@ -17,7 +17,7 @@
 auto read_range_only_data (boost::filesystem::path dir, const std::string& name)
 -> range_only_data_type {
 
-    using control_model_type = planar_robot::velocity_model;
+    using control_model_type = planar_robot::velocity_slip_model;
     using observation_model_type = planar_robot::range_only_model;
     
     using slam_result_impl_type = slam::slam_result_of_impl<control_model_type, observation_model_type>;
@@ -62,7 +62,7 @@ auto read_range_only_data (boost::filesystem::path dir, const std::string& name)
     {
         boost::filesystem::ifstream input_DR (dir/name/(name+"_DR.txt"));
         double timestamp, prev_timestamp = start_timestamp;
-        control_model_type::vector_type control;
+        control_model_type::vector_type control; control.setZero();
         
         while (input_DR >> timestamp >> control(0) >> control(1)) {
             const double dt = timestamp - prev_timestamp;

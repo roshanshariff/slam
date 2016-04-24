@@ -22,7 +22,7 @@
 #include "slam/interfaces.hpp"
 
 using range_only_data_type = std::tuple<
-std::shared_ptr<slam::dataset<planar_robot::velocity_model, planar_robot::range_only_model>>,
+std::shared_ptr<slam::dataset<planar_robot::velocity_slip_model, planar_robot::range_only_model>>,
 std::shared_ptr<slam::slam_result<planar_robot::pose, planar_robot::position>>
 >;
 

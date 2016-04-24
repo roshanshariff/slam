@@ -80,8 +80,14 @@ namespace slam {
         
         virtual auto get_initial_state () const -> state_type { return state_type(); };
         
-        virtual auto get_state (timestep_type) const -> state_type = 0;
-        virtual auto get_feature (featureid_type) const -> feature_type = 0;
+        virtual auto get_state (timestep_type t) const -> state_type {
+            assert (t <= current_timestep());
+            return get_initial_state() + get_trajectory().accumulate(t);
+        }
+        
+        virtual auto get_feature (featureid_type id) const -> feature_type {
+            return get_feature_map().at(id);
+        };
 
         virtual auto get_trajectory () const -> const trajectory_type& = 0;
         virtual auto get_feature_map () const -> const feature_map_type& = 0;
